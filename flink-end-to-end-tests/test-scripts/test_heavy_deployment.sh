@@ -45,4 +45,4 @@ $FLINK_DIR/bin/flink run ${TEST_PROGRAM_JAR} \
 --environment.max_parallelism 1024 --environment.parallelism 100 \
 --environment.restart_strategy fixed_delay --environment.restart_strategy.fixed_delay.attempts 3 \
 --state_backend.checkpoint_directory ${CHECKPOINT_DIR} \
---heavy_deployment_test.num_list_states_per_op "$1" --heavy_deployment_test.num_partitions_per_list_state "$1"
+--heavy_deployment_test.num_list_states_per_op 40 --heavy_deployment_test.num_partitions_per_list_state 40
