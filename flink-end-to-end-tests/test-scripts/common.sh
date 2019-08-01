@@ -417,7 +417,7 @@ function wait_for_job_state_transition {
   local job=$1
   local initial_state=$2
   local next_state=$3
-    
+
   echo "Waiting for job ($job) to switch from state ${initial_state} to state ${next_state} ..."
 
   while : ; do
