@@ -34,7 +34,7 @@ set_config_key "taskmanager.network.memory.max" "8mb"
 set_config_key "taskmanager.network.request-backoff.max" "60000"
 set_config_key "taskmanager.memory.segment-size" "8kb"
 
-set_config_key "taskmanager.numberOfTaskSlots" "10" # 10 slots per TM
+set_config_key "taskmanager.numberOfTaskSlots" "5" # 10 slots per TM
 
 start_cluster # this also starts 1TM
 start_taskmanagers 9 # 1TM + 9TM = 10TM a 10 slots = 100 slots
@@ -42,7 +42,7 @@ start_taskmanagers 9 # 1TM + 9TM = 10TM a 10 slots = 100 slots
 # This call will result in a deployment with state meta data of 100 x 100 x 40 union states x each 40 entries.
 # We can scale up the numbers to make the test even heavier.
 $FLINK_DIR/bin/flink run ${TEST_PROGRAM_JAR} \
---environment.max_parallelism 1024 --environment.parallelism 100 \
+--environment.max_parallelism 1024 --environment.parallelism 50 \
 --environment.restart_strategy fixed_delay --environment.restart_strategy.fixed_delay.attempts 3 \
 --state_backend.checkpoint_directory ${CHECKPOINT_DIR} \
 --heavy_deployment_test.num_list_states_per_op 40 --heavy_deployment_test.num_partitions_per_list_state 40
