@@ -26,7 +26,7 @@ TEST_PROGRAM_NAME=HeavyDeploymentStressTestProgram
 TEST_PROGRAM_JAR=${END_TO_END_DIR}/$TEST/target/$TEST_PROGRAM_NAME.jar
 
 set_config_key "containerized.heap-cutoff-min" "100"
-set_config_key "taskmanager.heap.size" "1024m" # 512Mb x 10TMs = 5Gb total heap
+set_config_key "taskmanager.heap.size" "512m" # 512Mb x 10TMs = 5Gb total heap
 
 set_config_key "jobmanager.heap.size" "2048m"
 
