@@ -61,6 +61,8 @@ function post_test_validation {
 
     local time_elapsed=$(end_timer)
 
+    check_logs_for_non_empty_out_files
+
     if [[ "${skip_check_exceptions}" != "skip_check_exceptions" ]]; then
         check_logs_for_errors
         check_logs_for_exceptions
