@@ -34,7 +34,7 @@ set_config_key "taskmanager.network.memory.max" "8mb"
 set_config_key "taskmanager.network.request-backoff.max" "60000"
 set_config_key "taskmanager.memory.segment-size" "8kb"
 
-set_config_key "taskmanager.numberOfTaskSlots" "5" # 10 slots per TM
+set_config_key "taskmanager.numberOfTaskSlots" "10" # 10 slots per TM
 
 set_config_key "env.java.opts.jobmanager" "-XX:+PrintGCDetails -XX:+PrintGCDateStamps"
 set_config_key "env.java.opts.taskmanager" "-XX:+PrintGCDetails -XX:+PrintGCDateStamps"
