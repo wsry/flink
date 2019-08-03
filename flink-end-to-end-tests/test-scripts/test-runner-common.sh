@@ -63,13 +63,13 @@ function post_test_validation {
 
     check_logs_for_non_empty_out_files
 
-    if [[ "${skip_check_exceptions}" != "skip_check_exceptions" ]]; then
-        check_logs_for_errors
-        check_logs_for_exceptions
-        check_logs_for_non_empty_out_files
-    else
-        echo "Checking of logs skipped."
-    fi
+#    if [[ "${skip_check_exceptions}" != "skip_check_exceptions" ]]; then
+#        check_logs_for_errors
+#        check_logs_for_exceptions
+#        check_logs_for_non_empty_out_files
+#    else
+#        echo "Checking of logs skipped."
+#    fi
 
     # Investigate exit_code for failures of test executable as well as EXIT_CODE for failures of the test.
     # Do not clean up if either fails.

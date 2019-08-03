@@ -78,6 +78,281 @@ jobs:
       script: ./tools/travis/nightly.sh split_heavy.sh
       name: heavy - hadoop 2.8
     - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
+      stage: E2E
+      env: PROFILE="-Dinclude-hadoop -Dhadoop.version=2.8.3 -Dinclude-kinesis -Dscala-2.11"
+      script: ./flink-end-to-end-tests/run-single-test.sh ./flink-end-to-end-tests/test-scripts/test_heavy_deployment.sh
+      name: heavy - hadoop 2.8
+    - if: type in (pull_request, push)
       stage: cleanup
       script: ./tools/travis_controller.sh cleanup
       env: PROFILE="-Dhadoop.version=2.8.3 -Pinclude-kinesis -Dscala-2.11"
