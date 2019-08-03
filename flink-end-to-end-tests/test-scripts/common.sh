@@ -378,7 +378,14 @@ function check_logs_for_exceptions {
 
 function check_logs_for_non_empty_out_files {
   echo "Checking for non-empty .out files..."
-  for file in `ls $FLINK_DIR/log/`
+  for file in `ls $FLINK_DIR/log/*.out`
+  do
+    echo "########################################################################################"
+    echo $file
+    echo "########################################################################################"
+    cat $FLINK_DIR/log/$file
+  done
+  for file in `ls $FLINK_DIR/log/flink-travis-standalonesession*.log`
   do
     echo "########################################################################################"
     echo $file
