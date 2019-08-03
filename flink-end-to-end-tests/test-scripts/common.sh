@@ -383,14 +383,14 @@ function check_logs_for_non_empty_out_files {
     echo "########################################################################################"
     echo $file
     echo "########################################################################################"
-    cat $FLINK_DIR/log/$file
+    cat $file
   done
   for file in `ls $FLINK_DIR/log/flink-travis-standalonesession*.log`
   do
     echo "########################################################################################"
     echo $file
     echo "########################################################################################"
-    cat $FLINK_DIR/log/$file
+    cat $file
   done
   rm -rf $FLINK_DIR/log/*
 #  cat $FLINK_DIR/log/*.out
