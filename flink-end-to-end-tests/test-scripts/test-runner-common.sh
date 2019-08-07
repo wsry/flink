@@ -48,10 +48,10 @@ function run_test {
     }
     trap 'test_error' ERR
 
-    free -mh
-    cat /proc/cpuinfo
-    df -h
-    top -bn 10 -i -c
+    #free -mh
+    #cat /proc/cpuinfo
+    #df -h
+    #top -bn 10 -i -c
 
     ${command}
     exit_code="$?"
