@@ -50,7 +50,8 @@ function run_test {
 
     free -mh
     cat /proc/cpuinfo
-    iostat -m 1 10
+    df -h
+    top -bn 10 -i -c
 
     ${command}
     exit_code="$?"
