@@ -48,6 +48,10 @@ function run_test {
     }
     trap 'test_error' ERR
 
+    free -mh
+    cat /proc/cpuinfo
+    iostat -m 1 10
+
     ${command}
     exit_code="$?"
     post_test_validation ${exit_code} "$description" "$skip_check_exceptions"
