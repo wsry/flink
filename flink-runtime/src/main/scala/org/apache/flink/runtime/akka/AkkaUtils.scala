@@ -261,6 +261,31 @@ object AkkaUtils {
     val supervisorStrategy = classOf[StoppingSupervisorWithoutLoggingActorKilledExceptionStrategy]
       .getCanonicalName
 
+    val akkaSerializers =
+      """
+        | serializers {
+        |   kryo = "org.apache.flink.runtime.akka.serializer.AkkaKryoSerializer"
+        | }
+      """.stripMargin
+
+    val akkaSerializationBindings =
+      """
+        | serialization-bindings {
+        |   "org.apache.flink.runtime.jobmaster.JMTMRegistrationSuccess" = kryo
+        |   "org.apache.flink.runtime.rpc.messages.RemoteHandshakeMessage" = kryo
+        |   "org.apache.flink.runtime.rpc.messages.HandshakeSuccessMessage" = kryo
+        |   "org.apache.flink.runtime.taskexecutor.TaskExecutorRegistrationSuccess" = kryo
+        |   "org.apache.flink.runtime.messages.Acknowledge" = kryo
+        |   "org.apache.flink.util.SerializedValue" = kryo
+        |   "org.apache.flink.runtime.rpc.messages.RemoteRpcInvocation" = kryo
+        |   "org.apache.flink.runtime.rpc.messages.RemoteFencedMessage" = kryo
+        |   "org.apache.flink.runtime.registration.RegistrationResponse" = kryo
+        |   "org.apache.flink.runtime.registration.RegistrationResponse$Decline" = kryo
+        |   "org.apache.flink.runtime.registration.RegistrationResponse$Success" = kryo
+        |   "java.util.ArrayList" = kryo
+        | }
+      """.stripMargin
+
     val config =
       s"""
         |akka {
@@ -283,7 +308,11 @@ object AkkaUtils {
         | actor {
         |   guardian-supervisor-strategy = $supervisorStrategy
         |
-        |   warn-about-java-serializer-usage = off
+        |   warn-about-java-serializer-usage = on
+        |   akka.actor.allow-java-serialization = off
+        |
+        |   $akkaSerializers
+        |   $akkaSerializationBindings
         |
         |   default-dispatcher {
         |     throughput = $akkaThroughput
