@@ -251,7 +251,7 @@ public class MesosResourceManagerTest extends TestLogger {
 		public Protos.TaskID task3 = Protos.TaskID.newBuilder().setValue("taskmanager-00003").build();
 
 		// task executors
-		SlotReport slotReport = new SlotReport();
+		SlotReport slotReport = new SlotReport(Collections.emptyList());
 		public MockTaskExecutor task1Executor;
 		public MockTaskExecutor task2Executor;
 		public MockTaskExecutor task3Executor;

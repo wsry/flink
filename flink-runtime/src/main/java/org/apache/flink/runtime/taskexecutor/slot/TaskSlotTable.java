@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -91,13 +91,13 @@ public class TaskSlotTable implements TimeoutListener<AllocationID> {
 
 		this.timerService = Preconditions.checkNotNull(timerService);
 
-		taskSlots = Arrays.asList(new TaskSlot[numberSlots]);
+		taskSlots = new ArrayList<>(numberSlots);
 
 		int index = 0;
 
 		// create the task slots for the given resource profiles
 		for (ResourceProfile resourceProfile: resourceProfiles) {
-			taskSlots.set(index, new TaskSlot(index, resourceProfile));
+			taskSlots.add(new TaskSlot(index, resourceProfile));
 			++index;
 		}
 
@@ -156,7 +156,7 @@ public class TaskSlotTable implements TimeoutListener<AllocationID> {
 	public SlotReport createSlotReport(ResourceID resourceId) {
 		final int numberSlots = taskSlots.size();
 
-		List<SlotStatus> slotStatuses = Arrays.asList(new SlotStatus[numberSlots]);
+		List<SlotStatus> slotStatuses = new ArrayList<>(numberSlots);
 
 		for (int i = 0; i < numberSlots; i++) {
 			TaskSlot taskSlot = taskSlots.get(i);
@@ -168,7 +168,7 @@ public class TaskSlotTable implements TimeoutListener<AllocationID> {
 				taskSlot.getJobId(),
 				taskSlot.getAllocationId());
 
-			slotStatuses.set(i, slotStatus);
+			slotStatuses.add(slotStatus);
 		}
 
 		final SlotReport slotReport = new SlotReport(slotStatuses);

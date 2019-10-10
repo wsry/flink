@@ -418,7 +418,7 @@ public class TaskExecutorTest extends TestLogger {
 		rpc.registerGateway(rmAddress, rmGateway);
 
 		final TaskSlotTable taskSlotTable = mock(TaskSlotTable.class);
-		final SlotReport slotReport = new SlotReport();
+		final SlotReport slotReport = new SlotReport(Collections.emptyList());
 		when(taskSlotTable.createSlotReport(any(ResourceID.class))).thenReturn(slotReport);
 
 		HeartbeatServices heartbeatServices = new HeartbeatServices(heartbeatInterval, heartbeatTimeout);
@@ -599,7 +599,7 @@ public class TaskExecutorTest extends TestLogger {
 		rpc.registerGateway(address2, rmGateway2);
 
 		final TaskSlotTable taskSlotTable = mock(TaskSlotTable.class);
-		final SlotReport slotReport = new SlotReport();
+		final SlotReport slotReport = new SlotReport(Collections.emptyList());
 		when(taskSlotTable.createSlotReport(any(ResourceID.class))).thenReturn(slotReport);
 
 		final TaskExecutorLocalStateStoresManager localStateStoresManager = createTaskExecutorLocalStateStoresManager();

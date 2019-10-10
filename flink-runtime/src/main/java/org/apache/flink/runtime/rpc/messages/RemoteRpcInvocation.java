@@ -18,8 +18,8 @@
 
 package org.apache.flink.runtime.rpc.messages;
 
+import org.apache.flink.runtime.rpc.serializer.RpcSerializationUtil;
 import org.apache.flink.util.Preconditions;
-import org.apache.flink.util.SerializedValue;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -38,7 +38,7 @@ public class RemoteRpcInvocation implements RpcInvocation, Serializable {
 	private static final long serialVersionUID = 6179354390913843809L;
 
 	// Serialized invocation data
-	private SerializedValue<RemoteRpcInvocation.MethodInvocation> serializedMethodInvocation;
+	private byte[] serializedMethodInvocation;
 
 	// Transient field which is lazily initialized upon first access to the invocation data
 	private transient RemoteRpcInvocation.MethodInvocation methodInvocation;
@@ -50,7 +50,8 @@ public class RemoteRpcInvocation implements RpcInvocation, Serializable {
 		final Class<?>[] parameterTypes,
 		final Object[] args) throws IOException {
 
-		serializedMethodInvocation = new SerializedValue<>(new RemoteRpcInvocation.MethodInvocation(methodName, parameterTypes, args));
+		serializedMethodInvocation = RpcSerializationUtil.serialize(
+			new RemoteRpcInvocation.MethodInvocation(methodName, parameterTypes, args));
 		methodInvocation = null;
 	}
 
@@ -110,12 +111,12 @@ public class RemoteRpcInvocation implements RpcInvocation, Serializable {
 	 * @return Size of the remote rpc invocation message
 	 */
 	public long getSize() {
-		return serializedMethodInvocation.getByteArray().length;
+		return serializedMethodInvocation.length;
 	}
 
 	private void deserializeMethodInvocation() throws IOException, ClassNotFoundException {
 		if (methodInvocation == null) {
-			methodInvocation = serializedMethodInvocation.deserializeValue(ClassLoader.getSystemClassLoader());
+			methodInvocation = RpcSerializationUtil.deserialize(serializedMethodInvocation);
 		}
 	}
 
@@ -129,7 +130,7 @@ public class RemoteRpcInvocation implements RpcInvocation, Serializable {
 
 	@SuppressWarnings("unchecked")
 	private void readObject(ObjectInputStream ois) throws IOException, ClassNotFoundException {
-		serializedMethodInvocation = (SerializedValue<RemoteRpcInvocation.MethodInvocation>) ois.readObject();
+		serializedMethodInvocation = (byte[]) ois.readObject();
 		methodInvocation = null;
 	}
 
