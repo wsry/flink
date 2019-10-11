@@ -155,6 +155,17 @@ public class AkkaOptions {
 		.defaultValue(50L)
 		.withDescription("Milliseconds a gate should be closed for after a remote connection was disconnected.");
 
+	/**
+	 * Type of serializer to be used by rpc message serialization. The default value is JAVA_INTERNAL,
+	 * another option is FAST_SERIALIZATION, which is faster than the java internal serialization method.
+	 */
+	public static final ConfigOption<String> RPC_SERIALIZER_TYPE = ConfigOptions
+		.key("akka.rpc.serializer-type")
+		.defaultValue("JAVA_INTERNAL")
+		.withDescription("Type of serializer to be used by rpc message serialization. " +
+			"The default value is JAVA_INTERNAL, another option is FAST_SERIALIZATION, " +
+			"which is faster than the java internal serialization method.");
+
 	// ==================================================
 	// Configurations for fork-join-executor.
 	// ==================================================

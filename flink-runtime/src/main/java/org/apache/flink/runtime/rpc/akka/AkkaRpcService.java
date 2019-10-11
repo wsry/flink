@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.rpc.akka;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.AkkaOptions;
 import org.apache.flink.runtime.akka.AkkaUtils;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.concurrent.ScheduledExecutor;
@@ -34,6 +35,7 @@ import org.apache.flink.runtime.rpc.RpcUtils;
 import org.apache.flink.runtime.rpc.exceptions.RpcConnectionException;
 import org.apache.flink.runtime.rpc.messages.HandshakeSuccessMessage;
 import org.apache.flink.runtime.rpc.messages.RemoteHandshakeMessage;
+import org.apache.flink.runtime.rpc.serializer.RpcSerializationUtil;
 
 import akka.actor.ActorIdentity;
 import akka.actor.ActorRef;
@@ -107,6 +109,10 @@ public class AkkaRpcService implements RpcService {
 	public AkkaRpcService(final ActorSystem actorSystem, final AkkaRpcServiceConfiguration configuration) {
 		this.actorSystem = checkNotNull(actorSystem, "actor system");
 		this.configuration = checkNotNull(configuration, "akka rpc service configuration");
+
+		// set the type of serializer to be used by rpc message serialization
+		final String serializerType = configuration.getConfiguration().getString(AkkaOptions.RPC_SERIALIZER_TYPE);
+		RpcSerializationUtil.serializerType = RpcSerializationUtil.RpcSerializerType.valueOf(serializerType);
 
 		Address actorSystemAddress = AkkaUtils.getAddress(actorSystem);
 
