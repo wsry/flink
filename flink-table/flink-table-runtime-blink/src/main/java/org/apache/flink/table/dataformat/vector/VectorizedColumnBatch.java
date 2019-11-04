@@ -123,7 +123,10 @@ public class VectorizedColumnBatch implements Serializable {
 			return null;
 		}
 
-		if (Decimal.is32BitDecimal(precision)) {
+		ColumnVector column = columns[colId];
+		if (column instanceof DecimalColumnVector) {
+			return ((DecimalColumnVector) column).getDecimal(rowId, precision, scale);
+		} else if (Decimal.is32BitDecimal(precision)) {
 			return Decimal.fromUnscaledLong(precision, scale, getInt(rowId, colId));
 		} else if (Decimal.is64BitDecimal(precision)) {
 			return Decimal.fromUnscaledLong(precision, scale, getLong(rowId, colId));
