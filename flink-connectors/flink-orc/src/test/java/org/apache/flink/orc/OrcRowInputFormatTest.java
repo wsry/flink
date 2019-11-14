@@ -996,7 +996,7 @@ public class OrcRowInputFormatTest {
 		assertEquals(5000, cnt);
 	}
 
-	private String getPath(String fileName) {
-		return getClass().getClassLoader().getResource(fileName).getPath();
+	static String getPath(String fileName) {
+		return OrcRowInputFormatTest.class.getClassLoader().getResource(fileName).getPath();
 	}
 }
