@@ -130,7 +130,7 @@ public class HiveTableSource implements StreamTableSource<BaseRow>, Partitionabl
 			}
 			source.setParallelism(Math.min(Math.max(1, splitNum), max));
 		}
-		return source;
+		return source.name(explainSource());
 	}
 
 	private HiveTableInputFormat getInputFormat() {
