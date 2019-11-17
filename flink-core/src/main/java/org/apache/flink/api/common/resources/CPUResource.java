@@ -23,25 +23,25 @@ import org.apache.flink.annotation.Internal;
 import java.math.BigDecimal;
 
 /**
- * The GPU resource.
+ * Represents CPU resource.
  */
 @Internal
-public class GPUResource extends Resource {
+public class CPUResource extends Resource {
 
-	private static final long serialVersionUID = -2276080061777135142L;
+	private static final long serialVersionUID = 7228645888210984393L;
 
-	public static final String NAME = "GPU";
+	public static final String NAME = "CPU";
 
-	public GPUResource(double value) {
+	public CPUResource(double value) {
 		super(NAME, value);
 	}
 
-	private GPUResource(BigDecimal value) {
+	private CPUResource(BigDecimal value) {
 		super(NAME, value);
 	}
 
 	@Override
 	public Resource create(BigDecimal value) {
-		return new GPUResource(value);
+		return new CPUResource(value);
 	}
 }
