@@ -144,6 +144,20 @@ public class BytesHashMap {
 	public BytesHashMap(
 			final Object owner,
 			MemoryManager memoryManager,
+			double memFraction,
+			LogicalType[] keyTypes,
+			LogicalType[] valueTypes) {
+		this(
+				owner,
+				memoryManager,
+				memoryManager.computeNumberOfPages(memFraction) * memoryManager.getPageSize(),
+				keyTypes,
+				valueTypes);
+	}
+
+	public BytesHashMap(
+			final Object owner,
+			MemoryManager memoryManager,
 			long memorySize,
 			LogicalType[] keyTypes,
 			LogicalType[] valueTypes) {

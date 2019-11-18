@@ -292,7 +292,7 @@ public class String2HashJoinOperatorTest implements Serializable {
 
 	private HashJoinOperator newOperator(long memorySize, HashJoinType type, boolean reverseJoinFunction) {
 		return HashJoinOperator.newHashJoinOperator(
-				memorySize, memorySize, 0, type,
+				type,
 				new GeneratedJoinCondition("", "", new Object[0]) {
 					@Override
 					public JoinCondition newInstance(ClassLoader classLoader) {

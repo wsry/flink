@@ -19,6 +19,7 @@
 package org.apache.flink.table.runtime.operators.sort;
 
 import org.apache.flink.metrics.Gauge;
+import org.apache.flink.runtime.memory.MemoryManager;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -74,8 +75,13 @@ public class SortOperator extends TableStreamOperator<BinaryRow>
 		RecordComparator comparator = gComparator.newInstance(cl);
 		gComputer = null;
 		gComparator = null;
+
+		double memFraction = getOperatorConfig().getManagedMemoryFractionOnHeap() +
+				getOperatorConfig().getManagedMemoryFractionOffHeap();
+
+		MemoryManager memManager = getContainingTask().getEnvironment().getMemoryManager();
 		this.sorter = new BinaryExternalSorter(this.getContainingTask(),
-				getContainingTask().getEnvironment().getMemoryManager(), reservedMemorySize,
+				memManager, memManager.computeNumberOfPages(memFraction) * memManager.getPageSize(),
 				this.getContainingTask().getEnvironment().getIOManager(), inputSerializer,
 				binarySerializer, computer, comparator, getContainingTask().getJobConfiguration());
 		this.sorter.startThreads();

@@ -158,16 +158,23 @@ public class SortMergeJoinOperator extends TableStreamOperator<BaseRow>
 		this.memManager = this.getContainingTask().getEnvironment().getMemoryManager();
 		this.ioManager = this.getContainingTask().getEnvironment().getIOManager();
 
+		double memFraction = getOperatorConfig().getManagedMemoryFractionOnHeap() +
+				getOperatorConfig().getManagedMemoryFractionOffHeap();
+		long totalMem = (memManager.computeNumberOfPages(memFraction) * memManager.getPageSize()) - externalBufferMemory;
+		double total = reservedSortMemory1 + reservedSortMemory2;
+		long realMem1 = (long) (totalMem * (reservedSortMemory1 / total));
+		long realMem2 = (long) (totalMem * (reservedSortMemory2 / total));
+
 		// sorter1
 		this.sorter1 = new BinaryExternalSorter(this.getContainingTask(),
-				memManager, reservedSortMemory1,
+				memManager, realMem1,
 				ioManager, inputSerializer1, serializer1,
 				computer1.newInstance(cl), comparator1.newInstance(cl), conf);
 		this.sorter1.startThreads();
 
 		// sorter2
 		this.sorter2 = new BinaryExternalSorter(this.getContainingTask(),
-				memManager, reservedSortMemory2, ioManager, inputSerializer2, serializer2,
+				memManager, realMem2, ioManager, inputSerializer2, serializer2,
 				computer2.newInstance(cl), comparator2.newInstance(cl), conf);
 		this.sorter2.startThreads();
 
