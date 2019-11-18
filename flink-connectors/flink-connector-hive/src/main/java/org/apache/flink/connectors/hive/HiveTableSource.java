@@ -45,6 +45,8 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.sql.Date;
@@ -63,6 +65,8 @@ import static org.apache.flink.table.utils.TableConnectorUtils.generateRuntimeNa
  * A TableSource implementation to read data from Hive tables.
  */
 public class HiveTableSource implements StreamTableSource<BaseRow>, PartitionableTableSource, ProjectableTableSource<BaseRow> {
+
+	private static final Logger LOG = LoggerFactory.getLogger(HiveTableSource.class);
 
 	private final JobConf jobConf;
 	private final ObjectPath tablePath;
@@ -124,7 +128,14 @@ public class HiveTableSource implements StreamTableSource<BaseRow>, Partitionabl
 			int max = conf.getInteger(TABLE_EXEC_HIVE_INFER_SOURCE_PARALLELISM_MAX);
 			int splitNum;
 			try {
+				long nano1 = System.nanoTime();
 				splitNum = inputFormat.createInputSplits(0).length;
+				long nano2 = System.nanoTime();
+				String msg = String.format("Hive source(%s) createInputSplits use time: %d ms",
+						tablePath, (nano2 - nano1) / 1000_000);
+				LOG.info(msg);
+				LOG.debug(msg);
+				System.out.println(msg);
 			} catch (IOException e) {
 				throw new FlinkHiveException(e);
 			}
