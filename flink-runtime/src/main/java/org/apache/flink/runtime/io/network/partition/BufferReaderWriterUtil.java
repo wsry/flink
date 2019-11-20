@@ -44,9 +44,13 @@ final class BufferReaderWriterUtil {
 
 	static final int HEADER_LENGTH = 8;
 
-	static final int HEADER_VALUE_IS_BUFFER = 0;
+	private static final short HEADER_VALUE_IS_BUFFER = 0;
 
-	static final int HEADER_VALUE_IS_EVENT = 1;
+	private static final short HEADER_VALUE_IS_EVENT = 1;
+
+	private static final short BUFFER_IS_COMPRESSED = 1;
+
+	private static final short BUFFER_IS_NOT_COMPRESSED = 0;
 
 	// ------------------------------------------------------------------------
 	//  ByteBuffer read / write
@@ -59,7 +63,8 @@ final class BufferReaderWriterUtil {
 			return false;
 		}
 
-		memory.putInt(buffer.isBuffer() ? HEADER_VALUE_IS_BUFFER : HEADER_VALUE_IS_EVENT);
+		memory.putShort(buffer.isBuffer() ? HEADER_VALUE_IS_BUFFER : HEADER_VALUE_IS_EVENT);
+		memory.putShort(buffer.isCompressed() ? BUFFER_IS_COMPRESSED : BUFFER_IS_NOT_COMPRESSED);
 		memory.putInt(bufferSize);
 		memory.put(buffer.getNioBufferReadable());
 		return true;
@@ -76,7 +81,8 @@ final class BufferReaderWriterUtil {
 			return null;
 		}
 
-		final int header = memory.getInt();
+		final boolean isEvent = memory.getShort() == HEADER_VALUE_IS_EVENT;
+		final boolean isCompressed = memory.getShort() == BUFFER_IS_COMPRESSED;
 		final int size = memory.getInt();
 
 		memory.limit(memory.position() + size);
@@ -90,7 +96,8 @@ final class BufferReaderWriterUtil {
 				memorySegment,
 				FreeingBufferRecycler.INSTANCE,
 				size,
-				header == HEADER_VALUE_IS_EVENT);
+				isEvent,
+				isCompressed);
 	}
 
 	// ------------------------------------------------------------------------
@@ -104,7 +111,8 @@ final class BufferReaderWriterUtil {
 
 		final ByteBuffer headerBuffer = arrayWithHeaderBuffer[0];
 		headerBuffer.clear();
-		headerBuffer.putInt(buffer.isBuffer() ? HEADER_VALUE_IS_BUFFER : HEADER_VALUE_IS_EVENT);
+		headerBuffer.putShort(buffer.isBuffer() ? HEADER_VALUE_IS_BUFFER : HEADER_VALUE_IS_EVENT);
+		headerBuffer.putShort(buffer.isCompressed() ? BUFFER_IS_COMPRESSED : BUFFER_IS_NOT_COMPRESSED);
 		headerBuffer.putInt(buffer.getSize());
 		headerBuffer.flip();
 
@@ -150,11 +158,13 @@ final class BufferReaderWriterUtil {
 		headerBuffer.flip();
 
 		final ByteBuffer targetBuf;
-		final int header;
+		final boolean isEvent;
+		final boolean isCompressed;
 		final int size;
 
 		try {
-			header = headerBuffer.getInt();
+			isEvent = headerBuffer.getShort() == HEADER_VALUE_IS_EVENT;
+			isCompressed = headerBuffer.getShort() == BUFFER_IS_COMPRESSED;
 			size = headerBuffer.getInt();
 			targetBuf = memorySegment.wrap(0, size);
 		}
@@ -167,7 +177,7 @@ final class BufferReaderWriterUtil {
 
 		readByteBufferFully(channel, targetBuf);
 
-		return bufferFromMemorySegment(memorySegment, bufferRecycler, size, header == HEADER_VALUE_IS_EVENT);
+		return bufferFromMemorySegment(memorySegment, bufferRecycler, size, isEvent, isCompressed);
 	}
 
 	static ByteBuffer allocatedHeaderBuffer() {
@@ -232,7 +242,8 @@ final class BufferReaderWriterUtil {
 			MemorySegment memorySegment,
 			BufferRecycler memorySegmentRecycler,
 			int size,
-			boolean isEvent) {
+			boolean isEvent,
+			boolean isCompressed) {
 
 		final Buffer buffer = new NetworkBuffer(memorySegment, memorySegmentRecycler);
 		buffer.setSize(size);
@@ -240,6 +251,8 @@ final class BufferReaderWriterUtil {
 		if (isEvent) {
 			buffer.tagAsEvent();
 		}
+
+		buffer.setCompressed(isCompressed);
 
 		return buffer;
 	}

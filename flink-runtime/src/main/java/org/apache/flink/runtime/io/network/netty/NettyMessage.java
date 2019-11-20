@@ -311,14 +311,18 @@ public abstract class NettyMessage {
 
 		final boolean isBuffer;
 
+		final boolean isCompressed;
+
 		private BufferResponse(
 				ByteBuf buffer,
 				boolean isBuffer,
+				boolean isCompressed,
 				int sequenceNumber,
 				InputChannelID receiverId,
 				int backlog) {
 			this.buffer = checkNotNull(buffer);
 			this.isBuffer = isBuffer;
+			this.isCompressed = isCompressed;
 			this.sequenceNumber = sequenceNumber;
 			this.receiverId = checkNotNull(receiverId);
 			this.backlog = backlog;
@@ -331,6 +335,7 @@ public abstract class NettyMessage {
 				int backlog) {
 			this.buffer = checkNotNull(buffer).asByteBuf();
 			this.isBuffer = buffer.isBuffer();
+			this.isCompressed = buffer.isCompressed();
 			this.sequenceNumber = sequenceNumber;
 			this.receiverId = checkNotNull(receiverId);
 			this.backlog = backlog;
@@ -338,6 +343,10 @@ public abstract class NettyMessage {
 
 		boolean isBuffer() {
 			return isBuffer;
+		}
+
+		boolean isCompressed() {
+			return isCompressed;
 		}
 
 		ByteBuf getNettyBuffer() {
@@ -354,8 +363,8 @@ public abstract class NettyMessage {
 
 		@Override
 		ByteBuf write(ByteBufAllocator allocator) throws IOException {
-			// receiver ID (16), sequence number (4), backlog (4), isBuffer (1), buffer size (4)
-			final int messageHeaderLength = 16 + 4 + 4 + 1 + 4;
+			// receiver ID (16), sequence number (4), backlog (4), isBuffer (1), isCompressed (1), buffer size (4)
+			final int messageHeaderLength = 16 + 4 + 4 + 1 + 1 + 4;
 
 			ByteBuf headerBuf = null;
 			try {
@@ -371,6 +380,7 @@ public abstract class NettyMessage {
 				headerBuf.writeInt(sequenceNumber);
 				headerBuf.writeInt(backlog);
 				headerBuf.writeBoolean(isBuffer);
+				headerBuf.writeBoolean(isCompressed);
 				headerBuf.writeInt(buffer.readableBytes());
 
 				CompositeByteBuf composityBuf = allocator.compositeDirectBuffer();
@@ -396,10 +406,11 @@ public abstract class NettyMessage {
 			int sequenceNumber = buffer.readInt();
 			int backlog = buffer.readInt();
 			boolean isBuffer = buffer.readBoolean();
+			boolean isCompressed = buffer.readBoolean();
 			int size = buffer.readInt();
 
 			ByteBuf retainedSlice = buffer.readSlice(size).retain();
-			return new BufferResponse(retainedSlice, isBuffer, sequenceNumber, receiverId, backlog);
+			return new BufferResponse(retainedSlice, isBuffer, isCompressed, sequenceNumber, receiverId, backlog);
 		}
 	}
 

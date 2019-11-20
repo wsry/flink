@@ -20,8 +20,10 @@ package org.apache.flink.runtime.io.network.partition;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.deployment.ResultPartitionDeploymentDescriptor;
+import org.apache.flink.runtime.io.compression.BlockCompressionFactory;
 import org.apache.flink.runtime.io.disk.FileChannelManager;
 import org.apache.flink.runtime.io.network.NettyShuffleEnvironment;
+import org.apache.flink.runtime.io.network.buffer.BufferCompressor;
 import org.apache.flink.runtime.io.network.buffer.BufferPool;
 import org.apache.flink.runtime.io.network.buffer.BufferPoolFactory;
 import org.apache.flink.runtime.io.network.buffer.BufferPoolOwner;
@@ -100,7 +102,8 @@ public class ResultPartitionFactory {
 			int maxParallelism,
 			FunctionWithException<BufferPoolOwner, BufferPool, IOException> bufferPoolFactory) {
 		ResultSubpartition[] subpartitions = new ResultSubpartition[numberOfSubpartitions];
-
+		String compressionFactoryName = BlockCompressionFactory.CompressionFactoryName.LZ4.toString();
+		BufferCompressor bufferCompressor = new BufferCompressor(networkBufferSize, compressionFactoryName);
 		ResultPartition partition = forcePartitionReleaseOnConsumption || !type.isBlocking()
 			? new ReleaseOnConsumptionResultPartition(
 				taskNameWithSubtaskAndId,
@@ -109,6 +112,7 @@ public class ResultPartitionFactory {
 				subpartitions,
 				maxParallelism,
 				partitionManager,
+				bufferCompressor,
 				bufferPoolFactory)
 			: new ResultPartition(
 				taskNameWithSubtaskAndId,
@@ -117,6 +121,7 @@ public class ResultPartitionFactory {
 				subpartitions,
 				maxParallelism,
 				partitionManager,
+				bufferCompressor,
 				bufferPoolFactory);
 
 		createSubpartitions(partition, type, blockingSubpartitionType, subpartitions);

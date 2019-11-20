@@ -21,6 +21,7 @@ package org.apache.flink.runtime.io.network.partition;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.api.serialization.EventSerializer;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
+import org.apache.flink.runtime.io.network.buffer.BufferCompressor;
 import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -88,6 +89,8 @@ final class BoundedBlockingSubpartition extends ResultSubpartition {
 	/** Flag indicating whether the subpartition has been released. */
 	private boolean isReleased;
 
+	private final BufferCompressor bufferCompressor;
+
 	public BoundedBlockingSubpartition(
 			int index,
 			ResultPartition parent,
@@ -97,6 +100,7 @@ final class BoundedBlockingSubpartition extends ResultSubpartition {
 
 		this.data = checkNotNull(data);
 		this.readers = new HashSet<>();
+		this.bufferCompressor = parent.getBufferCompressor();
 	}
 
 	// ------------------------------------------------------------------------
@@ -147,9 +151,13 @@ final class BoundedBlockingSubpartition extends ResultSubpartition {
 
 	private void writeAndCloseBufferConsumer(BufferConsumer bufferConsumer) throws IOException {
 		try {
-			final Buffer buffer = bufferConsumer.build();
+			Buffer buffer = bufferConsumer.build();
 			try {
-				data.writeBuffer(buffer);
+				if (bufferCompressor != null && buffer.isBuffer() && buffer.readableBytes() > 0) {
+					data.writeBuffer(bufferCompressor.compress(buffer, 0, buffer.readableBytes()));
+				} else {
+					data.writeBuffer(buffer);
+				}
 
 				numBuffersAndEventsWritten++;
 				if (buffer.isBuffer()) {

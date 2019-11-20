@@ -25,6 +25,7 @@ import org.apache.flink.runtime.event.TaskEvent;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.api.serialization.EventSerializer;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
+import org.apache.flink.runtime.io.network.buffer.BufferDecompressor;
 import org.apache.flink.runtime.io.network.buffer.BufferPool;
 import org.apache.flink.runtime.io.network.buffer.BufferProvider;
 import org.apache.flink.runtime.io.network.partition.PartitionProducerStateProvider;
@@ -168,6 +169,8 @@ public class SingleInputGate extends InputGate {
 
 	private final CompletableFuture<Void> closeFuture;
 
+	private BufferDecompressor bufferDecompressor;
+
 	public SingleInputGate(
 		String owningTaskName,
 		IntermediateDataSetID consumedResultId,
@@ -245,6 +248,10 @@ public class SingleInputGate extends InputGate {
 	// ------------------------------------------------------------------------
 	// Properties
 	// ------------------------------------------------------------------------
+
+	public void setBufferDecompressor(BufferDecompressor bufferDecompressor) {
+		this.bufferDecompressor = bufferDecompressor;
+	}
 
 	@Override
 	public int getNumberOfInputChannels() {
@@ -534,6 +541,14 @@ public class SingleInputGate extends InputGate {
 			boolean moreAvailable,
 			InputChannel currentChannel) throws IOException, InterruptedException {
 		if (buffer.isBuffer()) {
+			if (buffer.isCompressed()) {
+				try {
+					Buffer uncompressedBuffer = checkNotNull(bufferDecompressor).decompress(buffer);
+					return new BufferOrEvent(uncompressedBuffer, currentChannel.getChannelIndex(), moreAvailable);
+				} finally {
+					buffer.recycleBuffer();
+				}
+			}
 			return new BufferOrEvent(buffer, currentChannel.getChannelIndex(), moreAvailable);
 		}
 		else {

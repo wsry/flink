@@ -40,6 +40,8 @@ public final class ReadOnlySlicedNetworkBuffer extends ReadOnlyByteBuf implement
 
 	private final int memorySegmentOffset;
 
+	private boolean isCompressed = false;
+
 	/**
 	 * Creates a buffer which shares the memory segment of the given buffer and exposed the given
 	 * sub-region only.
@@ -204,6 +206,16 @@ public final class ReadOnlySlicedNetworkBuffer extends ReadOnlyByteBuf implement
 	@Override
 	public ByteBuf asByteBuf() {
 		return this;
+	}
+
+	@Override
+	public boolean isCompressed() {
+		return false;
+	}
+
+	@Override
+	public void setCompressed(boolean isCompressed) {
+		this.isCompressed = isCompressed;
 	}
 
 	private Buffer getBuffer() {

@@ -63,6 +63,8 @@ public class NetworkBuffer extends AbstractReferenceCountedByteBuf implements Bu
 	 */
 	private int currentSize;
 
+	private boolean isCompressed = false;
+
 	/**
 	 * Creates a new buffer instance backed by the given <tt>memorySegment</tt> with <tt>0</tt> for
 	 * the <tt>readerIndex</tt> and <tt>writerIndex</tt>.
@@ -603,5 +605,15 @@ public class NetworkBuffer extends AbstractReferenceCountedByteBuf implements Bu
 	@Override
 	public ByteBuf asByteBuf() {
 		return this;
+	}
+
+	@Override
+	public boolean isCompressed() {
+		return isCompressed;
+	}
+
+	@Override
+	public void setCompressed(boolean isCompressed) {
+		this.isCompressed = isCompressed;
 	}
 }

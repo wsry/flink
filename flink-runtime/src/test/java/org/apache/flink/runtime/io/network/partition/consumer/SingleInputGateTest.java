@@ -363,7 +363,8 @@ public class SingleInputGateTest extends InputGateTestBase {
 			netEnv.getConnectionManager(),
 			netEnv.getResultPartitionManager(),
 			new TaskEventDispatcher(),
-			netEnv.getNetworkBufferPool())
+			netEnv.getNetworkBufferPool(),
+			netEnv.getConfiguration().networkBufferSize())
 			.create(
 				"TestTask",
 				gateDesc,

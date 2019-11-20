@@ -217,4 +217,8 @@ public interface Buffer {
 	 * @return self as ByteBuf implementation.
 	 */
 	ByteBuf asByteBuf();
+
+	boolean isCompressed();
+
+	void setCompressed(boolean isCompressed);
 }

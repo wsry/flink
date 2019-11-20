@@ -313,7 +313,7 @@ class PartitionRequestClientHandler extends ChannelInboundHandlerAdapter impleme
 
 					if (buffer != null) {
 						nettyBuffer.readBytes(buffer.asByteBuf(), receivedSize);
-
+						buffer.setCompressed(bufferOrEvent.isCompressed);
 						inputChannel.onBuffer(buffer, bufferOrEvent.sequenceNumber, -1);
 
 						return true;
@@ -454,6 +454,7 @@ class PartitionRequestClientHandler extends ChannelInboundHandlerAdapter impleme
 				RemoteInputChannel inputChannel = inputChannels.get(stagedBufferResponse.receiverId);
 
 				if (inputChannel != null) {
+					buffer.setCompressed(stagedBufferResponse.isCompressed);
 					inputChannel.onBuffer(buffer, stagedBufferResponse.sequenceNumber, -1);
 
 					success = true;

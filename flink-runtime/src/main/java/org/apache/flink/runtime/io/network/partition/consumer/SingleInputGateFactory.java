@@ -21,9 +21,11 @@ package org.apache.flink.runtime.io.network.partition.consumer;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.deployment.InputGateDeploymentDescriptor;
+import org.apache.flink.runtime.io.compression.BlockCompressionFactory;
 import org.apache.flink.runtime.io.network.ConnectionManager;
 import org.apache.flink.runtime.io.network.NettyShuffleEnvironment;
 import org.apache.flink.runtime.io.network.TaskEventPublisher;
+import org.apache.flink.runtime.io.network.buffer.BufferDecompressor;
 import org.apache.flink.runtime.io.network.buffer.BufferPool;
 import org.apache.flink.runtime.io.network.buffer.BufferPoolFactory;
 import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
@@ -77,13 +79,16 @@ public class SingleInputGateFactory {
 
 	private final int floatingNetworkBuffersPerGate;
 
+	private final int networkBufferSize;
+
 	public SingleInputGateFactory(
 			@Nonnull ResourceID taskExecutorResourceId,
 			@Nonnull NettyShuffleEnvironmentConfiguration networkConfig,
 			@Nonnull ConnectionManager connectionManager,
 			@Nonnull ResultPartitionManager partitionManager,
 			@Nonnull TaskEventPublisher taskEventPublisher,
-			@Nonnull NetworkBufferPool networkBufferPool) {
+			@Nonnull NetworkBufferPool networkBufferPool,
+			int networkBufferSize) {
 		this.taskExecutorResourceId = taskExecutorResourceId;
 		this.isCreditBased = networkConfig.isCreditBased();
 		this.partitionRequestInitialBackoff = networkConfig.partitionRequestInitialBackoff();
@@ -94,6 +99,7 @@ public class SingleInputGateFactory {
 		this.partitionManager = partitionManager;
 		this.taskEventPublisher = taskEventPublisher;
 		this.networkBufferPool = networkBufferPool;
+		this.networkBufferSize = networkBufferSize;
 	}
 
 	/**
@@ -111,7 +117,8 @@ public class SingleInputGateFactory {
 			floatingNetworkBuffersPerGate,
 			igdd.getShuffleDescriptors().length,
 			igdd.getConsumedPartitionType());
-
+		String compressionFactoryName = BlockCompressionFactory.CompressionFactoryName.LZ4.toString();
+		BufferDecompressor bufferDecompressor = new BufferDecompressor(networkBufferSize, compressionFactoryName);
 		SingleInputGate inputGate = new SingleInputGate(
 			owningTaskName,
 			igdd.getConsumedResultId(),
@@ -121,6 +128,7 @@ public class SingleInputGateFactory {
 			partitionProducerStateProvider,
 			isCreditBased,
 			bufferPoolFactory);
+		inputGate.setBufferDecompressor(bufferDecompressor);
 
 		createInputChannels(owningTaskName, igdd, inputGate, metrics);
 		return inputGate;

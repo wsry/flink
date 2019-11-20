@@ -148,7 +148,8 @@ public class StreamNetworkBenchmarkEnvironment<T extends IOReadableWritable> {
 			receiverEnv.getConnectionManager(),
 			receiverEnv.getResultPartitionManager(),
 			new TaskEventDispatcher(),
-			receiverEnv.getNetworkBufferPool());
+			receiverEnv.getNetworkBufferPool(),
+			receiverEnv.getConfiguration().networkBufferSize());
 
 		generatePartitionIds();
 	}
