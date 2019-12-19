@@ -69,7 +69,11 @@ public class ShuffleCompressionITCase {
 	/** We plus 1 to guarantee that the last buffer contains no more than one record and can not be compressed. */
 	private static final int NUM_RECORDS_TO_SEND = NUM_BUFFERS_TO_SEND * BUFFER_SIZE / BYTES_PER_RECORD + 1;
 
-	private static final int PARALLELISM = 2;
+	private static final int NUM_TASKMANAGER = 2;
+
+	private static final int NUM_SLOT = 4;
+
+	private static final int PARALLELISM = NUM_TASKMANAGER * NUM_SLOT;
 
 	private static final LongValue RECORD_TO_SEND = new LongValue(4387942071694473832L);
 
@@ -99,8 +103,8 @@ public class ShuffleCompressionITCase {
 
 		final MiniClusterConfiguration miniClusterConfiguration = new MiniClusterConfiguration.Builder()
 			.setConfiguration(configuration)
-			.setNumTaskManagers(PARALLELISM)
-			.setNumSlotsPerTaskManager(1)
+			.setNumTaskManagers(NUM_SLOT)
+			.setNumSlotsPerTaskManager(NUM_TASKMANAGER)
 			.build();
 
 		try (MiniCluster miniCluster = new MiniCluster(miniClusterConfiguration)) {

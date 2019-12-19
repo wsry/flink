@@ -28,7 +28,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /**
- * Compressor for {@link Buffer}.
+ * A thread-safe compressor for {@link Buffer}.
  */
 public class BufferCompressor {
 
@@ -56,7 +56,7 @@ public class BufferCompressor {
 	 *
 	 * <p>Notes that the compression will always start from offset 0 to the size of the input {@link Buffer}.
 	 */
-	public Buffer compressToIntermediateBuffer(Buffer buffer) {
+	public synchronized Buffer compressToIntermediateBuffer(Buffer buffer) {
 		int compressedLen;
 		if ((compressedLen = compress(buffer)) == 0) {
 			return buffer;
@@ -73,7 +73,7 @@ public class BufferCompressor {
 	 *
 	 * <p>The caller must guarantee that the input {@link Buffer} is writable.
 	 */
-	public Buffer compressToOriginalBuffer(Buffer buffer) {
+	public synchronized Buffer compressToOriginalBuffer(Buffer buffer) {
 		int compressedLen;
 		if ((compressedLen = compress(buffer)) == 0) {
 			return buffer;

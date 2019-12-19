@@ -29,7 +29,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /**
- * Decompressor for compressed {@link Buffer}.
+ * A thread-safe decompressor for compressed {@link Buffer}.
  */
 public class BufferDecompressor {
 
@@ -56,7 +56,7 @@ public class BufferDecompressor {
 	 *
 	 * <p>Notes that the decompression will always start from offset 0 to the size of the input {@link Buffer}.
 	 */
-	public Buffer decompressToIntermediateBuffer(Buffer buffer) {
+	public synchronized Buffer decompressToIntermediateBuffer(Buffer buffer) {
 		int decompressedLen = decompress(buffer);
 		internalBuffer.setSize(decompressedLen);
 
@@ -70,7 +70,7 @@ public class BufferDecompressor {
 	 * <p>The caller must guarantee that the input {@link Buffer} is writable and there's enough space left.
 	 */
 	@VisibleForTesting
-	public Buffer decompressToOriginalBuffer(Buffer buffer) {
+	public synchronized Buffer decompressToOriginalBuffer(Buffer buffer) {
 		int decompressedLen = decompress(buffer);
 
 		// copy the decompressed data back
