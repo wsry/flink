@@ -21,6 +21,7 @@ package org.apache.flink.runtime.io.network.partition.consumer;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.deployment.InputGateDeploymentDescriptor;
+import org.apache.flink.runtime.io.network.ConnectionID;
 import org.apache.flink.runtime.io.network.ConnectionManager;
 import org.apache.flink.runtime.io.network.NettyShuffleEnvironment;
 import org.apache.flink.runtime.io.network.TaskEventPublisher;
@@ -186,6 +187,7 @@ public class SingleInputGateFactory {
 					connectionManager,
 					partitionRequestInitialBackoff,
 					partitionRequestMaxBackoff,
+					getConnectionIndex(),
 					metrics,
 					networkBufferPool);
 			},
@@ -224,7 +226,7 @@ public class SingleInputGateFactory {
 				inputGate,
 				index,
 				partitionId,
-				inputChannelDescriptor.getConnectionId(),
+				new ConnectionID(inputChannelDescriptor.getAddress(), getConnectionIndex()),
 				connectionManager,
 				partitionRequestInitialBackoff,
 				partitionRequestMaxBackoff,
@@ -256,5 +258,9 @@ public class SingleInputGateFactory {
 				numRemoteChannels,
 				numUnknownChannels);
 		}
+	}
+
+	private static int getConnectionIndex() {
+		return (int) (Math.random() * Integer.MAX_VALUE);
 	}
 }

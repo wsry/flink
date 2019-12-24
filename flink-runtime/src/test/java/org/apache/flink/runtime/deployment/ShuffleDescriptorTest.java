@@ -93,7 +93,7 @@ public class ShuffleDescriptorTest extends TestLogger {
 				verifyShuffleDescriptor(remoteShuffleDescriptor, NettyShuffleDescriptor.class, false, remotePartitionId);
 				nettyShuffleDescriptor = (NettyShuffleDescriptor) remoteShuffleDescriptor;
 				assertThat(nettyShuffleDescriptor.isLocalTo(consumerResourceID), is(false));
-				assertThat(nettyShuffleDescriptor.getConnectionId(), is(STUB_CONNECTION_ID));
+				assertThat(nettyShuffleDescriptor.getAddress(), is(STUB_CONNECTION_ID.getAddress()));
 			} else {
 				// Unknown (lazy deployment allowed)
 				verifyShuffleDescriptor(localShuffleDescriptor, UnknownShuffleDescriptor.class, true, localPartitionId);

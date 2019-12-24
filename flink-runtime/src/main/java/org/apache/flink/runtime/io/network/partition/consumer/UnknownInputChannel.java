@@ -30,6 +30,7 @@ import org.apache.flink.runtime.io.network.partition.ResultPartitionManager;
 import javax.annotation.Nonnull;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.Optional;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -51,6 +52,8 @@ class UnknownInputChannel extends InputChannel {
 
 	private final int maxBackoff;
 
+	private final int connectionIndex;
+
 	private final InputChannelMetrics metrics;
 
 	@Nonnull
@@ -65,6 +68,7 @@ class UnknownInputChannel extends InputChannel {
 			ConnectionManager connectionManager,
 			int initialBackoff,
 			int maxBackoff,
+			int connectionIndex,
 			InputChannelMetrics metrics,
 			@Nonnull MemorySegmentProvider memorySegmentProvider) {
 
@@ -76,6 +80,7 @@ class UnknownInputChannel extends InputChannel {
 		this.metrics = checkNotNull(metrics);
 		this.initialBackoff = initialBackoff;
 		this.maxBackoff = maxBackoff;
+		this.connectionIndex = connectionIndex;
 		this.memorySegmentProvider = memorySegmentProvider;
 	}
 
@@ -121,8 +126,9 @@ class UnknownInputChannel extends InputChannel {
 	// Graduation to a local or remote input channel at runtime
 	// ------------------------------------------------------------------------
 
-	public RemoteInputChannel toRemoteInputChannel(ConnectionID producerAddress) {
-		return new RemoteInputChannel(inputGate, channelIndex, partitionId, checkNotNull(producerAddress),
+	public RemoteInputChannel toRemoteInputChannel(InetSocketAddress producerAddress) {
+		return new RemoteInputChannel(
+			inputGate, channelIndex, partitionId, new ConnectionID(checkNotNull(producerAddress), connectionIndex),
 			connectionManager, initialBackoff, maxBackoff, metrics, memorySegmentProvider);
 	}
 

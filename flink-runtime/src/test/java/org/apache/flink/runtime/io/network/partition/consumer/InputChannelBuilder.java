@@ -118,6 +118,7 @@ public class InputChannelBuilder {
 			connectionManager,
 			initialBackoff,
 			maxBackoff,
+			connectionID.getConnectionIndex(),
 			metrics,
 			memorySegmentProvider);
 		inputGate.setInputChannel(partitionId.getPartitionId(), channel);

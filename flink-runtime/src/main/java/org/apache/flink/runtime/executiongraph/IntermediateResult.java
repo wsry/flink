@@ -53,8 +53,6 @@ public class IntermediateResult {
 
 	private int numConsumers;
 
-	private final int connectionIndex;
-
 	private final ResultPartitionType resultType;
 
 	public IntermediateResult(
@@ -75,9 +73,6 @@ public class IntermediateResult {
 
 		// we do not set the intermediate result partitions here, because we let them be initialized by
 		// the execution vertex that produces them
-
-		// assign a random connection index
-		this.connectionIndex = (int) (Math.random() * Integer.MAX_VALUE);
 
 		// The runtime type for this produced result
 		this.resultType = checkNotNull(resultType);
@@ -149,10 +144,6 @@ public class IntermediateResult {
 			}
 		}
 		return index;
-	}
-
-	public int getConnectionIndex() {
-		return connectionIndex;
 	}
 
 	@VisibleForTesting

@@ -353,7 +353,7 @@ public class SingleInputGate extends InputGate {
 					newChannel = unknownChannel.toLocalInputChannel();
 				} else {
 					RemoteInputChannel remoteInputChannel =
-						unknownChannel.toRemoteInputChannel(shuffleDescriptor.getConnectionId());
+						unknownChannel.toRemoteInputChannel(shuffleDescriptor.getAddress());
 					remoteInputChannel.assignExclusiveSegments();
 					newChannel = remoteInputChannel;
 				}

@@ -73,10 +73,9 @@ public class NettyShuffleDescriptorBuilder {
 	}
 
 	public NettyShuffleDescriptor buildRemote() {
-		ConnectionID connectionID = new ConnectionID(new InetSocketAddress(address, dataPort), connectionIndex);
 		return new NettyShuffleDescriptor(
 			producerLocation,
-			new NetworkPartitionConnectionInfo(connectionID),
+			new NetworkPartitionConnectionInfo(new InetSocketAddress(address, dataPort)),
 			id);
 	}
 

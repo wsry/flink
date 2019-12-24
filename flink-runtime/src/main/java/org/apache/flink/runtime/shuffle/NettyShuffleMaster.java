@@ -42,7 +42,7 @@ public enum NettyShuffleMaster implements ShuffleMaster<NettyShuffleDescriptor> 
 
 		NettyShuffleDescriptor shuffleDeploymentDescriptor = new NettyShuffleDescriptor(
 			producerDescriptor.getProducerLocation(),
-			createConnectionInfo(producerDescriptor, partitionDescriptor.getConnectionIndex()),
+			createConnectionInfo(producerDescriptor),
 			resultPartitionID);
 
 		return CompletableFuture.completedFuture(shuffleDeploymentDescriptor);
@@ -52,11 +52,9 @@ public enum NettyShuffleMaster implements ShuffleMaster<NettyShuffleDescriptor> 
 	public void releasePartitionExternally(ShuffleDescriptor shuffleDescriptor) {
 	}
 
-	private static PartitionConnectionInfo createConnectionInfo(
-			ProducerDescriptor producerDescriptor,
-			int connectionIndex) {
+	private static PartitionConnectionInfo createConnectionInfo(ProducerDescriptor producerDescriptor) {
 		return producerDescriptor.getDataPort() >= 0 ?
-			NetworkPartitionConnectionInfo.fromProducerDescriptor(producerDescriptor, connectionIndex) :
+			NetworkPartitionConnectionInfo.fromProducerDescriptor(producerDescriptor) :
 			LocalExecutionPartitionConnectionInfo.INSTANCE;
 	}
 }

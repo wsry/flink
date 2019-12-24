@@ -51,7 +51,7 @@ public class PartitionDescriptorBuilder {
 	}
 
 	public PartitionDescriptor build() {
-		return new PartitionDescriptor(new IntermediateDataSetID(), totalNumberOfPartitions, partitionId, partitionType, 1, 0);
+		return new PartitionDescriptor(new IntermediateDataSetID(), totalNumberOfPartitions, partitionId, partitionType, 1);
 	}
 
 	public static PartitionDescriptorBuilder newBuilder() {

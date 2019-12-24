@@ -61,8 +61,7 @@ public class ResultPartitionDeploymentDescriptorTest extends TestLogger {
 		numberOfPartitions,
 		partitionId,
 		partitionType,
-		numberOfSubpartitions,
-		connectionIndex);
+		numberOfSubpartitions);
 
 	private static final ResultPartitionID resultPartitionID = new ResultPartitionID(partitionId, producerExecutionId);
 
@@ -89,7 +88,7 @@ public class ResultPartitionDeploymentDescriptorTest extends TestLogger {
 	public void testSerializationWithNettyShuffleDescriptor() throws IOException {
 		ShuffleDescriptor shuffleDescriptor = new NettyShuffleDescriptor(
 			producerLocation,
-			new NetworkPartitionConnectionInfo(connectionID),
+			new NetworkPartitionConnectionInfo(connectionID.getAddress()),
 			resultPartitionID);
 
 		ResultPartitionDeploymentDescriptor copy =
@@ -100,7 +99,7 @@ public class ResultPartitionDeploymentDescriptorTest extends TestLogger {
 		assertThat(shuffleDescriptorCopy.getResultPartitionID(), is(resultPartitionID));
 		assertThat(shuffleDescriptorCopy.isUnknown(), is(false));
 		assertThat(shuffleDescriptorCopy.isLocalTo(producerLocation), is(true));
-		assertThat(shuffleDescriptorCopy.getConnectionId(), is(connectionID));
+		assertThat(shuffleDescriptorCopy.getAddress(), is(connectionID.getAddress()));
 	}
 
 	private static ResultPartitionDeploymentDescriptor createCopyAndVerifyResultPartitionDeploymentDescriptor(
