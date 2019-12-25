@@ -55,6 +55,16 @@ public class NettyShuffleEnvironmentOptions {
 				" global flag for internal SSL (" + SecurityOptions.SSL_INTERNAL_ENABLED.key() + ") is set to true");
 
 	/**
+	 * The maximum number of tpc connections between taskmanagers for data communication. If a non-positive value is
+	 * configured, the number of slots will be used as the default value.
+	 */
+	public static final ConfigOption<Integer> MAX_NUM_TCP_CONNECTIONS =
+		key("taskmanager.network.max-num-tcp-connections")
+			.defaultValue(-1)
+			.withDescription("The maximum number of tpc connections between taskmanagers for data communication. If " +
+				"a non-positive value is configured, the number of slots will be used as the default value.");
+
+	/**
 	 * Boolean flag indicating whether the shuffle data will be compressed for blocking shuffle mode.
 	 *
 	 * <p>Note: Data is compressed per buffer and compression can incur extra CPU overhead so it is more effective for

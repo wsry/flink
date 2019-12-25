@@ -49,6 +49,8 @@ public class NettyShuffleEnvironmentBuilder {
 
 	private int floatingNetworkBuffersPerGate = 8;
 
+	private int maxNumberOfConnections = 1;
+
 	private boolean blockingShuffleCompressionEnabled = false;
 
 	private String compressionCodec = "LZ4";
@@ -89,6 +91,11 @@ public class NettyShuffleEnvironmentBuilder {
 		return this;
 	}
 
+	public NettyShuffleEnvironmentBuilder setMaxNumberOfConnections(int maxNumberOfConnections) {
+		this.maxNumberOfConnections = maxNumberOfConnections;
+		return this;
+	}
+
 	public NettyShuffleEnvironmentBuilder setBlockingShuffleCompressionEnabled(boolean blockingShuffleCompressionEnabled) {
 		this.blockingShuffleCompressionEnabled = blockingShuffleCompressionEnabled;
 		return this;
@@ -125,7 +132,8 @@ public class NettyShuffleEnvironmentBuilder {
 				BoundedBlockingSubpartitionType.AUTO,
 				false,
 				blockingShuffleCompressionEnabled,
-				compressionCodec),
+				compressionCodec,
+				maxNumberOfConnections),
 			taskManagerLocation,
 			new TaskEventDispatcher(),
 			metricGroup);

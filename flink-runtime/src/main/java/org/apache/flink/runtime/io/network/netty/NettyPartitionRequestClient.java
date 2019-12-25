@@ -76,7 +76,10 @@ public class NettyPartitionRequestClient implements PartitionRequestClient {
 	}
 
 	boolean disposeIfNotUsed() {
-		return closeReferenceCounter.disposeIfNotUsed();
+		if (clientHandler.isChannelError()) {
+			return closeReferenceCounter.disposeIfNotUsed();
+		}
+		return false;
 	}
 
 	/**
@@ -86,7 +89,10 @@ public class NettyPartitionRequestClient implements PartitionRequestClient {
 	 * instance of this client to ensure correct closing logic.
 	 */
 	boolean incrementReferenceCounter() {
-		return closeReferenceCounter.increment();
+		if (!clientHandler.isChannelError()) {
+			return closeReferenceCounter.increment();
+		}
+		return false;
 	}
 
 	/**
@@ -180,7 +186,7 @@ public class NettyPartitionRequestClient implements PartitionRequestClient {
 
 		clientHandler.removeInputChannel(inputChannel);
 
-		if (closeReferenceCounter.decrement()) {
+		if (clientHandler.isChannelError() && closeReferenceCounter.decrement(true)) {
 			// Close the TCP connection. Send a close request msg to ensure
 			// that outstanding backwards task events are not discarded.
 			tcpChannel.writeAndFlush(new NettyMessage.CloseRequest())
@@ -189,6 +195,9 @@ public class NettyPartitionRequestClient implements PartitionRequestClient {
 			// Make sure to remove the client from the factory
 			clientFactory.destroyPartitionRequestClient(connectionId, this);
 		} else {
+			if (!clientHandler.isChannelError()) {
+				closeReferenceCounter.decrement(false);
+			}
 			clientHandler.cancelRequestFor(inputChannel.getInputChannelId());
 		}
 	}

@@ -30,6 +30,7 @@ import org.apache.flink.shaded.netty4.io.netty.channel.ChannelFuture;
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelFutureListener;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -54,6 +55,8 @@ class PartitionRequestClientFactory {
 	 * creates a {@link NettyPartitionRequestClient} instance for this connection.
 	 */
 	NettyPartitionRequestClient createPartitionRequestClient(ConnectionID connectionId) throws IOException, InterruptedException {
+		tryCloseErrorChannelConnections();
+
 		Object entry;
 		NettyPartitionRequestClient client = null;
 
@@ -116,6 +119,15 @@ class PartitionRequestClientFactory {
 
 			if (channel.dispose()) {
 				clients.remove(connectionId, channel);
+			}
+		}
+	}
+
+	public void tryCloseErrorChannelConnections() {
+		for (Map.Entry<ConnectionID, Object> entry: clients.entrySet()) {
+			if (entry.getValue() instanceof NettyPartitionRequestClient &&
+				((NettyPartitionRequestClient) entry.getValue()).disposeIfNotUsed()) {
+				clients.remove(entry.getKey(), entry.getValue());
 			}
 		}
 	}

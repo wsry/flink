@@ -60,8 +60,7 @@ public interface PartitionRequestClient {
 	void sendTaskEvent(ResultPartitionID partitionId, TaskEvent event, RemoteInputChannel inputChannel) throws IOException;
 
 	/**
-	 * Cancels the partition request for the given remote input channel and removes
-	 * this client from factory if it is not referenced by any other input channels.
+	 * Cancels the partition request for the given remote input channel.
 	 *
 	 * @param inputChannel The remote input channel for canceling partition and to
 	 *                     be removed from network stack.

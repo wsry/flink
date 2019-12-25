@@ -83,6 +83,8 @@ public class SingleInputGateFactory {
 
 	private final int networkBufferSize;
 
+	private final int maxNumberOfConnections;
+
 	public SingleInputGateFactory(
 			@Nonnull ResourceID taskExecutorResourceId,
 			@Nonnull NettyShuffleEnvironmentConfiguration networkConfig,
@@ -102,6 +104,7 @@ public class SingleInputGateFactory {
 		this.partitionManager = partitionManager;
 		this.taskEventPublisher = taskEventPublisher;
 		this.networkBufferPool = networkBufferPool;
+		this.maxNumberOfConnections = networkConfig.maxNumberOfConnections();
 	}
 
 	/**
@@ -260,7 +263,7 @@ public class SingleInputGateFactory {
 		}
 	}
 
-	private static int getConnectionIndex() {
-		return (int) (Math.random() * Integer.MAX_VALUE);
+	private int getConnectionIndex() {
+		return (int) (Math.random() * maxNumberOfConnections);
 	}
 }
