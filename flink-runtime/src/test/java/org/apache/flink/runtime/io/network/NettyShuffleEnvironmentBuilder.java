@@ -59,6 +59,8 @@ public class NettyShuffleEnvironmentBuilder {
 
 	private MetricGroup metricGroup = UnregisteredMetricGroups.createUnregisteredTaskManagerMetricGroup();
 
+	private int maxNumberOfConnections = Integer.MAX_VALUE;
+
 	public NettyShuffleEnvironmentBuilder setTaskManagerLocation(ResourceID taskManagerLocation) {
 		this.taskManagerLocation = taskManagerLocation;
 		return this;
@@ -109,6 +111,11 @@ public class NettyShuffleEnvironmentBuilder {
 		return this;
 	}
 
+	public NettyShuffleEnvironmentBuilder setMaxNumberOfConnections(int maxNumberOfConnections) {
+		this.maxNumberOfConnections = maxNumberOfConnections;
+		return this;
+	}
+
 	public NettyShuffleEnvironment build() {
 		return NettyShuffleServiceFactory.createNettyShuffleEnvironment(
 			new NettyShuffleEnvironmentConfiguration(
@@ -125,7 +132,8 @@ public class NettyShuffleEnvironmentBuilder {
 				BoundedBlockingSubpartitionType.AUTO,
 				false,
 				blockingShuffleCompressionEnabled,
-				compressionCodec),
+				compressionCodec,
+				maxNumberOfConnections),
 			taskManagerLocation,
 			new TaskEventDispatcher(),
 			metricGroup);
