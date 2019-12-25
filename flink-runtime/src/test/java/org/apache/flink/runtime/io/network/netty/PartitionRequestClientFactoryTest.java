@@ -77,7 +77,7 @@ public class PartitionRequestClientFactoryTest {
 		final UncaughtTestExceptionHandler exceptionHandler = new UncaughtTestExceptionHandler();
 
 		try {
-			final PartitionRequestClientFactory factory = new PartitionRequestClientFactory(client);
+			final PartitionRequestClientFactory factory = new PartitionRequestClientFactory(client, Integer.MAX_VALUE);
 
 			final Thread connect = new Thread(new Runnable() {
 				@Override
