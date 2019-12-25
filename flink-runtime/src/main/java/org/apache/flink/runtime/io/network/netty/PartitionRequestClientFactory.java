@@ -52,13 +52,16 @@ class PartitionRequestClientFactory {
 
 	private final ConcurrentMap<ConnectionID, CompletableFuture<NettyPartitionRequestClient>> clients = new ConcurrentHashMap<>();
 
+	private final int maxNumberOfConnections;
+
 	PartitionRequestClientFactory(NettyClient nettyClient) {
-		this(nettyClient, 0);
+		this(nettyClient, 0, Integer.MAX_VALUE);
 	}
 
-	PartitionRequestClientFactory(NettyClient nettyClient, int retryNumber) {
+	PartitionRequestClientFactory(NettyClient nettyClient, int retryNumber, int maxNumberOfConnections) {
 		this.nettyClient = nettyClient;
 		this.retryNumber = retryNumber;
+		this.maxNumberOfConnections = maxNumberOfConnections;
 	}
 
 	/**
@@ -66,6 +69,8 @@ class PartitionRequestClientFactory {
 	 * creates a {@link NettyPartitionRequestClient} instance for this connection.
 	 */
 	NettyPartitionRequestClient createPartitionRequestClient(ConnectionID connectionId) throws IOException, InterruptedException {
+		// We map the input ConnectionID to a new value to restrict the number of tcp connections
+		connectionId = new ConnectionID(connectionId.getAddress(), connectionId.getConnectionIndex() % maxNumberOfConnections);
 		while (true) {
 			AtomicBoolean isTheFirstOne = new AtomicBoolean(false);
 			CompletableFuture<NettyPartitionRequestClient> clientFuture = clients.computeIfAbsent(connectionId, unused -> {
