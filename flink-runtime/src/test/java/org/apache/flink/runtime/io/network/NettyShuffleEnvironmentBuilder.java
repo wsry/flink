@@ -61,6 +61,8 @@ public class NettyShuffleEnvironmentBuilder {
 
 	private int maxNumberOfConnections = Integer.MAX_VALUE;
 
+	private boolean connectionReuseEnabled = false;
+
 	public NettyShuffleEnvironmentBuilder setTaskManagerLocation(ResourceID taskManagerLocation) {
 		this.taskManagerLocation = taskManagerLocation;
 		return this;
@@ -116,6 +118,11 @@ public class NettyShuffleEnvironmentBuilder {
 		return this;
 	}
 
+	public NettyShuffleEnvironmentBuilder setConnectionReuseEnabled(boolean connectionReuseEnabled) {
+		this.connectionReuseEnabled = connectionReuseEnabled;
+		return this;
+	}
+
 	public NettyShuffleEnvironment build() {
 		return NettyShuffleServiceFactory.createNettyShuffleEnvironment(
 			new NettyShuffleEnvironmentConfiguration(
@@ -133,7 +140,8 @@ public class NettyShuffleEnvironmentBuilder {
 				false,
 				blockingShuffleCompressionEnabled,
 				compressionCodec,
-				maxNumberOfConnections),
+				maxNumberOfConnections,
+				connectionReuseEnabled),
 			taskManagerLocation,
 			new TaskEventDispatcher(),
 			metricGroup);

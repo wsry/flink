@@ -64,12 +64,6 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 	private final ChannelFutureListener writeListener = new WriteAndFlushNextMessageIfPossibleListener();
 
 	/**
-	 * Set of cancelled partition requests. A request is cancelled iff an input channel is cleared
-	 * while data is still coming in for this channel.
-	 */
-	private final ConcurrentMap<InputChannelID, InputChannelID> cancelled = new ConcurrentHashMap<>();
-
-	/**
 	 * The channel handler context is initialized in channel active event by netty thread, the context may also
 	 * be accessed by task thread or canceler thread to cancel partition request during releasing resources.
 	 */
@@ -102,14 +96,17 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 			return;
 		}
 
-		if (cancelled.putIfAbsent(inputChannelId, inputChannelId) == null) {
-			ctx.writeAndFlush(new NettyMessage.CancelPartitionRequest(inputChannelId));
-		}
+		ctx.writeAndFlush(new NettyMessage.CancelPartitionRequest(inputChannelId));
 	}
 
 	@Override
 	public void notifyCreditAvailable(final RemoteInputChannel inputChannel) {
 		ctx.executor().execute(() -> ctx.pipeline().fireUserEventTriggered(inputChannel));
+	}
+
+	@Override
+	public boolean isChannelError() {
+		return channelError.get() != null;
 	}
 
 	// ------------------------------------------------------------------------

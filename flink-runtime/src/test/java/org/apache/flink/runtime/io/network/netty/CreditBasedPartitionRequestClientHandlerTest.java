@@ -305,8 +305,9 @@ public class CreditBasedPartitionRequestClientHandlerTest {
 		final CreditBasedPartitionRequestClientHandler handler = new CreditBasedPartitionRequestClientHandler();
 		final NetworkBufferAllocator allocator = new NetworkBufferAllocator(handler);
 		final EmbeddedChannel channel = new EmbeddedChannel(handler);
-		final PartitionRequestClient client = new NettyPartitionRequestClient(
+		final NettyPartitionRequestClient client = new NettyPartitionRequestClient(
 			channel, handler, mock(ConnectionID.class), mock(PartitionRequestClientFactory.class));
+		client.incrementReferenceCounter();
 
 		final NetworkBufferPool networkBufferPool = new NetworkBufferPool(10, 32, 2);
 		final SingleInputGate inputGate = createSingleInputGate(1);
@@ -414,8 +415,9 @@ public class CreditBasedPartitionRequestClientHandlerTest {
 	public void testNotifyCreditAvailableAfterReleased() throws Exception {
 		final CreditBasedPartitionRequestClientHandler handler = new CreditBasedPartitionRequestClientHandler();
 		final EmbeddedChannel channel = new EmbeddedChannel(handler);
-		final PartitionRequestClient client = new NettyPartitionRequestClient(
+		final NettyPartitionRequestClient client = new NettyPartitionRequestClient(
 			channel, handler, mock(ConnectionID.class), mock(PartitionRequestClientFactory.class));
+		client.incrementReferenceCounter();
 
 		final NetworkBufferPool networkBufferPool = new NetworkBufferPool(10, 32, 2);
 		final SingleInputGate inputGate = createSingleInputGate(1);

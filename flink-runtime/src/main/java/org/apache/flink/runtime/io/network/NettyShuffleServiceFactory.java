@@ -90,7 +90,8 @@ public class NettyShuffleServiceFactory implements ShuffleServiceFactory<NettySh
 				resultPartitionManager,
 				taskEventPublisher,
 				nettyConfig,
-				config.maxNumberOfConnections()) :
+				config.maxNumberOfConnections(),
+				config.isConnectionReuseEnabled()) :
 			new LocalConnectionManager();
 
 		NetworkBufferPool networkBufferPool = new NetworkBufferPool(

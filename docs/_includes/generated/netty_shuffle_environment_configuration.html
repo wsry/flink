@@ -116,5 +116,11 @@
             <td>Integer</td>
             <td>Maximum backoff in milliseconds for partition requests of input channels.</td>
         </tr>
+        <tr>
+            <td><h5>taskmanager.network.tcp-connection.enable-reuse</h5></td>
+            <td style="word-wrap: break-word;">false</td>
+            <td>Boolean</td>
+            <td>Whether to reuse tcp connections across multi jobs. If set to true, tcp connections will become a cluster level resource and will not be released after job finishes. Note that to avoid connection leak, you must set taskmanager.network.max-num-tcp-connections to a smaller value before you enable tcp connection reuse.</td>
+        </tr>
     </tbody>
 </table>
