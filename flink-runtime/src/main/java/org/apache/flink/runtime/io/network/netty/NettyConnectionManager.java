@@ -44,13 +44,15 @@ public class NettyConnectionManager implements ConnectionManager {
 		ResultPartitionProvider partitionProvider,
 		TaskEventPublisher taskEventPublisher,
 		NettyConfig nettyConfig,
-		int maxNumberOfConnections) {
+		int maxNumberOfConnections,
+		boolean connectionReuseEnabled) {
 
 		this.server = new NettyServer(nettyConfig);
 		this.client = new NettyClient(nettyConfig);
 		this.bufferPool = new NettyBufferPool(nettyConfig.getNumberOfArenas());
 
-		this.partitionRequestClientFactory = new PartitionRequestClientFactory(client, maxNumberOfConnections);
+		this.partitionRequestClientFactory =
+			new PartitionRequestClientFactory(client, maxNumberOfConnections, connectionReuseEnabled);
 
 		this.nettyProtocol = new NettyProtocol(checkNotNull(partitionProvider), checkNotNull(taskEventPublisher));
 	}

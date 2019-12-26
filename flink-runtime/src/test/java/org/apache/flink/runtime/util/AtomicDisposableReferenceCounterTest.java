@@ -39,11 +39,11 @@ public class AtomicDisposableReferenceCounterTest {
 
 		assertTrue(counter.increment());
 
-		assertTrue(counter.decrement());
+		assertTrue(counter.decrement(true));
 
 		assertFalse(counter.increment());
 
-		assertFalse(counter.decrement());
+		assertFalse(counter.decrement(true));
 	}
 
 	@Test
@@ -52,11 +52,11 @@ public class AtomicDisposableReferenceCounterTest {
 
 		assertTrue(counter.increment());
 
-		assertFalse(counter.decrement());
+		assertFalse(counter.decrement(true));
 
-		assertFalse(counter.decrement());
+		assertFalse(counter.decrement(true));
 
-		assertTrue(counter.decrement());
+		assertTrue(counter.decrement(true));
 	}
 
 	@Test
@@ -117,7 +117,7 @@ public class AtomicDisposableReferenceCounterTest {
 
 		@Override
 		public Boolean call() throws Exception {
-			return counter.decrement();
+			return counter.decrement(true);
 		}
 	}
 }

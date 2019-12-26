@@ -30,6 +30,7 @@ import org.apache.flink.shaded.netty4.io.netty.channel.ChannelFuture;
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelFutureListener;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -47,9 +48,12 @@ class PartitionRequestClientFactory {
 
 	private final int maxNumberOfConnections;
 
-	PartitionRequestClientFactory(NettyClient nettyClient, int maxNumberOfConnections) {
+	private final boolean connectionReuseEnabled;
+
+	PartitionRequestClientFactory(NettyClient nettyClient, int maxNumberOfConnections, boolean connectionReuseEnabled) {
 		this.nettyClient = nettyClient;
 		this.maxNumberOfConnections = maxNumberOfConnections;
+		this.connectionReuseEnabled = connectionReuseEnabled;
 	}
 
 	/**
@@ -59,6 +63,10 @@ class PartitionRequestClientFactory {
 	NettyPartitionRequestClient createPartitionRequestClient(ConnectionID connectionId) throws IOException, InterruptedException {
 		Object entry;
 		NettyPartitionRequestClient client = null;
+
+		if (connectionReuseEnabled) {
+			closeErrorChannelConnections();
+		}
 
 		// We map the input ConnectionID to a new value to restrict the number of tcp connections
 		connectionId = new ConnectionID(connectionId.getAddress(), connectionId.getConnectionIndex() % maxNumberOfConnections);
@@ -130,11 +138,24 @@ class PartitionRequestClientFactory {
 		return clients.size();
 	}
 
+	boolean isConnectionReuseEnabled() {
+		return connectionReuseEnabled;
+	}
+
 	/**
 	 * Removes the client for the given {@link ConnectionID}.
 	 */
 	void destroyPartitionRequestClient(ConnectionID connectionId, PartitionRequestClient client) {
 		clients.remove(connectionId, client);
+	}
+
+	public void closeErrorChannelConnections() {
+		for (Map.Entry<ConnectionID, Object> entry: clients.entrySet()) {
+			if (entry.getValue() instanceof NettyPartitionRequestClient &&
+				((NettyPartitionRequestClient) entry.getValue()).disposeIfNotUsed()) {
+				((NettyPartitionRequestClient) entry.getValue()).closeConnection();
+			}
+		}
 	}
 
 	private static final class ConnectingChannel implements ChannelFutureListener {

@@ -63,6 +63,21 @@ public class NettyShuffleEnvironmentOptions {
 			.withDescription("The maximum number of tpc connections between taskmanagers for data communication.");
 
 	/**
+	 * Whether to reuse tcp connections across multi jobs. If set to true, tcp connections will become a cluster level
+	 * resource and will not be released after job finishes.
+	 *
+	 * <p>Note: To avoid connection leak, you must set {@link #MAX_NUM_TCP_CONNECTIONS} to a smaller value before you
+	 * enable tcp connection reuse.
+	 */
+	public static final ConfigOption<Boolean> TCP_CONNECTION_REUSE_ENABLED =
+		key("taskmanager.network.tcp-connection.enable-reuse")
+			.defaultValue(false)
+			.withDescription("Whether to reuse tcp connections across multi jobs. If set to true, tcp connections " +
+				"will become a cluster level resource and will not be released after job finishes. Note that to avoid" +
+				" connection leak, you must set " + MAX_NUM_TCP_CONNECTIONS.key() + " to a smaller value before you " +
+				"enable tcp connection reuse.");
+
+	/**
 	 * Boolean flag indicating whether the shuffle data will be compressed for blocking shuffle mode.
 	 *
 	 * <p>Note: Data is compressed per buffer and compression can incur extra CPU overhead so it is more effective for

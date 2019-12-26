@@ -18,6 +18,8 @@
 
 package org.apache.flink.runtime.util;
 
+import static org.apache.flink.util.Preconditions.checkState;
+
 /**
  * Atomic reference counter, which enters a "disposed" state after it reaches a configurable
  * reference count (default 0).
@@ -65,15 +67,16 @@ public class AtomicDisposableReferenceCounter {
 	 * If the method returns <code>true</code>, the decrement operation disposed the counter.
 	 * Otherwise it returns <code>false</code>.
 	 */
-	public boolean decrement() {
+	public boolean decrement(boolean dispose) {
 		synchronized (lock) {
 			if (isDisposed) {
 				return false;
 			}
 
+			checkState(referenceCount > disposeOnReferenceCount);
 			referenceCount--;
 
-			if (referenceCount <= disposeOnReferenceCount) {
+			if (referenceCount <= disposeOnReferenceCount && dispose) {
 				isDisposed = true;
 			}
 
