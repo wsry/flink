@@ -76,7 +76,10 @@ public class NettyPartitionRequestClient implements PartitionRequestClient {
 	}
 
 	boolean disposeIfNotUsed() {
-		return closeReferenceCounter.disposeIfNotUsed();
+		if (shouldDispose()) {
+			return closeReferenceCounter.disposeIfNotUsed();
+		}
+		return false;
 	}
 
 	/**
@@ -86,7 +89,10 @@ public class NettyPartitionRequestClient implements PartitionRequestClient {
 	 * instance of this client to ensure correct closing logic.
 	 */
 	boolean incrementReferenceCounter() {
-		return closeReferenceCounter.increment();
+		if (!clientHandler.isChannelError()) {
+			return closeReferenceCounter.increment();
+		}
+		return false;
 	}
 
 	/**
@@ -185,17 +191,21 @@ public class NettyPartitionRequestClient implements PartitionRequestClient {
 
 		clientHandler.removeInputChannel(inputChannel);
 
-		if (closeReferenceCounter.decrement()) {
-			// Close the TCP connection. Send a close request msg to ensure
-			// that outstanding backwards task events are not discarded.
-			tcpChannel.writeAndFlush(new NettyMessage.CloseRequest())
-					.addListener(ChannelFutureListener.CLOSE_ON_FAILURE);
-
-			// Make sure to remove the client from the factory
-			clientFactory.destroyPartitionRequestClient(connectionId, this);
+		if (closeReferenceCounter.decrement(shouldDispose())) {
+			closeConnection();
 		} else {
 			clientHandler.cancelRequestFor(inputChannel.getInputChannelId());
 		}
+	}
+
+	public void closeConnection() {
+		// Close the TCP connection. Send a close request msg to ensure
+		// that outstanding backwards task events are not discarded.
+		tcpChannel.writeAndFlush(new NettyMessage.CloseRequest())
+			.addListener(ChannelFutureListener.CLOSE_ON_FAILURE);
+
+		// Make sure to remove the client from the factory
+		clientFactory.destroyPartitionRequestClient(connectionId, this);
 	}
 
 	private void checkNotClosed() throws IOException {
@@ -204,5 +214,12 @@ public class NettyPartitionRequestClient implements PartitionRequestClient {
 			final SocketAddress remoteAddr = tcpChannel.remoteAddress();
 			throw new LocalTransportException(String.format("Channel to '%s' closed.", remoteAddr), localAddr);
 		}
+	}
+
+	private boolean shouldDispose() {
+		if (clientFactory.isConnectionReuseEnabled()) {
+			return clientHandler.isChannelError();
+		}
+		return true;
 	}
 }

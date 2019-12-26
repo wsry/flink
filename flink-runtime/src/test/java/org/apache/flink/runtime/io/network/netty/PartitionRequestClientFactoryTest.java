@@ -64,7 +64,7 @@ public class PartitionRequestClientFactoryTest {
 		NettyTestUtil.NettyServerAndClient serverAndClient = createNettyServerAndClient();
 		UnstableNettyClient unstableNettyClient = new UnstableNettyClient(serverAndClient.client(), 2);
 
-		PartitionRequestClientFactory factory = new PartitionRequestClientFactory(unstableNettyClient, 2, Integer.MAX_VALUE);
+		PartitionRequestClientFactory factory = new PartitionRequestClientFactory(unstableNettyClient, 2, Integer.MAX_VALUE, false);
 		ConnectionID serverAddress = new ConnectionID(new InetSocketAddress(InetAddress.getLocalHost(),
 			serverAndClient.server().getConfig().getServerPort()), 0);
 
@@ -80,7 +80,7 @@ public class PartitionRequestClientFactoryTest {
 		UnstableNettyClient unstableNettyClient = new UnstableNettyClient(serverAndClient.client(), 3);
 
 		try {
-			PartitionRequestClientFactory factory = new PartitionRequestClientFactory(unstableNettyClient, 2, Integer.MAX_VALUE);
+			PartitionRequestClientFactory factory = new PartitionRequestClientFactory(unstableNettyClient, 2, Integer.MAX_VALUE, false);
 			ConnectionID serverAddress = new ConnectionID(new InetSocketAddress(InetAddress.getLocalHost(),
 				serverAndClient.server().getConfig().getServerPort()), 0);
 
@@ -99,7 +99,7 @@ public class PartitionRequestClientFactoryTest {
 		NettyTestUtil.NettyServerAndClient serverAndClient = createNettyServerAndClient();
 		UnstableNettyClient unstableNettyClient = new UnstableNettyClient(serverAndClient.client(), 2);
 
-		PartitionRequestClientFactory factory = new PartitionRequestClientFactory(unstableNettyClient, 2, Integer.MAX_VALUE);
+		PartitionRequestClientFactory factory = new PartitionRequestClientFactory(unstableNettyClient, 2, Integer.MAX_VALUE, false);
 		ConnectionID serverAddress = new ConnectionID(new InetSocketAddress(InetAddress.getLocalHost(),
 			serverAndClient.server().getConfig().getServerPort()), 0);
 

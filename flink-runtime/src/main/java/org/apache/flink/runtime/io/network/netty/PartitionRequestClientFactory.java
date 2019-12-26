@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
@@ -54,14 +55,21 @@ class PartitionRequestClientFactory {
 
 	private final int maxNumberOfConnections;
 
+	private final boolean connectionReuseEnabled;
+
 	PartitionRequestClientFactory(NettyClient nettyClient) {
-		this(nettyClient, 0, Integer.MAX_VALUE);
+		this(nettyClient, 0, Integer.MAX_VALUE, false);
 	}
 
-	PartitionRequestClientFactory(NettyClient nettyClient, int retryNumber, int maxNumberOfConnections) {
+	PartitionRequestClientFactory(
+			NettyClient nettyClient,
+			int retryNumber,
+			int maxNumberOfConnections,
+			boolean connectionReuseEnabled) {
 		this.nettyClient = nettyClient;
 		this.retryNumber = retryNumber;
 		this.maxNumberOfConnections = maxNumberOfConnections;
+		this.connectionReuseEnabled = connectionReuseEnabled;
 	}
 
 	/**
@@ -69,6 +77,9 @@ class PartitionRequestClientFactory {
 	 * creates a {@link NettyPartitionRequestClient} instance for this connection.
 	 */
 	NettyPartitionRequestClient createPartitionRequestClient(ConnectionID connectionId) throws IOException, InterruptedException {
+		if (connectionReuseEnabled) {
+			closeErrorChannelConnections();
+		}
 		// We map the input ConnectionID to a new value to restrict the number of tcp connections
 		connectionId = new ConnectionID(connectionId.getAddress(), connectionId.getConnectionIndex() % maxNumberOfConnections);
 		while (true) {
@@ -142,6 +153,10 @@ class PartitionRequestClientFactory {
 		return clients.size();
 	}
 
+	boolean isConnectionReuseEnabled() {
+		return connectionReuseEnabled;
+	}
+
 	/**
 	 * Removes the client for the given {@link ConnectionID}.
 	 */
@@ -156,4 +171,16 @@ class PartitionRequestClientFactory {
 		}
 	}
 
+	public void closeErrorChannelConnections() throws IOException {
+		try {
+			for (Map.Entry<ConnectionID, CompletableFuture<NettyPartitionRequestClient>> entry: clients.entrySet()) {
+				if (entry.getValue().isDone() && entry.getValue().get().disposeIfNotUsed()) {
+					entry.getValue().get().closeConnection();
+				}
+			}
+		} catch (ExecutionException | InterruptedException e) {
+			LOG.error("Failed to close error channel connections.", e);
+			throw new IOException(e);
+		}
+	}
 }

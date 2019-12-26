@@ -59,7 +59,8 @@ public class NettyPartitionRequestClientTest {
 
 		final CreditBasedPartitionRequestClientHandler handler = new CreditBasedPartitionRequestClientHandler();
 		final EmbeddedChannel channel = new EmbeddedChannel(handler);
-		final PartitionRequestClient client = createPartitionRequestClient(channel, handler);
+		final NettyPartitionRequestClient client = createPartitionRequestClient(channel, handler);
+		client.incrementReferenceCounter();
 
 		final int numExclusiveBuffers = 2;
 		final NetworkBufferPool networkBufferPool = new NetworkBufferPool(10, 32, numExclusiveBuffers);
@@ -117,7 +118,8 @@ public class NettyPartitionRequestClientTest {
 	public void testDoublePartitionRequest() throws Exception {
 		final CreditBasedPartitionRequestClientHandler handler = new CreditBasedPartitionRequestClientHandler();
 		final EmbeddedChannel channel = new EmbeddedChannel(handler);
-		final PartitionRequestClient client = createPartitionRequestClient(channel, handler);
+		final NettyPartitionRequestClient client = createPartitionRequestClient(channel, handler);
+		client.incrementReferenceCounter();
 
 		final int numExclusiveBuffers = 2;
 		final NetworkBufferPool networkBufferPool = new NetworkBufferPool(10, 32, numExclusiveBuffers);
