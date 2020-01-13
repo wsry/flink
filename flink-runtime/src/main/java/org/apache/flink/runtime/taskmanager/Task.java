@@ -27,6 +27,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.core.fs.FileSystemSafetyNet;
 import org.apache.flink.core.fs.Path;
+import org.apache.flink.core.plugin.PluginManager;
 import org.apache.flink.runtime.accumulators.AccumulatorRegistry;
 import org.apache.flink.runtime.blob.BlobCacheService;
 import org.apache.flink.runtime.blob.PermanentBlobKey;
@@ -238,6 +239,8 @@ public class Task implements Runnable, TaskActions, PartitionProducerStateProvid
 	/** Future that is completed once {@link #run()} exits. */
 	private final CompletableFuture<ExecutionState> terminationFuture = new CompletableFuture<>();
 
+	private final PluginManager pluginManager;
+
 	// ------------------------------------------------------------------------
 	//  Fields that control the task execution. All these fields are volatile
 	//  (which means that they introduce memory barriers), to establish
@@ -287,6 +290,7 @@ public class Task implements Runnable, TaskActions, PartitionProducerStateProvid
 		KvStateService kvStateService,
 		BroadcastVariableManager bcVarManager,
 		TaskEventDispatcher taskEventDispatcher,
+		PluginManager pluginManager,
 		TaskStateManager taskStateManager,
 		TaskManagerActions taskManagerActions,
 		InputSplitProvider inputSplitProvider,
@@ -336,6 +340,7 @@ public class Task implements Runnable, TaskActions, PartitionProducerStateProvid
 		this.ioManager = Preconditions.checkNotNull(ioManager);
 		this.broadcastVariableManager = Preconditions.checkNotNull(bcVarManager);
 		this.taskEventDispatcher = Preconditions.checkNotNull(taskEventDispatcher);
+		this.pluginManager = Preconditions.checkNotNull(pluginManager);
 		this.taskStateManager = Preconditions.checkNotNull(taskStateManager);
 		this.accumulatorRegistry = new AccumulatorRegistry(jobId, executionId);
 
@@ -902,7 +907,8 @@ public class Task implements Runnable, TaskActions, PartitionProducerStateProvid
 		long startDownloadTime = System.currentTimeMillis();
 
 		// triggers the download of all missing jar files from the job manager
-		libraryCache.registerTask(jobId, executionId, requiredJarFiles, requiredClasspaths);
+		libraryCache.registerTask(
+			jobId, executionId, requiredJarFiles, requiredClasspaths, pluginManager.getPluginClassLoaders());
 
 		LOG.debug("Getting user code class loader for task {} at library cache manager took {} milliseconds",
 				executionId, System.currentTimeMillis() - startDownloadTime);

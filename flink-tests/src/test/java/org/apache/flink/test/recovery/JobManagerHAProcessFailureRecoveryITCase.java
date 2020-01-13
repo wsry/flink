@@ -32,6 +32,7 @@ import org.apache.flink.configuration.HighAvailabilityOptions;
 import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.configuration.NettyShuffleEnvironmentOptions;
 import org.apache.flink.configuration.TaskManagerOptions;
+import org.apache.flink.core.plugin.PluginUtils;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.concurrent.ScheduledExecutorServiceAdapter;
@@ -273,7 +274,10 @@ public class JobManagerHAProcessFailureRecoveryITCase extends TestLogger {
 
 			// Start the task manager process
 			for (int i = 0; i < numberOfTaskManagers; i++) {
-				taskManagerRunners[i] = new TaskManagerRunner(config, ResourceID.generate());
+				taskManagerRunners[i] = new TaskManagerRunner(
+					config,
+					ResourceID.generate(),
+					PluginUtils.createPluginManagerFromRootFolder(config));
 				taskManagerRunners[i].start();
 			}
 

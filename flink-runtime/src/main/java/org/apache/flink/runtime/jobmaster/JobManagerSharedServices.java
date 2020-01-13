@@ -22,6 +22,8 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.CoreOptions;
 import org.apache.flink.configuration.IllegalConfigurationException;
 import org.apache.flink.configuration.WebOptions;
+import org.apache.flink.core.plugin.PluginManager;
+import org.apache.flink.core.plugin.PluginUtils;
 import org.apache.flink.runtime.akka.AkkaUtils;
 import org.apache.flink.runtime.blob.BlobServer;
 import org.apache.flink.runtime.blob.BlobWriter;
@@ -61,6 +63,8 @@ public class JobManagerSharedServices {
 
 	private final BackPressureStatsTracker backPressureStatsTracker;
 
+	private final PluginManager pluginManager;
+
 	@Nonnull
 	private final BlobWriter blobWriter;
 
@@ -70,7 +74,8 @@ public class JobManagerSharedServices {
 			RestartStrategyFactory restartStrategyFactory,
 			BackPressureRequestCoordinator backPressureSampleCoordinator,
 			BackPressureStatsTracker backPressureStatsTracker,
-			@Nonnull BlobWriter blobWriter) {
+			@Nonnull BlobWriter blobWriter,
+			PluginManager pluginManager) {
 
 		this.scheduledExecutorService = checkNotNull(scheduledExecutorService);
 		this.libraryCacheManager = checkNotNull(libraryCacheManager);
@@ -78,6 +83,7 @@ public class JobManagerSharedServices {
 		this.backPressureSampleCoordinator = checkNotNull(backPressureSampleCoordinator);
 		this.backPressureStatsTracker = checkNotNull(backPressureStatsTracker);
 		this.blobWriter = blobWriter;
+		this.pluginManager = checkNotNull(pluginManager);
 	}
 
 	public ScheduledExecutorService getScheduledExecutorService() {
@@ -99,6 +105,10 @@ public class JobManagerSharedServices {
 	@Nonnull
 	public BlobWriter getBlobWriter() {
 		return blobWriter;
+	}
+
+	public PluginManager getPluginManager() {
+		return pluginManager;
 	}
 
 	/**
@@ -185,6 +195,7 @@ public class JobManagerSharedServices {
 			RestartStrategyFactory.createRestartStrategyFactory(config),
 			coordinator,
 			backPressureStatsTracker,
-			blobServer);
+			blobServer,
+			PluginUtils.createPluginManagerFromRootFolder(config));
 	}
 }

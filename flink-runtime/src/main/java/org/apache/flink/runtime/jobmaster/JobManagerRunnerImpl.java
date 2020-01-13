@@ -20,6 +20,7 @@ package org.apache.flink.runtime.jobmaster;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.core.plugin.PluginManager;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.execution.librarycache.LibraryCacheManager;
@@ -107,6 +108,7 @@ public class JobManagerRunnerImpl implements LeaderContender, OnCompletionAction
 			final JobMasterServiceFactory jobMasterFactory,
 			final HighAvailabilityServices haServices,
 			final LibraryCacheManager libraryCacheManager,
+			final PluginManager pluginManager,
 			final Executor executor,
 			final FatalErrorHandler fatalErrorHandler) throws Exception {
 
@@ -126,7 +128,10 @@ public class JobManagerRunnerImpl implements LeaderContender, OnCompletionAction
 			// libraries and class loader first
 			try {
 				libraryCacheManager.registerJob(
-						jobGraph.getJobID(), jobGraph.getUserJarBlobKeys(), jobGraph.getClasspaths());
+					jobGraph.getJobID(),
+					jobGraph.getUserJarBlobKeys(),
+					jobGraph.getClasspaths(),
+					pluginManager.getPluginClassLoaders());
 			} catch (IOException e) {
 				throw new Exception("Cannot set up the user code libraries: " + e.getMessage(), e);
 			}

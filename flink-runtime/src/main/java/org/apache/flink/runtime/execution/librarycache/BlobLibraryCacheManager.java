@@ -23,6 +23,7 @@ import org.apache.flink.runtime.blob.PermanentBlobKey;
 import org.apache.flink.runtime.blob.PermanentBlobService;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.FlinkUserCodeClassLoader;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,9 +87,9 @@ public class BlobLibraryCacheManager implements LibraryCacheManager {
 	}
 
 	@Override
-	public void registerJob(JobID id, Collection<PermanentBlobKey> requiredJarFiles, Collection<URL> requiredClasspaths)
-		throws IOException {
-		registerTask(id, JOB_ATTEMPT_ID, requiredJarFiles, requiredClasspaths);
+	public void registerJob(JobID id, Collection<PermanentBlobKey> requiredJarFiles, Collection<URL> requiredClasspaths,
+			FlinkUserCodeClassLoader[] extClassLoaders) throws IOException {
+		registerTask(id, JOB_ATTEMPT_ID, requiredJarFiles, requiredClasspaths, extClassLoaders);
 	}
 
 	@Override
@@ -96,7 +97,8 @@ public class BlobLibraryCacheManager implements LibraryCacheManager {
 		JobID jobId,
 		ExecutionAttemptID task,
 		@Nullable Collection<PermanentBlobKey> requiredJarFiles,
-		@Nullable Collection<URL> requiredClasspaths) throws IOException {
+		@Nullable Collection<URL> requiredClasspaths,
+		FlinkUserCodeClassLoader[] extClassLoaders) throws IOException {
 
 		checkNotNull(jobId, "The JobId must not be null.");
 		checkNotNull(task, "The task execution id must not be null.");
@@ -127,8 +129,16 @@ public class BlobLibraryCacheManager implements LibraryCacheManager {
 						++count;
 					}
 
-					cacheEntries.put(jobId, new LibraryCacheEntry(
-						requiredJarFiles, requiredClasspaths, urls, task, classLoaderResolveOrder, alwaysParentFirstPatterns));
+					cacheEntries.put(
+						jobId,
+						new LibraryCacheEntry(
+							requiredJarFiles,
+							requiredClasspaths,
+							urls,
+							task,
+							classLoaderResolveOrder,
+							alwaysParentFirstPatterns,
+							extClassLoaders));
 				} catch (Throwable t) {
 					// rethrow or wrap
 					ExceptionUtils.tryRethrowIOException(t);
@@ -264,6 +274,7 @@ public class BlobLibraryCacheManager implements LibraryCacheManager {
 		 * 		or parent ClassLoader
 		 * @param alwaysParentFirstPatterns A list of patterns for classes that should always be
 		 * 		resolved from the parent ClassLoader (if possible).
+		 * @param extClassLoaders Extra ClassLoaders to load classes from.
 		 */
 		LibraryCacheEntry(
 				Collection<PermanentBlobKey> requiredLibraries,
@@ -271,14 +282,16 @@ public class BlobLibraryCacheManager implements LibraryCacheManager {
 				URL[] libraryURLs,
 				ExecutionAttemptID initialReference,
 				FlinkUserCodeClassLoaders.ResolveOrder classLoaderResolveOrder,
-				String[] alwaysParentFirstPatterns) {
+				String[] alwaysParentFirstPatterns,
+				FlinkUserCodeClassLoader[] extClassLoaders) {
 
 			this.classLoader =
 				FlinkUserCodeClassLoaders.create(
 					classLoaderResolveOrder,
 					libraryURLs,
 					FlinkUserCodeClassLoaders.class.getClassLoader(),
-					alwaysParentFirstPatterns);
+					alwaysParentFirstPatterns,
+					extClassLoaders);
 
 			// NOTE: do not store the class paths, i.e. URLs, into a set for performance reasons
 			//       see http://findbugs.sourceforge.net/bugDescriptions.html#DMI_COLLECTION_OF_URLS

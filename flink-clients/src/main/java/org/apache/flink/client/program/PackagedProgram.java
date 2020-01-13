@@ -22,6 +22,7 @@ import org.apache.flink.api.common.ProgramDescription;
 import org.apache.flink.client.ClientUtils;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.core.plugin.PluginUtils;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.JarUtils;
@@ -140,7 +141,8 @@ public class PackagedProgram {
 			getJobJarAndDependencies(),
 			classpaths,
 			getClass().getClassLoader(),
-			configuration);
+			configuration,
+			PluginUtils.createPluginManagerFromRootFolder(configuration).getPluginClassLoaders());
 
 		// load the entry point class
 		this.mainClass = loadMainClass(

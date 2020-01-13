@@ -21,6 +21,7 @@ package org.apache.flink.runtime.execution.librarycache;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.blob.PermanentBlobKey;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
+import org.apache.flink.util.FlinkUserCodeClassLoader;
 
 import javax.annotation.Nonnull;
 
@@ -45,13 +46,14 @@ public interface LibraryCacheManager {
 	 * @param id job ID
 	 * @param requiredJarFiles collection of blob keys identifying the required jar files
 	 * @param requiredClasspaths collection of classpaths that are added to the user code class loader
+	 * @param extClassLoaders extra ClassLoaders to load classes from
 	 *
 	 * @throws IOException if any error occurs when retrieving the required jar files
 	 *
 	 * @see #unregisterJob(JobID) counterpart of this method
 	 */
-	void registerJob(JobID id, Collection<PermanentBlobKey> requiredJarFiles, Collection<URL> requiredClasspaths)
-		throws IOException;
+	void registerJob(JobID id, Collection<PermanentBlobKey> requiredJarFiles, Collection<URL> requiredClasspaths,
+		FlinkUserCodeClassLoader[] extClassLoaders) throws IOException;
 
 	/**
 	 * Registers a job task execution with its required jar files and classpaths. The jar files are
@@ -60,37 +62,39 @@ public interface LibraryCacheManager {
 	 * @param id job ID
 	 * @param requiredJarFiles collection of blob keys identifying the required jar files
 	 * @param requiredClasspaths collection of classpaths that are added to the user code class loader
+	 * @param extClassLoaders extra ClassLoaders to load classes from
 	 *
 	 * @throws IOException if any error occurs when retrieving the required jar files
 	 *
 	 * @see #unregisterTask(JobID, ExecutionAttemptID) counterpart of this method
 	 */
 	void registerTask(JobID id, ExecutionAttemptID execution, Collection<PermanentBlobKey> requiredJarFiles,
-		Collection<URL> requiredClasspaths) throws IOException;
+		Collection<URL> requiredClasspaths, FlinkUserCodeClassLoader[] extClassLoaders) throws IOException;
 
 	/**
 	 * Unregisters a job task execution from the library cache manager.
 	 * <p>
-	 * <strong>Note:</strong> this is the counterpart of {@link #registerTask(JobID,
-	 * ExecutionAttemptID, Collection, Collection)} and it will not remove any job added via
-	 * {@link #registerJob(JobID, Collection, Collection)}!
+	 * <strong>Note:</strong> this is the counterpart of {@link #registerTask(JobID,ExecutionAttemptID,
+	 * Collection, Collection, FlinkUserCodeClassLoader[])} and it will not remove any job added via
+	 * {@link #registerJob(JobID, Collection, Collection, FlinkUserCodeClassLoader[])}!
 	 *
 	 * @param id job ID
 	 *
-	 * @see #registerTask(JobID, ExecutionAttemptID, Collection, Collection) counterpart of this method
+	 * @see #registerTask(JobID, ExecutionAttemptID, Collection, Collection, FlinkUserCodeClassLoader[])
+	 * counterpart of this method
 	 */
 	void unregisterTask(JobID id, ExecutionAttemptID execution);
 
 	/**
 	 * Unregisters a job from the library cache manager.
 	 * <p>
-	 * <strong>Note:</strong> this is the counterpart of {@link #registerJob(JobID, Collection,
-	 * Collection)} and it will not remove any job task execution added via {@link
-	 * #registerTask(JobID, ExecutionAttemptID, Collection, Collection)}!
+	 * <strong>Note:</strong> this is the counterpart of {@link #registerJob(JobID, Collection, Collection,
+	 * FlinkUserCodeClassLoader[])} and it will not remove any job task execution added via {@link #registerTask(
+	 * JobID, ExecutionAttemptID, Collection, Collection, FlinkUserCodeClassLoader[])}!
 	 *
 	 * @param id job ID
 	 *
-	 * @see #registerJob(JobID, Collection, Collection) counterpart of this method
+	 * @see #registerJob(JobID, Collection, Collection, FlinkUserCodeClassLoader[]) counterpart of this method
 	 */
 	void unregisterJob(JobID id);
 

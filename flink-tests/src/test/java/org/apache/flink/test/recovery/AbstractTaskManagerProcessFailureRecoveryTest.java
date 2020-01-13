@@ -28,6 +28,7 @@ import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.configuration.NettyShuffleEnvironmentOptions;
 import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.configuration.TaskManagerOptions;
+import org.apache.flink.core.plugin.PluginUtils;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.entrypoint.StandaloneSessionClusterEntrypoint;
 import org.apache.flink.runtime.taskexecutor.TaskManagerRunner;
@@ -321,7 +322,7 @@ public abstract class AbstractTaskManagerProcessFailureRecoveryTest extends Test
 				final ParameterTool parameterTool = ParameterTool.fromArgs(args);
 				Configuration cfg = parameterTool.getConfiguration();
 
-				TaskManagerRunner.runTaskManager(cfg, ResourceID.generate());
+				TaskManagerRunner.runTaskManager(cfg, ResourceID.generate(), PluginUtils.createPluginManagerFromRootFolder(cfg));
 			}
 			catch (Throwable t) {
 				LOG.error("Failed to start TaskManager process", t);

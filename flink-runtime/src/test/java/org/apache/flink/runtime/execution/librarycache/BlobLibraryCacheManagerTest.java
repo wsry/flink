@@ -103,7 +103,7 @@ public class BlobLibraryCacheManagerTest extends TestLogger {
 			checkFileCountForJob(1, jobId2, server);
 			checkFileCountForJob(0, jobId2, cache);
 
-			libCache.registerJob(jobId1, keys1, Collections.<URL>emptyList());
+			libCache.registerJob(jobId1, keys1, Collections.<URL>emptyList(), null);
 			ClassLoader classLoader1 = libCache.getClassLoader(jobId1);
 
 			assertEquals(1, libCache.getNumberOfManagedJobs());
@@ -116,12 +116,12 @@ public class BlobLibraryCacheManagerTest extends TestLogger {
 			checkFileCountForJob(1, jobId2, server);
 			checkFileCountForJob(0, jobId2, cache);
 
-			libCache.registerJob(jobId2, keys2, Collections.<URL>emptyList());
+			libCache.registerJob(jobId2, keys2, Collections.<URL>emptyList(), null);
 			ClassLoader classLoader2 = libCache.getClassLoader(jobId2);
 			assertNotEquals(classLoader1, classLoader2);
 
 			try {
-				libCache.registerJob(jobId2, keys1, Collections.<URL>emptyList());
+				libCache.registerJob(jobId2, keys1, Collections.<URL>emptyList(), null);
 				fail("Should fail with an IllegalStateException");
 			}
 			catch (IllegalStateException e) {
@@ -131,7 +131,7 @@ public class BlobLibraryCacheManagerTest extends TestLogger {
 			try {
 				libCache.registerJob(
 					jobId2, keys2,
-					Collections.singletonList(new URL("file:///tmp/does-not-exist")));
+					Collections.singletonList(new URL("file:///tmp/does-not-exist")), null);
 				fail("Should fail with an IllegalStateException");
 			}
 			catch (IllegalStateException e) {
@@ -230,7 +230,7 @@ public class BlobLibraryCacheManagerTest extends TestLogger {
 			checkFileCountForJob(2, jobId, server);
 			checkFileCountForJob(0, jobId, cache);
 
-			libCache.registerTask(jobId, attempt1, keys, Collections.<URL>emptyList());
+			libCache.registerTask(jobId, attempt1, keys, Collections.<URL>emptyList(), null);
 			ClassLoader classLoader1 = libCache.getClassLoader(jobId);
 
 			assertEquals(1, libCache.getNumberOfManagedJobs());
@@ -239,14 +239,14 @@ public class BlobLibraryCacheManagerTest extends TestLogger {
 			checkFileCountForJob(2, jobId, server);
 			checkFileCountForJob(2, jobId, cache);
 
-			libCache.registerTask(jobId, attempt2, keys, Collections.<URL>emptyList());
+			libCache.registerTask(jobId, attempt2, keys, Collections.<URL>emptyList(), null);
 			ClassLoader classLoader2 = libCache.getClassLoader(jobId);
 			assertEquals(classLoader1, classLoader2);
 
 			try {
 				libCache.registerTask(
 					jobId, new ExecutionAttemptID(), Collections.emptyList(),
-					Collections.emptyList());
+					Collections.emptyList(), null);
 				fail("Should fail with an IllegalStateException");
 			}
 			catch (IllegalStateException e) {
@@ -256,7 +256,7 @@ public class BlobLibraryCacheManagerTest extends TestLogger {
 			try {
 				libCache.registerTask(
 					jobId, new ExecutionAttemptID(), keys,
-					Collections.singletonList(new URL("file:///tmp/does-not-exist")));
+					Collections.singletonList(new URL("file:///tmp/does-not-exist")), null);
 				fail("Should fail with an IllegalStateException");
 			}
 			catch (IllegalStateException e) {
@@ -342,7 +342,7 @@ public class BlobLibraryCacheManagerTest extends TestLogger {
 			checkFileCountForJob(2, jobId, server);
 			checkFileCountForJob(0, jobId, cache);
 
-			libCache.registerJob(jobId, keys, Collections.<URL>emptyList());
+			libCache.registerJob(jobId, keys, Collections.<URL>emptyList(), null);
 			ClassLoader classLoader1 = libCache.getClassLoader(jobId);
 
 			assertEquals(1, libCache.getNumberOfManagedJobs());
@@ -351,14 +351,14 @@ public class BlobLibraryCacheManagerTest extends TestLogger {
 			checkFileCountForJob(2, jobId, server);
 			checkFileCountForJob(2, jobId, cache);
 
-			libCache.registerTask(jobId, attempt1, keys, Collections.<URL>emptyList());
+			libCache.registerTask(jobId, attempt1, keys, Collections.<URL>emptyList(), null);
 			ClassLoader classLoader2 = libCache.getClassLoader(jobId);
 			assertEquals(classLoader1, classLoader2);
 
 			try {
 				libCache.registerTask(
 					jobId, new ExecutionAttemptID(), Collections.emptyList(),
-					Collections.emptyList());
+					Collections.emptyList(), null);
 				fail("Should fail with an IllegalStateException");
 			}
 			catch (IllegalStateException e) {
@@ -368,7 +368,7 @@ public class BlobLibraryCacheManagerTest extends TestLogger {
 			try {
 				libCache.registerTask(
 					jobId, new ExecutionAttemptID(), keys,
-					Collections.singletonList(new URL("file:///tmp/does-not-exist")));
+					Collections.singletonList(new URL("file:///tmp/does-not-exist")), null);
 				fail("Should fail with an IllegalStateException");
 			}
 			catch (IllegalStateException e) {
@@ -461,7 +461,7 @@ public class BlobLibraryCacheManagerTest extends TestLogger {
 
 				cache.registerJob(jobId);
 				ExecutionAttemptID executionId = new ExecutionAttemptID();
-				libCache.registerTask(jobId, executionId, keys, Collections.<URL>emptyList());
+				libCache.registerTask(jobId, executionId, keys, Collections.<URL>emptyList(), null);
 				ClassLoader classLoader1 = libCache.getClassLoader(jobId);
 				assertEquals(1, libCache.getNumberOfManagedJobs());
 				assertEquals(1, libCache.getNumberOfReferenceHolders(jobId));
@@ -470,7 +470,7 @@ public class BlobLibraryCacheManagerTest extends TestLogger {
 				checkFileCountForJob(1, jobId, cache);
 				assertNotNull(libCache.getClassLoader(jobId));
 
-				libCache.registerJob(jobId, keys, Collections.<URL>emptyList());
+				libCache.registerJob(jobId, keys, Collections.<URL>emptyList(), null);
 				ClassLoader classLoader2 = libCache.getClassLoader(jobId);
 				assertEquals(classLoader1, classLoader2);
 				assertEquals(1, libCache.getNumberOfManagedJobs());
@@ -525,7 +525,7 @@ public class BlobLibraryCacheManagerTest extends TestLogger {
 			try {
 				cache.registerJob(jobId);
 				libCache.registerTask(jobId, new ExecutionAttemptID(), Collections.singleton(dataKey2),
-					Collections.<URL>emptyList());
+					Collections.<URL>emptyList(), null);
 				fail("This should fail with an IOException");
 			}
 			catch (IOException e) {

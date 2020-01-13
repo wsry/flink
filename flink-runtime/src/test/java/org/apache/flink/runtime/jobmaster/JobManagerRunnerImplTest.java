@@ -20,6 +20,8 @@ package org.apache.flink.runtime.jobmaster;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.core.plugin.PluginUtils;
 import org.apache.flink.runtime.blob.FailingPermanentBlobService;
 import org.apache.flink.runtime.blob.VoidPermanentBlobService;
 import org.apache.flink.runtime.checkpoint.StandaloneCheckpointRecoveryFactory;
@@ -315,6 +317,7 @@ public class JobManagerRunnerImplTest extends TestLogger {
 			jobMasterServiceFactory,
 			haServices,
 			libraryCacheManager,
+			PluginUtils.createPluginManagerFromRootFolder(new Configuration()),
 			TestingUtils.defaultExecutor(),
 			fatalErrorHandler);
 	}

@@ -81,6 +81,7 @@ public enum DefaultJobManagerRunnerFactory implements JobManagerRunnerFactory {
 			jobMasterFactory,
 			highAvailabilityServices,
 			jobManagerServices.getLibraryCacheManager(),
+			jobManagerServices.getPluginManager(),
 			jobManagerServices.getScheduledExecutorService(),
 			fatalErrorHandler);
 	}

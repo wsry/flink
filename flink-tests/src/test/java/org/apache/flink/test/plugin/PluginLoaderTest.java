@@ -21,6 +21,7 @@ package org.apache.flink.test.plugin;
 import org.apache.flink.core.plugin.PluginDescriptor;
 import org.apache.flink.core.plugin.PluginLoader;
 import org.apache.flink.test.plugin.jar.plugina.TestServiceA;
+import org.apache.flink.util.FlinkUserCodeClassLoader;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -39,7 +40,8 @@ public class PluginLoaderTest extends PluginTestBase {
 		final URL classpathA = createPluginJarURLFromString(PLUGIN_A);
 
 		PluginDescriptor pluginDescriptorA = new PluginDescriptor("A", new URL[]{classpathA}, new String[0]);
-		ClassLoader pluginClassLoaderA = PluginLoader.createPluginClassLoader(pluginDescriptorA, PARENT_CLASS_LOADER, new String[0]);
+		FlinkUserCodeClassLoader pluginClassLoaderA = PluginLoader.
+			createPluginClassLoader(pluginDescriptorA, PARENT_CLASS_LOADER, new String[0]);
 		Assert.assertNotEquals(PARENT_CLASS_LOADER, pluginClassLoaderA);
 		final PluginLoader pluginLoaderA = new PluginLoader(pluginClassLoaderA);
 

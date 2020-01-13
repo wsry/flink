@@ -28,6 +28,7 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.ClusterOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ConfigurationUtils;
+import org.apache.flink.core.plugin.PluginUtils;
 import org.apache.flink.runtime.akka.AkkaUtils;
 import org.apache.flink.runtime.blob.BlobCacheService;
 import org.apache.flink.runtime.blob.BlobClient;
@@ -518,6 +519,7 @@ public class MiniCluster implements JobExecutorService, AutoCloseableAsync {
 				heartbeatServices,
 				metricRegistry,
 				blobCacheService,
+				PluginUtils.createPluginManagerFromRootFolder(configuration),
 				useLocalCommunication(),
 				taskManagerTerminatingFatalErrorHandlerFactory.create(taskManagers.size()));
 

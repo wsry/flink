@@ -21,6 +21,8 @@ package org.apache.flink.runtime.taskmanager;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.core.plugin.PluginManager;
+import org.apache.flink.core.plugin.PluginUtils;
 import org.apache.flink.runtime.blob.BlobCacheService;
 import org.apache.flink.runtime.blob.PermanentBlobCache;
 import org.apache.flink.runtime.blob.PermanentBlobKey;
@@ -194,6 +196,7 @@ public final class TestTaskBuilder {
 			kvStateService,
 			new BroadcastVariableManager(),
 			new TaskEventDispatcher(),
+			PluginUtils.createPluginManagerFromRootFolder(taskManagerConfig),
 			new TestTaskStateManager(),
 			taskManagerActions,
 			new MockInputSplitProvider(),

@@ -21,6 +21,7 @@ package org.apache.flink.core.plugin;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.util.ArrayUtils;
 import org.apache.flink.util.ChildFirstClassLoader;
+import org.apache.flink.util.FlinkUserCodeClassLoader;
 
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -37,15 +38,18 @@ import java.util.ServiceLoader;
 public class PluginLoader {
 
 	/** Classloader which is used to load the plugin classes. We expect this classloader is thread-safe.*/
-	private final ClassLoader pluginClassLoader;
+	private final FlinkUserCodeClassLoader pluginClassLoader;
 
 	@VisibleForTesting
-	public PluginLoader(ClassLoader pluginClassLoader) {
+	public PluginLoader(FlinkUserCodeClassLoader pluginClassLoader) {
 		this.pluginClassLoader = pluginClassLoader;
 	}
 
 	@VisibleForTesting
-	public static ClassLoader createPluginClassLoader(PluginDescriptor pluginDescriptor, ClassLoader parentClassLoader, String[] alwaysParentFirstPatterns) {
+	public static FlinkUserCodeClassLoader createPluginClassLoader(
+			PluginDescriptor pluginDescriptor,
+			ClassLoader parentClassLoader,
+			String[] alwaysParentFirstPatterns) {
 		return new ChildFirstClassLoader(
 			pluginDescriptor.getPluginResourceURLs(),
 			parentClassLoader,

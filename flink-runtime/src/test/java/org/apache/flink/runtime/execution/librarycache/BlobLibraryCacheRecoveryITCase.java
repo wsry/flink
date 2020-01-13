@@ -104,7 +104,7 @@ public class BlobLibraryCacheRecoveryITCase extends TestLogger {
 
 			// Register uploaded libraries
 			ExecutionAttemptID executionId = new ExecutionAttemptID();
-			libServer[0].registerTask(jobId, executionId, keys, Collections.<URL>emptyList());
+			libServer[0].registerTask(jobId, executionId, keys, Collections.<URL>emptyList(), null);
 
 			// Verify key 1
 			File f = cache.getFile(jobId, keys.get(0));

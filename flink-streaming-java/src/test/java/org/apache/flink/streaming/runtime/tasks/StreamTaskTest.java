@@ -25,6 +25,7 @@ import org.apache.flink.api.common.typeutils.base.StringSerializer;
 import org.apache.flink.configuration.CheckpointingOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.FSDataInputStream;
+import org.apache.flink.core.plugin.PluginUtils;
 import org.apache.flink.core.testutils.OneShotLatch;
 import org.apache.flink.runtime.blob.BlobCacheService;
 import org.apache.flink.runtime.blob.PermanentBlobCache;
@@ -1250,6 +1251,7 @@ public class StreamTaskTest extends TestLogger {
 			new KvStateService(new KvStateRegistry(), null, null),
 			mock(BroadcastVariableManager.class),
 			new TaskEventDispatcher(),
+			PluginUtils.createPluginManagerFromRootFolder(new Configuration()),
 			taskStateManager,
 			taskManagerActions,
 			mock(InputSplitProvider.class),

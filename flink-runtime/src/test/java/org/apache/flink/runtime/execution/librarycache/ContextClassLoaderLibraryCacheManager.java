@@ -21,6 +21,7 @@ package org.apache.flink.runtime.execution.librarycache;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.blob.PermanentBlobKey;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
+import org.apache.flink.util.FlinkUserCodeClassLoader;
 
 import javax.annotation.Nonnull;
 
@@ -39,12 +40,12 @@ public enum ContextClassLoaderLibraryCacheManager implements LibraryCacheManager
 	}
 
 	@Override
-	public void registerJob(JobID id, Collection<PermanentBlobKey> requiredJarFiles, Collection<URL> requiredClasspaths) {
+	public void registerJob(JobID id, Collection<PermanentBlobKey> requiredJarFiles, Collection<URL> requiredClasspaths, FlinkUserCodeClassLoader[] extClassLoaders) {
 
 	}
 
 	@Override
-	public void registerTask(JobID id, ExecutionAttemptID execution, Collection<PermanentBlobKey> requiredJarFiles, Collection<URL> requiredClasspaths) {
+	public void registerTask(JobID id, ExecutionAttemptID execution, Collection<PermanentBlobKey> requiredJarFiles, Collection<URL> requiredClasspaths, FlinkUserCodeClassLoader[] extClassLoaders) {
 
 	}
 

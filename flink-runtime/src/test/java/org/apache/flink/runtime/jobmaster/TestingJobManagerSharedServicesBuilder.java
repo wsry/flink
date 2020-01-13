@@ -18,6 +18,8 @@
 
 package org.apache.flink.runtime.jobmaster;
 
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.core.plugin.PluginUtils;
 import org.apache.flink.runtime.blob.BlobWriter;
 import org.apache.flink.runtime.blob.VoidBlobWriter;
 import org.apache.flink.runtime.execution.librarycache.ContextClassLoaderLibraryCacheManager;
@@ -95,6 +97,7 @@ public class TestingJobManagerSharedServicesBuilder {
 			restartStrategyFactory,
 			backPressureSampleCoordinator,
 			backPressureStatsTracker,
-			blobWriter);
+			blobWriter,
+			PluginUtils.createPluginManagerFromRootFolder(new Configuration()));
 	}
 }

@@ -19,6 +19,7 @@
 package org.apache.flink.core.plugin;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.util.FlinkUserCodeClassLoader;
 
 import org.apache.flink.shaded.guava18.com.google.common.collect.Iterators;
 
@@ -27,7 +28,9 @@ import javax.annotation.concurrent.ThreadSafe;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 
 /**
  * Manager class and entry-point for the plugin mechanism in Flink.
@@ -45,6 +48,9 @@ public class PluginManager {
 	/** List of patterns for classes that should always be resolved from the parent ClassLoader. */
 	private final String[] alwaysParentFirstPatterns;
 
+	/** Plugin ClassLoaders which can be reused. */
+	private final Map<String, FlinkUserCodeClassLoader> pluginClassLoaders;
+
 	public PluginManager(Collection<PluginDescriptor> pluginDescriptors, String[] alwaysParentFirstPatterns) {
 		this(pluginDescriptors, PluginManager.class.getClassLoader(), alwaysParentFirstPatterns);
 	}
@@ -53,6 +59,13 @@ public class PluginManager {
 		this.pluginDescriptors = pluginDescriptors;
 		this.parentClassLoader = parentClassLoader;
 		this.alwaysParentFirstPatterns = alwaysParentFirstPatterns;
+
+		this.pluginClassLoaders = new HashMap<>();
+		for (PluginDescriptor pluginDescriptor: pluginDescriptors) {
+			FlinkUserCodeClassLoader pluginClassLoader = PluginLoader.createPluginClassLoader(
+				pluginDescriptor, parentClassLoader, alwaysParentFirstPatterns);
+			pluginClassLoaders.put(pluginDescriptor.getPluginId(), pluginClassLoader);
+		}
 	}
 
 	/**
@@ -70,6 +83,15 @@ public class PluginManager {
 			combinedIterators.add(pluginLoader.load(service));
 		}
 		return Iterators.concat(combinedIterators.iterator());
+	}
+
+	public FlinkUserCodeClassLoader getPluginClassLoader(String pluginId) {
+		return pluginClassLoaders.get(pluginId);
+	}
+
+	public FlinkUserCodeClassLoader[] getPluginClassLoaders() {
+		FlinkUserCodeClassLoader[] classLoaders = new FlinkUserCodeClassLoader[pluginClassLoaders.size()];
+		return pluginClassLoaders.values().toArray(classLoaders);
 	}
 
 	@Override

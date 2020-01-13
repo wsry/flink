@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.taskexecutor;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.core.plugin.PluginManager;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.broadcast.BroadcastVariableManager;
 import org.apache.flink.runtime.clusterframework.TaskExecutorResourceSpec;
@@ -70,6 +71,7 @@ public class TaskManagerServices {
 	private final JobLeaderService jobLeaderService;
 	private final TaskExecutorLocalStateStoresManager taskManagerStateStore;
 	private final TaskEventDispatcher taskEventDispatcher;
+	private final PluginManager pluginManager;
 
 	TaskManagerServices(
 		TaskManagerLocation taskManagerLocation,
@@ -82,7 +84,8 @@ public class TaskManagerServices {
 		JobManagerTable jobManagerTable,
 		JobLeaderService jobLeaderService,
 		TaskExecutorLocalStateStoresManager taskManagerStateStore,
-		TaskEventDispatcher taskEventDispatcher) {
+		TaskEventDispatcher taskEventDispatcher,
+		PluginManager pluginManager) {
 
 		this.taskManagerLocation = Preconditions.checkNotNull(taskManagerLocation);
 		this.managedMemorySize = managedMemorySize;
@@ -95,6 +98,7 @@ public class TaskManagerServices {
 		this.jobLeaderService = Preconditions.checkNotNull(jobLeaderService);
 		this.taskManagerStateStore = Preconditions.checkNotNull(taskManagerStateStore);
 		this.taskEventDispatcher = Preconditions.checkNotNull(taskEventDispatcher);
+		this.pluginManager = Preconditions.checkNotNull(pluginManager);
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -143,6 +147,10 @@ public class TaskManagerServices {
 
 	public TaskEventDispatcher getTaskEventDispatcher() {
 		return taskEventDispatcher;
+	}
+
+	public PluginManager getPluginManager() {
+		return pluginManager;
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -215,6 +223,7 @@ public class TaskManagerServices {
 	public static TaskManagerServices fromConfiguration(
 			TaskManagerServicesConfiguration taskManagerServicesConfiguration,
 			MetricGroup taskManagerMetricGroup,
+			PluginManager pluginManager,
 			Executor taskIOExecutor) throws Exception {
 
 		// pre-start checks
@@ -275,7 +284,8 @@ public class TaskManagerServices {
 			jobManagerTable,
 			jobLeaderService,
 			taskStateManager,
-			taskEventDispatcher);
+			taskEventDispatcher,
+			pluginManager);
 	}
 
 	private static TaskSlotTable createTaskSlotTable(
