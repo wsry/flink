@@ -679,7 +679,8 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		int maxParallelism = consumerVertex.getMaxParallelism();
 		return maxParallelism;
 	}
-
+    public static long totalDeployTime = 0;
+	public static int totalDeploy = 0;
 	/**
 	 * Deploys the execution to the previously assigned resource.
 	 *
@@ -732,6 +733,7 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 						attemptNumber, getAssignedResourceLocation()));
 			}
 
+			final long startTime = System.nanoTime();
 			final TaskDeploymentDescriptor deployment = TaskDeploymentDescriptorFactory
 				.fromExecutionVertex(vertex, attemptNumber)
 				.createDeploymentDescriptor(
@@ -739,6 +741,10 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 					slot.getPhysicalSlotNumber(),
 					taskRestore,
 					producedPartitions.values());
+			final long endTime = System.nanoTime();
+			Execution.totalDeploy++;
+			Execution.totalDeployTime += endTime - startTime;
+			LOG.info("Create TaskDeploymentDescriptor: " + Execution.totalDeploy + " " + Execution.totalDeployTime);
 
 			// null taskRestore to let it be GC'ed
 			taskRestore = null;
