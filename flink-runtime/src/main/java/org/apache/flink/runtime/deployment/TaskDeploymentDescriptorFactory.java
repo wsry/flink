@@ -42,6 +42,9 @@ import org.apache.flink.runtime.shuffle.UnknownShuffleDescriptor;
 import org.apache.flink.types.Either;
 import org.apache.flink.util.SerializedValue;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 
 import java.io.IOException;
@@ -54,6 +57,8 @@ import java.util.Optional;
  * Factory of {@link TaskDeploymentDescriptor} to deploy {@link org.apache.flink.runtime.taskmanager.Task} from {@link Execution}.
  */
 public class TaskDeploymentDescriptorFactory {
+	private static final Logger LOG = LoggerFactory.getLogger(TaskDeploymentDescriptorFactory.class);
+
 	private final ExecutionAttemptID executionId;
 	private final int attemptNumber;
 	private final MaybeOffloaded<JobInformation> serializedJobInformation;
@@ -126,13 +131,20 @@ public class TaskDeploymentDescriptorFactory {
 		return inputGates;
 	}
 
+	public static long totalDeployTime = 0;
+	public static int totalDeploy = 0;
 	private ShuffleDescriptor[] getConsumedPartitionShuffleDescriptors(ExecutionEdge[] edges) {
+		final long startTime = System.nanoTime();
 		ShuffleDescriptor[] shuffleDescriptors = new ShuffleDescriptor[edges.length];
 		// Each edge is connected to a different result partition
 		for (int i = 0; i < edges.length; i++) {
 			shuffleDescriptors[i] =
 				getConsumedPartitionShuffleDescriptor(edges[i], allowUnknownPartitions);
 		}
+		final long endTime = System.nanoTime();
+		TaskDeploymentDescriptorFactory.totalDeploy++;
+		TaskDeploymentDescriptorFactory.totalDeployTime += endTime - startTime;
+		LOG.info("Create ShuffleDescriptor: " + TaskDeploymentDescriptorFactory.totalDeploy + " " + TaskDeploymentDescriptorFactory.totalDeployTime);
 		return shuffleDescriptors;
 	}
 
