@@ -189,7 +189,7 @@ public class TaskDeploymentDescriptorFactory {
 
 		ExecutionState producerState = producer.getState();
 		Optional<ResultPartitionDeploymentDescriptor> consumedPartitionDescriptor =
-			producer.getResultPartitionDeploymentDescriptor(consumedPartition.getPartitionId());
+			Optional.of(producer.getDeploymentDescriptor());
 
 		ResultPartitionID consumedPartitionId = new ResultPartitionID(
 			consumedPartition.getPartitionId(),

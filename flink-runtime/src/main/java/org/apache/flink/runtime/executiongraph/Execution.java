@@ -594,6 +594,12 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 		return registerProducedPartitions(location, vertex.getExecutionGraph().getScheduleMode().allowLazyDeployment());
 	}
 
+	private ResultPartitionDeploymentDescriptor deploymentDescriptor = null;
+
+	public ResultPartitionDeploymentDescriptor getDeploymentDescriptor() {
+		return deploymentDescriptor;
+	}
+
 	public CompletableFuture<Execution> registerProducedPartitions(
 			TaskManagerLocation location,
 			boolean sendScheduleOrUpdateConsumersMessage) {
@@ -605,6 +611,11 @@ public class Execution implements AccessExecution, Archiveable<ArchivedExecution
 			vertex.getExecutionGraph().getJobMasterMainThreadExecutor(),
 			producedPartitionsCache -> {
 				producedPartitions = producedPartitionsCache;
+				if (producedPartitions != null) {
+					for (ResultPartitionDeploymentDescriptor dd: producedPartitions.values()) {
+						deploymentDescriptor = dd;
+					}
+				}
 				startTrackingPartitions(location.getResourceID(), producedPartitionsCache.values());
 				return this;
 			});
