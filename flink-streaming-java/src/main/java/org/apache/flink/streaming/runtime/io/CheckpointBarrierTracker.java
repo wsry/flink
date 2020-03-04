@@ -85,12 +85,15 @@ public class CheckpointBarrierTracker extends CheckpointBarrierHandler {
 	}
 
 	@Override
-	public boolean processBarrier(CheckpointBarrier receivedBarrier, int channelIndex, long bufferedBytes) throws Exception {
+	public boolean processBarrier(
+			CheckpointBarrier receivedBarrier,
+			CheckpointedInputGate inputGate,
+			int channelIndex) throws Exception {
 		final long barrierId = receivedBarrier.getId();
 
 		// fast path for single channel trackers
 		if (totalNumberOfInputChannels == 1) {
-			notifyCheckpoint(receivedBarrier, 0, 0);
+			notifyCheckpoint(receivedBarrier, 0);
 			return false;
 		}
 
@@ -128,7 +131,7 @@ public class CheckpointBarrierTracker extends CheckpointBarrierHandler {
 						LOG.debug("Received all barriers for checkpoint {}", barrierId);
 					}
 
-					notifyCheckpoint(receivedBarrier, 0, 0);
+					notifyCheckpoint(receivedBarrier, 0);
 				}
 			}
 		}
@@ -227,11 +230,6 @@ public class CheckpointBarrierTracker extends CheckpointBarrierHandler {
 
 	public long getAlignmentDurationNanos() {
 		return 0;
-	}
-
-	@Override
-	public void checkpointSizeLimitExceeded(long maxBufferedBytes) throws Exception {
-		throw new UnsupportedOperationException("This should never happened as this class doesn't block any data");
 	}
 
 	/**

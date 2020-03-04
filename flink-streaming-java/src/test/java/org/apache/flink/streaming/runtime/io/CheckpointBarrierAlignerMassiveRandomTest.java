@@ -59,7 +59,6 @@ public class CheckpointBarrierAlignerMassiveRandomTest {
 			CheckpointedInputGate checkpointedInputGate =
 				new CheckpointedInputGate(
 					myIG,
-					new CachedBufferStorage(PAGE_SIZE),
 					"Testing: No task associated",
 					new DummyCheckpointInvokable());
 

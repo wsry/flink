@@ -44,6 +44,8 @@ public class BufferConsumer implements Closeable {
 
 	private int currentReaderPosition;
 
+	private final boolean isBlockingEvent;
+
 	/**
 	 * Constructs {@link BufferConsumer} instance with the initial reader position.
 	 */
@@ -55,31 +57,47 @@ public class BufferConsumer implements Closeable {
 		this(
 			new NetworkBuffer(checkNotNull(memorySegment), checkNotNull(recycler), true),
 			currentWriterPosition,
-			currentReaderPosition);
+			currentReaderPosition,
+			false);
 	}
 
 	/**
 	 * Constructs {@link BufferConsumer} instance with static content.
 	 */
-	public BufferConsumer(MemorySegment memorySegment, BufferRecycler recycler, boolean isBuffer) {
-		this(memorySegment, recycler, memorySegment.size(), isBuffer);
+	public BufferConsumer(
+			MemorySegment memorySegment,
+			BufferRecycler recycler,
+			boolean isBuffer,
+			boolean isBlockingEvent) {
+		this(memorySegment, recycler, memorySegment.size(), isBuffer, isBlockingEvent);
 	}
 
 	/**
 	 * Constructs {@link BufferConsumer} instance with static content of a certain size.
 	 */
-	public BufferConsumer(MemorySegment memorySegment, BufferRecycler recycler, int size, boolean isBuffer) {
+	public BufferConsumer(
+			MemorySegment memorySegment,
+			BufferRecycler recycler,
+			int size,
+			boolean isBuffer,
+			boolean isBlockingEvent) {
 		this(new NetworkBuffer(checkNotNull(memorySegment), checkNotNull(recycler), isBuffer),
 				() -> -size,
-				0);
+				0,
+				isBlockingEvent);
 		checkState(memorySegment.size() > 0);
 		checkState(isFinished(), "BufferConsumer with static size must be finished after construction!");
 	}
 
-	private BufferConsumer(Buffer buffer, BufferBuilder.PositionMarker currentWriterPosition, int currentReaderPosition) {
+	private BufferConsumer(
+			Buffer buffer,
+			BufferBuilder.PositionMarker currentWriterPosition,
+			int currentReaderPosition,
+			boolean isBlockingEvent) {
 		this.buffer = checkNotNull(buffer);
 		this.writerPosition = new CachedPositionMarker(checkNotNull(currentWriterPosition));
 		this.currentReaderPosition = currentReaderPosition;
+		this.isBlockingEvent = isBlockingEvent;
 	}
 
 	/**
@@ -115,11 +133,15 @@ public class BufferConsumer implements Closeable {
 	 * @return a retained copy of self with separate indexes
 	 */
 	public BufferConsumer copy() {
-		return new BufferConsumer(buffer.retainBuffer(), writerPosition.positionMarker, currentReaderPosition);
+		return new BufferConsumer(buffer.retainBuffer(), writerPosition.positionMarker, currentReaderPosition, isBlockingEvent);
 	}
 
 	public boolean isBuffer() {
 		return buffer.isBuffer();
+	}
+
+	public boolean isBlockingEvent() {
+		return isBlockingEvent;
 	}
 
 	@Override
@@ -137,7 +159,7 @@ public class BufferConsumer implements Closeable {
 		return writerPosition.getCached();
 	}
 
-	int getCurrentReaderPosition() {
+	public int getCurrentReaderPosition() {
 		return currentReaderPosition;
 	}
 

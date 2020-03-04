@@ -60,4 +60,6 @@ public interface ResultSubpartitionView {
 	boolean isAvailable();
 
 	int unsynchronizedGetNumberOfQueuedBuffers();
+
+	int getAndResetUnannouncedBacklog();
 }

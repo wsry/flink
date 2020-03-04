@@ -44,4 +44,6 @@ public interface NetworkClientHandler extends ChannelHandler {
 	 * @param inputChannel The input channel with unannounced credits.
 	 */
 	void notifyCreditAvailable(final RemoteInputChannel inputChannel);
+
+	void resumeConsumption(RemoteInputChannel inputChannel);
 }

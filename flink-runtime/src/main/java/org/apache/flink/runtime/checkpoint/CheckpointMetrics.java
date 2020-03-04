@@ -65,13 +65,9 @@ public class CheckpointMetrics implements Serializable {
 		this.asyncDurationMillis = asyncDurationMillis;
 	}
 
+	// TODO remove this
 	public long getBytesBufferedInAlignment() {
 		return bytesBufferedInAlignment;
-	}
-
-	public CheckpointMetrics setBytesBufferedInAlignment(long bytesBufferedInAlignment) {
-		this.bytesBufferedInAlignment = bytesBufferedInAlignment;
-		return this;
 	}
 
 	public long getAlignmentDurationNanos() {

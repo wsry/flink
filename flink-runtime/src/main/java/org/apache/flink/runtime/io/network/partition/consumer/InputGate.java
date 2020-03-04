@@ -69,13 +69,28 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * will have an input gate attached to it. This will provide its input, which will consist of one
  * subpartition from each partition of the intermediate result.
  */
-public abstract class InputGate implements PullingAsyncDataInput<BufferOrEvent>, AutoCloseable {
+public abstract class InputGate implements PullingAsyncDataInput<BufferOrEvent>, UnblockCheckpointListener, AutoCloseable {
 
 	protected final AvailabilityHelper availabilityHelper = new AvailabilityHelper();
 
 	public abstract int getNumberOfInputChannels();
 
 	public abstract boolean isFinished();
+
+	@Override
+	public void unblockAllChannels(long checkpointId) throws Exception {
+		// default empty implementation
+	}
+
+	@Override
+	public void unblockAllChannelsExceptFor(long checkpointId, int channelIndex) throws Exception {
+
+	}
+
+	@Override
+	public void unblockChannel(long checkpointId, int channelIndex) throws Exception {
+		// default empty implementation
+	}
 
 	/**
 	 * Blocking call waiting for next {@link BufferOrEvent}.

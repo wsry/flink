@@ -70,6 +70,10 @@ public abstract class InputChannel {
 	/** The current backoff (in ms). */
 	private int currentBackoff;
 
+	protected long currentCheckpointId = Long.MIN_VALUE;
+
+	protected boolean blockedByCheckpoint = false;
+
 	protected InputChannel(
 			SingleInputGate inputGate,
 			int channelIndex,
@@ -124,6 +128,18 @@ public abstract class InputChannel {
 	 */
 	protected void notifyChannelNonEmpty() {
 		inputGate.notifyChannelNonEmpty(this);
+	}
+
+	// ------------------------------------------------------------------------
+	// Credit-based
+	// ------------------------------------------------------------------------
+
+	public void onBlockingCheckpointBarrier(long checkpointId) {
+		// the default empty implementation
+	}
+
+	public void unblockCheckpointBarrier(long checkpointId) throws Exception {
+		// the default empty implementation
 	}
 
 	// ------------------------------------------------------------------------

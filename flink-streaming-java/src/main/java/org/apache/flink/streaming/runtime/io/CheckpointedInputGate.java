@@ -25,6 +25,7 @@ import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.partition.consumer.BufferOrEvent;
 import org.apache.flink.runtime.io.network.partition.consumer.InputGate;
+import org.apache.flink.runtime.io.network.partition.consumer.UnblockCheckpointListener;
 import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
 
 import org.slf4j.Logger;
@@ -34,14 +35,12 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-import static org.apache.flink.util.Preconditions.checkNotNull;
-
 /**
  * The {@link CheckpointedInputGate} uses {@link CheckpointBarrierHandler} to handle incoming
  * {@link CheckpointBarrier} from the {@link InputGate}.
  */
 @Internal
-public class CheckpointedInputGate implements PullingAsyncDataInput<BufferOrEvent> {
+public class CheckpointedInputGate implements PullingAsyncDataInput<BufferOrEvent>, UnblockCheckpointListener {
 
 	private static final Logger LOG = LoggerFactory.getLogger(CheckpointedInputGate.class);
 
@@ -52,23 +51,18 @@ public class CheckpointedInputGate implements PullingAsyncDataInput<BufferOrEven
 
 	private final int channelIndexOffset;
 
-	private final BufferStorage bufferStorage;
-
 	/** Flag to indicate whether we have drawn all available input. */
 	private boolean endOfInputGate;
 
-	/** Indicate end of the input. Set to true after encountering {@link #endOfInputGate} and depleting
-	 * {@link #bufferStorage}. */
+	/** Indicate end of the input. Set to true after encountering {@link #endOfInputGate}. */
 	private boolean isFinished;
 
 	public CheckpointedInputGate(
 			InputGate inputGate,
-			BufferStorage bufferStorage,
 			String taskName,
 			AbstractInvokable toNotifyOnCheckpoint) {
 		this(
 			inputGate,
-			bufferStorage,
 			new CheckpointBarrierAligner(
 				inputGate.getNumberOfInputChannels(),
 				taskName,
@@ -78,9 +72,8 @@ public class CheckpointedInputGate implements PullingAsyncDataInput<BufferOrEven
 
 	public CheckpointedInputGate(
 			InputGate inputGate,
-			BufferStorage bufferStorage,
 			CheckpointBarrierHandler barrierHandler) {
-		this(inputGate, bufferStorage, barrierHandler, 0);
+		this(inputGate, barrierHandler, 0);
 	}
 
 	/**
@@ -91,44 +84,29 @@ public class CheckpointedInputGate implements PullingAsyncDataInput<BufferOrEven
 	 * checkpoint has been cancelled.
 	 *
 	 * @param inputGate The input gate to draw the buffers and events from.
-	 * @param bufferStorage The storage to hold the buffers and events for blocked channels.
 	 * @param barrierHandler Handler that controls which channels are blocked.
 	 * @param channelIndexOffset Optional offset added to channelIndex returned from the inputGate
 	 *                           before passing it to the barrierHandler.
 	 */
 	public CheckpointedInputGate(
 			InputGate inputGate,
-			BufferStorage bufferStorage,
 			CheckpointBarrierHandler barrierHandler,
 			int channelIndexOffset) {
 		this.inputGate = inputGate;
 		this.channelIndexOffset = channelIndexOffset;
-		this.bufferStorage = checkNotNull(bufferStorage);
 		this.barrierHandler = barrierHandler;
+		this.barrierHandler.registerUnblockCheckpointListener(this);
 	}
 
 	@Override
 	public CompletableFuture<?> getAvailableFuture() {
-		if (bufferStorage.isEmpty()) {
-			return inputGate.getAvailableFuture();
-		}
-		return AVAILABLE;
+		return inputGate.getAvailableFuture();
 	}
 
 	@Override
 	public Optional<BufferOrEvent> pollNext() throws Exception {
 		while (true) {
-			// process buffered BufferOrEvents before grabbing new ones
-			Optional<BufferOrEvent> next;
-			if (bufferStorage.isEmpty()) {
-				next = inputGate.pollNext();
-			}
-			else {
-				next = bufferStorage.pollNext();
-				if (!next.isPresent()) {
-					return pollNext();
-				}
-			}
+			Optional<BufferOrEvent> next = inputGate.pollNext();
 
 			if (!next.isPresent()) {
 				return handleEmptyBuffer();
@@ -136,12 +114,7 @@ public class CheckpointedInputGate implements PullingAsyncDataInput<BufferOrEven
 
 			BufferOrEvent bufferOrEvent = next.get();
 			if (barrierHandler.isBlocked(offsetChannelIndex(bufferOrEvent.getChannelIndex()))) {
-				// if the channel is blocked, we just store the BufferOrEvent
-				bufferStorage.add(bufferOrEvent);
-				if (bufferStorage.isFull()) {
-					barrierHandler.checkpointSizeLimitExceeded(bufferStorage.getMaxBufferedBytes());
-					bufferStorage.rollOver();
-				}
+				throw new IllegalStateException("Channel already blocked.");
 			}
 			else if (bufferOrEvent.isBuffer()) {
 				return next;
@@ -150,21 +123,15 @@ public class CheckpointedInputGate implements PullingAsyncDataInput<BufferOrEven
 				CheckpointBarrier checkpointBarrier = (CheckpointBarrier) bufferOrEvent.getEvent();
 				if (!endOfInputGate) {
 					// process barriers only if there is a chance of the checkpoint completing
-					if (barrierHandler.processBarrier(checkpointBarrier, offsetChannelIndex(bufferOrEvent.getChannelIndex()), bufferStorage.getPendingBytes())) {
-						bufferStorage.rollOver();
-					}
+					barrierHandler.processBarrier(checkpointBarrier, this, offsetChannelIndex(bufferOrEvent.getChannelIndex()));
 				}
 			}
 			else if (bufferOrEvent.getEvent().getClass() == CancelCheckpointMarker.class) {
-				if (barrierHandler.processCancellationBarrier((CancelCheckpointMarker) bufferOrEvent.getEvent())) {
-					bufferStorage.rollOver();
-				}
+				barrierHandler.processCancellationBarrier((CancelCheckpointMarker) bufferOrEvent.getEvent());
 			}
 			else {
 				if (bufferOrEvent.getEvent().getClass() == EndOfPartitionEvent.class) {
-					if (barrierHandler.processEndOfPartition()) {
-						bufferStorage.rollOver();
-					}
+					barrierHandler.processEndOfPartition();
 				}
 				return next;
 			}
@@ -187,7 +154,6 @@ public class CheckpointedInputGate implements PullingAsyncDataInput<BufferOrEven
 			// end of input stream. stream continues with the buffered data
 			endOfInputGate = true;
 			barrierHandler.releaseBlocksAndResetBarriers();
-			bufferStorage.rollOver();
 			return pollNext();
 		}
 	}
@@ -197,7 +163,7 @@ public class CheckpointedInputGate implements PullingAsyncDataInput<BufferOrEven
 	 * @return {@code True}, if no data is buffered internally, {@code false} otherwise.
 	 */
 	public boolean isEmpty() {
-		return bufferStorage.isEmpty();
+		return true;
 	}
 
 	@Override
@@ -211,7 +177,6 @@ public class CheckpointedInputGate implements PullingAsyncDataInput<BufferOrEven
 	 * @throws IOException Thrown if the cleanup of I/O resources failed.
 	 */
 	public void cleanup() throws IOException {
-		bufferStorage.close();
 	}
 
 	// ------------------------------------------------------------------------
@@ -262,5 +227,20 @@ public class CheckpointedInputGate implements PullingAsyncDataInput<BufferOrEven
 	@Override
 	public String toString() {
 		return barrierHandler.toString();
+	}
+
+	@Override
+	public void unblockChannel(long checkpointId, int channelIndex) throws Exception {
+		inputGate.unblockChannel(checkpointId, channelIndex - channelIndexOffset);
+	}
+
+	@Override
+	public void unblockAllChannels(long checkpointId) throws Exception {
+		inputGate.unblockAllChannels(checkpointId);
+	}
+
+	@Override
+	public void unblockAllChannelsExceptFor(long checkpointId, int channelIndex) throws Exception {
+		inputGate.unblockAllChannelsExceptFor(checkpointId, channelIndex - channelIndexOffset);
 	}
 }

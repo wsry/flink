@@ -18,7 +18,6 @@
 
 package org.apache.flink.runtime.io.network.partition;
 
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
 
@@ -96,20 +95,13 @@ public abstract class ResultSubpartition {
 	public abstract boolean isReleased();
 
 	/**
-	 * Gets the number of non-event buffers in this subpartition.
-	 *
-	 * <p><strong>Beware:</strong> This method should only be used in tests in non-concurrent access
-	 * scenarios since it does not make any concurrency guarantees.
-	 */
-	@VisibleForTesting
-	abstract int getBuffersInBacklog();
-
-	/**
 	 * Makes a best effort to get the current size of the queue.
 	 * This method must not acquire locks or interfere with the task and network threads in
 	 * any way.
 	 */
 	public abstract int unsynchronizedGetNumberOfQueuedBuffers();
+
+	public abstract int getAndResetUnannouncedBacklog();
 
 	// ------------------------------------------------------------------------
 
@@ -121,14 +113,25 @@ public abstract class ResultSubpartition {
 
 		private final Buffer buffer;
 		private final boolean isMoreAvailable;
-		private final int buffersInBacklog;
+		private final int unannouncedBacklog;
 		private final boolean nextBufferIsEvent;
+		private final boolean shouldBlocking;
 
-		public BufferAndBacklog(Buffer buffer, boolean isMoreAvailable, int buffersInBacklog, boolean nextBufferIsEvent) {
+		public BufferAndBacklog(Buffer buffer, boolean isMoreAvailable, int backlog, boolean nextBufferIsEvent) {
+			this(buffer, isMoreAvailable, backlog, nextBufferIsEvent, false);
+		}
+
+		public BufferAndBacklog(
+				Buffer buffer,
+				boolean isMoreAvailable,
+				int backlog,
+				boolean nextBufferIsEvent,
+				boolean shouldBlocking) {
 			this.buffer = checkNotNull(buffer);
-			this.buffersInBacklog = buffersInBacklog;
+			this.unannouncedBacklog = backlog;
 			this.isMoreAvailable = isMoreAvailable;
 			this.nextBufferIsEvent = nextBufferIsEvent;
+			this.shouldBlocking = shouldBlocking;
 		}
 
 		public Buffer buffer() {
@@ -139,8 +142,12 @@ public abstract class ResultSubpartition {
 			return isMoreAvailable;
 		}
 
-		public int buffersInBacklog() {
-			return buffersInBacklog;
+		public boolean shouldBlocking() {
+			return shouldBlocking;
+		}
+
+		public int unannouncedBacklog() {
+			return unannouncedBacklog;
 		}
 
 		public boolean nextBufferIsEvent() {

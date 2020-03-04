@@ -208,7 +208,7 @@ public class EventSerializer {
 		final byte[] locationBytes = checkpointOptions.getTargetLocation().isDefaultReference() ?
 				null : checkpointOptions.getTargetLocation().getReferenceBytes();
 
-		final ByteBuffer buf = ByteBuffer.allocate(28 + (locationBytes == null ? 0 : locationBytes.length));
+		final ByteBuffer buf = ByteBuffer.allocate(28 + (locationBytes == null ? 0 : locationBytes.length) + 1);
 
 		// we do not use checkpointType.ordinal() here to make the serialization robust
 		// against changes in the enum (such as changes in the order of the values)
@@ -234,6 +234,7 @@ public class EventSerializer {
 			buf.putInt(locationBytes.length);
 			buf.put(locationBytes);
 		}
+		buf.put((byte) (barrier.isExactlyOnceMode() ? 1 : 0));
 
 		buf.flip();
 		return buf;
@@ -265,8 +266,9 @@ public class EventSerializer {
 			buffer.get(bytes);
 			locationRef = new CheckpointStorageLocationReference(bytes);
 		}
+		final boolean isExactlyOnceMode = buffer.get() == 1;
 
-		return new CheckpointBarrier(id, timestamp, new CheckpointOptions(checkpointType, locationRef));
+		return new CheckpointBarrier(id, timestamp, new CheckpointOptions(checkpointType, locationRef), isExactlyOnceMode);
 	}
 
 	// ------------------------------------------------------------------------
@@ -289,7 +291,7 @@ public class EventSerializer {
 
 		MemorySegment data = MemorySegmentFactory.wrap(serializedEvent.array());
 
-		return new BufferConsumer(data, FreeingBufferRecycler.INSTANCE, false);
+		return new BufferConsumer(data, FreeingBufferRecycler.INSTANCE, false, isBlockingEvent(event));
 	}
 
 	public static AbstractEvent fromBuffer(Buffer buffer, ClassLoader classLoader) throws IOException {
@@ -305,5 +307,9 @@ public class EventSerializer {
 	 */
 	public static boolean isEvent(Buffer buffer, Class<?> eventClass) throws IOException {
 		return !buffer.isBuffer() && isEvent(buffer.getNioBufferReadable(), eventClass);
+	}
+
+	public static boolean isBlockingEvent(AbstractEvent event) {
+		return event instanceof CheckpointBarrier && ((CheckpointBarrier) event).isExactlyOnceMode();
 	}
 }

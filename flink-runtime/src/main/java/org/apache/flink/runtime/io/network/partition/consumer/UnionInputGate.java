@@ -86,6 +86,8 @@ public class UnionInputGate extends InputGate {
 	 */
 	private final Map<InputGate, Integer> inputGateToIndexOffsetMap;
 
+	private InputGate lastGate;
+
 	public UnionInputGate(InputGate... inputGates) {
 		this.inputGates = checkNotNull(inputGates);
 		checkArgument(inputGates.length > 1, "Union input gate should union at least two input gates.");
@@ -139,6 +141,30 @@ public class UnionInputGate extends InputGate {
 	}
 
 	@Override
+	public void unblockAllChannels(long checkpointId) throws Exception {
+		for (InputGate inputGate: inputGates) {
+			inputGate.unblockAllChannels(checkpointId);
+		}
+	}
+
+	@Override
+	public void unblockAllChannelsExceptFor(long checkpointId, int channelIndex) throws Exception {
+		for (InputGate inputGate: inputGates) {
+			if (inputGate != lastGate) {
+				inputGate.unblockAllChannels(checkpointId);
+			} else {
+				inputGate.unblockAllChannelsExceptFor(checkpointId, channelIndex);
+			}
+		}
+	}
+
+	@Override
+	public void unblockChannel(long checkpointId, int channelIndex) throws Exception {
+		checkState(lastGate != null, "Last gate should not be null.");
+		lastGate.unblockChannel(checkpointId, channelIndex - inputGateToIndexOffsetMap.get(lastGate));
+	}
+
+	@Override
 	public Optional<BufferOrEvent> getNext() throws IOException, InterruptedException {
 		return getNextBufferOrEvent(true);
 	}
@@ -159,6 +185,7 @@ public class UnionInputGate extends InputGate {
 		}
 
 		InputWithData<InputGate, BufferOrEvent> inputWithData = next.get();
+		lastGate = inputWithData.input;
 
 		handleEndOfPartitionEvent(inputWithData.data, inputWithData.input);
 		return Optional.of(adjustForUnionInputGate(

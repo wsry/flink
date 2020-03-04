@@ -25,6 +25,7 @@ import org.apache.flink.util.IOUtils;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -50,7 +51,7 @@ final class BoundedBlockingSubpartitionReader implements ResultSubpartitionView 
 	private BoundedData.Reader dataReader;
 
 	/** The remaining number of data buffers (not events) in the result. */
-	private int dataBufferBacklog;
+	private AtomicInteger dataBufferBacklog;
 
 	/** Flag whether this reader is released. Atomic, to avoid double release. */
 	private boolean isReleased;
@@ -71,7 +72,7 @@ final class BoundedBlockingSubpartitionReader implements ResultSubpartitionView 
 		this.nextBuffer = dataReader.nextBuffer();
 
 		checkArgument(numDataBuffers >= 0);
-		this.dataBufferBacklog = numDataBuffers;
+		this.dataBufferBacklog = new AtomicInteger(numDataBuffers);
 
 		this.availabilityListener = checkNotNull(availabilityListener);
 	}
@@ -86,14 +87,11 @@ final class BoundedBlockingSubpartitionReader implements ResultSubpartitionView 
 			// but also in case the reader is disposed (rather than throwing an exception)
 			return null;
 		}
-		if (current.isBuffer()) {
-			dataBufferBacklog--;
-		}
 
 		assert dataReader != null;
 		nextBuffer = dataReader.nextBuffer();
 
-		return BufferAndBacklog.fromBufferAndLookahead(current, nextBuffer, dataBufferBacklog);
+		return BufferAndBacklog.fromBufferAndLookahead(current, nextBuffer, getAndResetUnannouncedBacklog());
 	}
 
 	/**
@@ -164,6 +162,11 @@ final class BoundedBlockingSubpartitionReader implements ResultSubpartitionView 
 	@Override
 	public int unsynchronizedGetNumberOfQueuedBuffers() {
 		return parent.unsynchronizedGetNumberOfQueuedBuffers();
+	}
+
+	@Override
+	public int getAndResetUnannouncedBacklog() {
+		return dataBufferBacklog.getAndSet(0);
 	}
 
 	@Override

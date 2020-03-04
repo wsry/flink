@@ -63,7 +63,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.hamcrest.MockitoHamcrest.argThat;
 
 /**
- * Tests for the behavior of the {@link CheckpointBarrierAligner} with different {@link BufferStorage} implements.
+ * Tests for the behavior of the {@link CheckpointBarrierAligner}.
  */
 public abstract class CheckpointBarrierAlignerTestBase {
 

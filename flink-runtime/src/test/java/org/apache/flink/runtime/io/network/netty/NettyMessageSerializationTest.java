@@ -135,7 +135,6 @@ public class NettyMessageSerializationTest {
 			assertEquals(expected.partitionId, actual.partitionId);
 			assertEquals(expected.queueIndex, actual.queueIndex);
 			assertEquals(expected.receiverId, actual.receiverId);
-			assertEquals(expected.credit, actual.credit);
 		}
 
 		{

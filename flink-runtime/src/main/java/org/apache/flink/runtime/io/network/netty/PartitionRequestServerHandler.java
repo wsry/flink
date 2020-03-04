@@ -33,6 +33,7 @@ import org.apache.flink.shaded.netty4.io.netty.channel.SimpleChannelInboundHandl
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.flink.runtime.io.network.netty.NettyMessage.ResumeConsumption;
 import static org.apache.flink.runtime.io.network.netty.NettyMessage.PartitionRequest;
 import static org.apache.flink.runtime.io.network.netty.NettyMessage.TaskEventRequest;
 
@@ -118,6 +119,10 @@ class PartitionRequestServerHandler extends SimpleChannelInboundHandler<NettyMes
 				AddCredit request = (AddCredit) msg;
 
 				outboundQueue.addCredit(request.receiverId, request.credit);
+			} else if (msgClazz == ResumeConsumption.class) {
+				ResumeConsumption request = (ResumeConsumption) msg;
+
+				outboundQueue.resumeConsumption(request.credit, request.receiverId);
 			} else {
 				LOG.warn("Received unexpected client request: {}", msg);
 			}

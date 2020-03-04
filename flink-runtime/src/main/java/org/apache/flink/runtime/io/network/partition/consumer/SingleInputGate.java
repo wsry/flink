@@ -23,6 +23,7 @@ import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.event.AbstractEvent;
 import org.apache.flink.runtime.event.TaskEvent;
 import org.apache.flink.runtime.execution.CancelTaskException;
+import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.api.serialization.EventSerializer;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
@@ -49,6 +50,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -137,11 +139,19 @@ public class SingleInputGate extends InputGate {
 	/** Channels, which notified this input gate about available data. */
 	private final ArrayDeque<InputChannel> inputChannelsWithData = new ArrayDeque<>();
 
+	private final LinkedHashMap<Integer, InputChannel> blockedInputChannels = new LinkedHashMap<>();
+
+	private final LinkedHashMap<Integer, InputChannel> blockedInputChannelsWithData = new LinkedHashMap<>();
+
 	/**
 	 * Field guaranteeing uniqueness for inputChannelsWithData queue. Both of those fields should be unified
 	 * onto one.
 	 */
 	private final BitSet enqueuedInputChannelsWithData;
+
+	private final BitSet channelsBlockedByCheckpoint;
+
+	private final BitSet enqueuedBlockedInputChannelsWithData;
 
 	private final BitSet channelsWithEndOfPartitionEvents;
 
@@ -198,6 +208,8 @@ public class SingleInputGate extends InputGate {
 		this.inputChannels = new HashMap<>(numberOfInputChannels);
 		this.channelsWithEndOfPartitionEvents = new BitSet(numberOfInputChannels);
 		this.enqueuedInputChannelsWithData = new BitSet(numberOfInputChannels);
+		this.enqueuedBlockedInputChannelsWithData = new BitSet(numberOfInputChannels);
+		this.channelsBlockedByCheckpoint = new BitSet(numberOfInputChannels);
 
 		this.partitionProducerStateProvider = checkNotNull(partitionProducerStateProvider);
 
@@ -459,6 +471,73 @@ public class SingleInputGate extends InputGate {
 		return hasReceivedAllEndOfPartitionEvents;
 	}
 
+	@Override
+	public void unblockChannel(long checkpointId, int channelIndex) throws Exception {
+		InputChannel inputChannelToNotify = null;
+		synchronized (inputChannelsWithData) {
+			if (channelsBlockedByCheckpoint.get(channelIndex)) {
+				channelsBlockedByCheckpoint.clear(channelIndex);
+				inputChannelToNotify = blockedInputChannels.remove(channelIndex);
+				if (enqueuedBlockedInputChannelsWithData.get(channelIndex)) {
+					blockedInputChannelsWithData.remove(channelIndex);
+					enqueuedBlockedInputChannelsWithData.clear(channelIndex);
+					queueChannel(inputChannelToNotify);
+				}
+			}
+		}
+
+		if (inputChannelToNotify != null) {
+			inputChannelToNotify.unblockCheckpointBarrier(checkpointId);
+		}
+	}
+
+	@Override
+	public void unblockAllChannels(long checkpointId) throws Exception {
+		unblockAllChannelsExceptFor(checkpointId, Integer.MIN_VALUE);
+	}
+
+	@Override
+	public void unblockAllChannelsExceptFor(long checkpointId, int channelIndex) throws Exception {
+		List<InputChannel> inputChannelsToNotify;
+		InputChannel channelToAddBack = null;
+		synchronized (inputChannelsWithData) {
+			for (InputChannel inputChannel: blockedInputChannelsWithData.values()) {
+				if (inputChannel.getChannelIndex() == channelIndex) {
+					channelToAddBack = inputChannel;
+					continue;
+				}
+				enqueuedBlockedInputChannelsWithData.clear(inputChannel.getChannelIndex());
+				channelsBlockedByCheckpoint.clear(inputChannel.getChannelIndex());
+				queueChannel(inputChannel);
+			}
+			blockedInputChannelsWithData.clear();
+
+			if (channelToAddBack != null) {
+				blockedInputChannelsWithData.put(channelToAddBack.getChannelIndex(), channelToAddBack);
+				channelToAddBack = null;
+			}
+
+			inputChannelsToNotify = new ArrayList<>(blockedInputChannels.size());
+			for (InputChannel inputChannel: blockedInputChannels.values()) {
+				if (inputChannel.getChannelIndex() == channelIndex) {
+					channelToAddBack = inputChannel;
+					continue;
+				}
+				inputChannelsToNotify.add(inputChannel);
+				channelsBlockedByCheckpoint.clear(inputChannel.getChannelIndex());
+			}
+			blockedInputChannels.clear();
+
+			if (channelToAddBack != null) {
+				blockedInputChannels.put(channelToAddBack.getChannelIndex(), channelToAddBack);
+			}
+		}
+
+		for (InputChannel inputChannel: inputChannelsToNotify) {
+			inputChannel.unblockCheckpointBarrier(checkpointId);
+		}
+	}
+
 	// ------------------------------------------------------------------------
 	// Consume
 	// ------------------------------------------------------------------------
@@ -497,20 +576,30 @@ public class SingleInputGate extends InputGate {
 	private Optional<InputWithData<InputChannel, BufferAndAvailability>> waitAndGetNextData(boolean blocking)
 			throws IOException, InterruptedException {
 		while (true) {
-			Optional<InputChannel> inputChannel = getChannel(blocking);
-			if (!inputChannel.isPresent()) {
+			Optional<InputChannel> optionalInputChannel = getChannel(blocking);
+			if (!optionalInputChannel.isPresent()) {
 				return Optional.empty();
+			}
+
+			InputChannel inputChannel = optionalInputChannel.get();
+			synchronized (inputChannelsWithData) {
+				if (channelsBlockedByCheckpoint.get(inputChannel.getChannelIndex()) &&
+						!enqueuedBlockedInputChannelsWithData.get(inputChannel.getChannelIndex())) {
+					blockedInputChannelsWithData.put(inputChannel.getChannelIndex(), inputChannel);
+					enqueuedBlockedInputChannelsWithData.set(inputChannel.getChannelIndex());
+					continue;
+				}
 			}
 
 			// Do not query inputChannel under the lock, to avoid potential deadlocks coming from
 			// notifications.
-			Optional<BufferAndAvailability> result = inputChannel.get().getNextBuffer();
+			Optional<BufferAndAvailability> result = inputChannel.getNextBuffer();
 
 			synchronized (inputChannelsWithData) {
 				if (result.isPresent() && result.get().moreAvailable()) {
 					// enqueue the inputChannel at the end to avoid starvation
-					inputChannelsWithData.add(inputChannel.get());
-					enqueuedInputChannelsWithData.set(inputChannel.get().getChannelIndex());
+					inputChannelsWithData.add(inputChannel);
+					enqueuedInputChannelsWithData.set(inputChannel.getChannelIndex());
 				}
 
 				if (inputChannelsWithData.isEmpty()) {
@@ -519,7 +608,7 @@ public class SingleInputGate extends InputGate {
 
 				if (result.isPresent()) {
 					return Optional.of(new InputWithData<>(
-						inputChannel.get(),
+						inputChannel,
 						result.get(),
 						!inputChannelsWithData.isEmpty()));
 				}
@@ -568,6 +657,21 @@ public class SingleInputGate extends InputGate {
 			}
 
 			currentChannel.releaseAllResources();
+		} else if (event.getClass() == CheckpointBarrier.class) {
+			CheckpointBarrier checkpointBarrier = (CheckpointBarrier) event;
+
+			if (checkpointBarrier.isExactlyOnceMode()) {
+				currentChannel.onBlockingCheckpointBarrier(checkpointBarrier.getId());
+
+				synchronized (inputChannelsWithData) {
+					if (!channelsBlockedByCheckpoint.get(currentChannel.getChannelIndex())) {
+						blockedInputChannels.put(currentChannel.getChannelIndex(), currentChannel);
+						channelsBlockedByCheckpoint.set(currentChannel.getChannelIndex());
+					} else {
+						throw new IllegalStateException("Barrier already received.");
+					}
+				}
+			}
 		}
 
 		return new BufferOrEvent(event, currentChannel.getChannelIndex(), moreAvailable, buffer.getSize());
@@ -637,7 +741,13 @@ public class SingleInputGate extends InputGate {
 		CompletableFuture<?> toNotify = null;
 
 		synchronized (inputChannelsWithData) {
-			if (enqueuedInputChannelsWithData.get(channel.getChannelIndex())) {
+			if (enqueuedInputChannelsWithData.get(channel.getChannelIndex()) ||
+					enqueuedBlockedInputChannelsWithData.get(channel.getChannelIndex())) {
+				return;
+			}
+			if (channelsBlockedByCheckpoint.get(channel.getChannelIndex())) {
+				blockedInputChannelsWithData.put(channel.getChannelIndex(), channel);
+				enqueuedBlockedInputChannelsWithData.set(channel.getChannelIndex());
 				return;
 			}
 			availableChannels = inputChannelsWithData.size();

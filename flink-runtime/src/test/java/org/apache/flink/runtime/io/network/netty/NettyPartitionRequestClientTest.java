@@ -68,7 +68,6 @@ public class NettyPartitionRequestClientTest {
 		try {
 			final BufferPool bufferPool = networkBufferPool.createBufferPool(6, 6);
 			inputGate.setBufferPool(bufferPool);
-			inputGate.assignExclusiveSegments();
 
 			// first subpartition request
 			inputChannel.requestSubpartition(0);
@@ -77,7 +76,6 @@ public class NettyPartitionRequestClientTest {
 			Object readFromOutbound = channel.readOutbound();
 			assertThat(readFromOutbound, instanceOf(PartitionRequest.class));
 			assertEquals(inputChannel.getInputChannelId(), ((PartitionRequest) readFromOutbound).receiverId);
-			assertEquals(numExclusiveBuffers, ((PartitionRequest) readFromOutbound).credit);
 
 			// retrigger subpartition request, e.g. due to failures
 			inputGate.retriggerPartitionRequest(inputChannel.getPartitionId().getPartitionId());
@@ -86,7 +84,6 @@ public class NettyPartitionRequestClientTest {
 			readFromOutbound = channel.readOutbound();
 			assertThat(readFromOutbound, instanceOf(PartitionRequest.class));
 			assertEquals(inputChannel.getInputChannelId(), ((PartitionRequest) readFromOutbound).receiverId);
-			assertEquals(numExclusiveBuffers, ((PartitionRequest) readFromOutbound).credit);
 
 			// retrigger subpartition request once again, e.g. due to failures
 			inputGate.retriggerPartitionRequest(inputChannel.getPartitionId().getPartitionId());
@@ -95,7 +92,6 @@ public class NettyPartitionRequestClientTest {
 			readFromOutbound = channel.readOutbound();
 			assertThat(readFromOutbound, instanceOf(PartitionRequest.class));
 			assertEquals(inputChannel.getInputChannelId(), ((PartitionRequest) readFromOutbound).receiverId);
-			assertEquals(numExclusiveBuffers, ((PartitionRequest) readFromOutbound).credit);
 
 			assertNull(channel.readOutbound());
 		} finally {
@@ -122,7 +118,6 @@ public class NettyPartitionRequestClientTest {
 		try {
 			final BufferPool bufferPool = networkBufferPool.createBufferPool(6, 6);
 			inputGate.setBufferPool(bufferPool);
-			inputGate.assignExclusiveSegments();
 			inputChannel.requestSubpartition(0);
 
 			// The input channel should only send one partition request
@@ -130,7 +125,6 @@ public class NettyPartitionRequestClientTest {
 			Object readFromOutbound = channel.readOutbound();
 			assertThat(readFromOutbound, instanceOf(PartitionRequest.class));
 			assertEquals(inputChannel.getInputChannelId(), ((PartitionRequest) readFromOutbound).receiverId);
-			assertEquals(numExclusiveBuffers, ((PartitionRequest) readFromOutbound).credit);
 
 			assertNull(channel.readOutbound());
 		} finally {

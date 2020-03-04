@@ -45,8 +45,6 @@ import static org.junit.Assert.assertTrue;
  */
 public class CheckpointBarrierTrackerTest {
 
-	private static final int PAGE_SIZE = 512;
-
 	private CheckpointedInputGate inputGate;
 
 	@After
@@ -377,7 +375,6 @@ public class CheckpointBarrierTrackerTest {
 		MockInputGate gate = new MockInputGate(numberOfChannels, Arrays.asList(sequence));
 		return new CheckpointedInputGate(
 			gate,
-			new CachedBufferStorage(PAGE_SIZE, -1, "Testing"),
 			new CheckpointBarrierTracker(gate.getNumberOfInputChannels(), toNotifyOnCheckpoint));
 	}
 

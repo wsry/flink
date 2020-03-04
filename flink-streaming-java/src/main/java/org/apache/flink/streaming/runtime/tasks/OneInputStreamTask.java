@@ -107,7 +107,6 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
 			this,
 			configuration.getCheckpointMode(),
 			inputGate,
-			getEnvironment().getTaskManagerInfo().getConfiguration(),
 			getEnvironment().getMetricGroup().getIOMetricGroup(),
 			getTaskNameWithSubtaskAndId());
 	}

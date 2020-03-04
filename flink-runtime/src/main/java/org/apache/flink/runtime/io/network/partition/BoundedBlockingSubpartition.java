@@ -251,6 +251,11 @@ final class BoundedBlockingSubpartition extends ResultSubpartition {
 	}
 
 	@Override
+	public int getAndResetUnannouncedBacklog() {
+		return 0;
+	}
+
+	@Override
 	protected long getTotalNumberOfBuffers() {
 		return numBuffersAndEventsWritten;
 	}

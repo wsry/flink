@@ -47,6 +47,8 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 
 	private volatile ResultSubpartitionView subpartitionView;
 
+	private boolean consumptionBlocked = false;
+
 	/**
 	 * The status indicating whether this reader is already enqueued in the pipeline for transferring
 	 * data or not.
@@ -59,16 +61,18 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 	/** The number of available buffers for holding data on the consumer side. */
 	private int numCreditsAvailable;
 
+	private final int initialCredit;
+
 	private int sequenceNumber = -1;
 
 	CreditBasedSequenceNumberingViewReader(
 			InputChannelID receiverId,
 			int initialCredit,
 			PartitionRequestQueue requestQueue) {
-
+		this.initialCredit = initialCredit;
 		this.receiverId = receiverId;
-		this.numCreditsAvailable = initialCredit;
 		this.requestQueue = requestQueue;
+		this.numCreditsAvailable = initialCredit;
 	}
 
 	@Override
@@ -95,7 +99,22 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 
 	@Override
 	public void addCredit(int creditDeltas) {
-		numCreditsAvailable += creditDeltas;
+		if (!consumptionBlocked) {
+			numCreditsAvailable += creditDeltas;
+		}
+	}
+
+	@Override
+	public void resumeConsumption() {
+		consumptionBlocked = false;
+	}
+
+	@Override
+	public int getAndResetUnannouncedBacklog() {
+		if (consumptionBlocked) {
+			return 0;
+		}
+		return subpartitionView.getAndResetUnannouncedBacklog();
 	}
 
 	@Override
@@ -115,6 +134,9 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 	@Override
 	public boolean isAvailable() {
 		// BEWARE: this must be in sync with #isAvailable(BufferAndBacklog)!
+		if (consumptionBlocked) {
+			return false;
+		}
 		if (numCreditsAvailable > 0) {
 			return subpartitionView.isAvailable();
 		}
@@ -135,6 +157,9 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 	 */
 	private boolean isAvailable(BufferAndBacklog bufferAndBacklog) {
 		// BEWARE: this must be in sync with #isAvailable()!
+		if (consumptionBlocked) {
+			return false;
+		}
 		if (numCreditsAvailable > 0) {
 			return bufferAndBacklog.isMoreAvailable();
 		}
@@ -153,8 +178,8 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 		return sequenceNumber;
 	}
 
-	@VisibleForTesting
-	int getNumCreditsAvailable() {
+	@Override
+	public int getNumCreditsAvailable() {
 		return numCreditsAvailable;
 	}
 
@@ -173,8 +198,13 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 				throw new IllegalStateException("no credit available");
 			}
 
+			if (next.shouldBlocking()) {
+				numCreditsAvailable = 0;
+				consumptionBlocked = true;
+			}
+
 			return new BufferAndAvailability(
-				next.buffer(), isAvailable(next), next.buffersInBacklog());
+				next.buffer(), isAvailable(next), next.unannouncedBacklog());
 		} else {
 			return null;
 		}

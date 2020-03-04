@@ -249,6 +249,12 @@ public abstract class NettyMessage {
 					case AddCredit.ID:
 						decodedMsg = AddCredit.readFrom(msg);
 						break;
+					case AddBacklog.ID:
+						decodedMsg = AddBacklog.readFrom(msg);
+						break;
+					case ResumeConsumption.ID:
+						decodedMsg = ResumeConsumption.readFrom(msg);
+						break;
 					default:
 						throw new ProtocolException(
 							"Received unknown message from producer: " + msg);
@@ -688,6 +694,106 @@ public abstract class NettyMessage {
 		@Override
 		public String toString() {
 			return String.format("AddCredit(%s : %d)", receiverId, credit);
+		}
+	}
+
+	/**
+	 * Incremental backlog announcement from the server to the client.
+	 */
+	static class AddBacklog extends NettyMessage {
+
+		private static final byte ID = 7;
+
+		final int backlog;
+
+		final InputChannelID receiverId;
+
+		AddBacklog(int backlog, InputChannelID receiverId) {
+			checkArgument(backlog > 0, "The announced backlog should be greater than 0");
+
+			this.backlog = backlog;
+			this.receiverId = receiverId;
+		}
+
+		@Override
+		ByteBuf write(ByteBufAllocator allocator) throws IOException {
+			ByteBuf result = null;
+
+			try {
+				result = allocateBuffer(allocator, ID, 4 + 16);
+				result.writeInt(backlog);
+				receiverId.writeTo(result);
+
+				return result;
+			}
+			catch (Throwable t) {
+				if (result != null) {
+					result.release();
+				}
+
+				throw new IOException(t);
+			}
+		}
+
+		static AddBacklog readFrom(ByteBuf buffer) {
+			int backlog = buffer.readInt();
+			InputChannelID receiverId = InputChannelID.fromByteBuf(buffer);
+
+			return new AddBacklog(backlog, receiverId);
+		}
+
+		@Override
+		public String toString() {
+			return String.format("AddBacklog(%s : %d)", receiverId, backlog);
+		}
+	}
+
+	/**
+	 * Notification for resuming consumption after a checkpoint completes.
+	 */
+	static class ResumeConsumption extends NettyMessage {
+
+		private static final byte ID = 8;
+
+		final int credit;
+
+		final InputChannelID receiverId;
+
+		ResumeConsumption(int credit, InputChannelID receiverId) {
+			this.credit = credit;
+			this.receiverId = receiverId;
+		}
+
+		@Override
+		ByteBuf write(ByteBufAllocator allocator) throws IOException {
+			ByteBuf result = null;
+
+			try {
+				result = allocateBuffer(allocator, ID, 16 + 4);
+				result.writeInt(credit);
+				receiverId.writeTo(result);
+
+				return result;
+			}
+			catch (Throwable t) {
+				if (result != null) {
+					result.release();
+				}
+
+				throw new IOException(t);
+			}
+		}
+
+		static ResumeConsumption readFrom(ByteBuf buffer) {
+			int credit = buffer.readInt();
+			InputChannelID receiverId = InputChannelID.fromByteBuf(buffer);
+
+			return new ResumeConsumption(credit, receiverId);
+		}
+
+		@Override
+		public String toString() {
+			return String.format("ResumeConsumption(%s : %d)", receiverId, credit);
 		}
 	}
 }

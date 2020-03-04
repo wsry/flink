@@ -90,6 +90,21 @@ public class LocalInputChannel extends InputChannel implements BufferAvailabilit
 		this.taskEventPublisher = checkNotNull(taskEventPublisher);
 	}
 
+	@Override
+	public void onBlockingCheckpointBarrier(long checkpointId) {
+		checkState(!blockedByCheckpoint && checkpointId > currentCheckpointId);
+		currentCheckpointId = checkpointId;
+		blockedByCheckpoint = true;
+	}
+
+	@Override
+	public void unblockCheckpointBarrier(long checkpointId) {
+		if (blockedByCheckpoint) {
+			checkState(checkpointId >= currentCheckpointId);
+			blockedByCheckpoint = false;
+		}
+	}
+
 	// ------------------------------------------------------------------------
 	// Consume
 	// ------------------------------------------------------------------------
@@ -195,7 +210,7 @@ public class LocalInputChannel extends InputChannel implements BufferAvailabilit
 
 		numBytesIn.inc(next.buffer().getSize());
 		numBuffersIn.inc();
-		return Optional.of(new BufferAndAvailability(next.buffer(), next.isMoreAvailable(), next.buffersInBacklog()));
+		return Optional.of(new BufferAndAvailability(next.buffer(), next.isMoreAvailable(), next.unannouncedBacklog()));
 	}
 
 	@Override

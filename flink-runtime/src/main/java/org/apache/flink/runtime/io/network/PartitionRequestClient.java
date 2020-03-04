@@ -43,6 +43,8 @@ public interface PartitionRequestClient {
 		RemoteInputChannel inputChannel,
 		int delayMs) throws IOException;
 
+	void resumeConsumption(RemoteInputChannel inputChannel);
+
 	/**
 	 * Notifies available credits from one remote input channel.
 	 *

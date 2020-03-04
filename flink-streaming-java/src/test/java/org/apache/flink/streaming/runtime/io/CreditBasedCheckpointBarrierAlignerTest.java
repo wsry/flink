@@ -25,13 +25,13 @@ import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
 import static org.junit.Assert.assertEquals;
 
 /**
- * Tests for the behaviors of the {@link CheckpointedInputGate} with {@link CachedBufferStorage}.
+ * Tests for the behaviors of the {@link CheckpointedInputGate}.
  */
 public class CreditBasedCheckpointBarrierAlignerTest extends CheckpointBarrierAlignerTestBase {
 
 	@Override
 	CheckpointedInputGate createBarrierBuffer(InputGate gate, AbstractInvokable toNotify) {
-		return new CheckpointedInputGate(gate, new CachedBufferStorage(PAGE_SIZE), "Testing", toNotify);
+		return new CheckpointedInputGate(gate, "Testing", toNotify);
 	}
 
 	@Override

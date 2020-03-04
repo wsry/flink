@@ -56,6 +56,7 @@ import org.apache.flink.runtime.state.TaskStateManager;
 import org.apache.flink.runtime.taskmanager.DispatcherThreadFactory;
 import org.apache.flink.runtime.util.ExecutorThreadFactory;
 import org.apache.flink.runtime.util.FatalExitExceptionHandler;
+import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamEdge;
@@ -184,6 +185,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	/** The external storage where checkpoint data is persisted. */
 	private CheckpointStorageWorkerView checkpointStorage;
 
+	private final CheckpointingMode checkpointingMode;
+
 	/**
 	 * The internal {@link TimerService} used to define the current
 	 * processing time (default = {@code System.currentTimeMillis()}) and
@@ -286,6 +289,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 		this.actionExecutor = Preconditions.checkNotNull(actionExecutor);
 		this.mailboxProcessor = new MailboxProcessor(this::processInput, mailbox, actionExecutor);
 		this.asyncExceptionHandler = new StreamTaskAsyncExceptionHandler(environment);
+		this.checkpointingMode = configuration.getCheckpointMode();
 	}
 
 	// ------------------------------------------------------------------------
@@ -735,9 +739,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			boolean advanceToEndOfEventTime) throws Exception {
 		try {
 			// No alignment if we inject a checkpoint
-			CheckpointMetrics checkpointMetrics = new CheckpointMetrics()
-				.setBytesBufferedInAlignment(0L)
-				.setAlignmentDurationNanos(0L);
+			CheckpointMetrics checkpointMetrics = new CheckpointMetrics().setAlignmentDurationNanos(0L);
 
 			boolean success = performCheckpoint(checkpointMetaData, checkpointOptions, checkpointMetrics, advanceToEndOfEventTime);
 			if (!success) {
@@ -829,7 +831,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 				operatorChain.broadcastCheckpointBarrier(
 						checkpointId,
 						checkpointMetaData.getTimestamp(),
-						checkpointOptions);
+						checkpointOptions,
+						checkpointingMode);
 
 				// Step (3): Take the state snapshot. This should be largely asynchronous, to not
 				//           impact progress of the streaming topology

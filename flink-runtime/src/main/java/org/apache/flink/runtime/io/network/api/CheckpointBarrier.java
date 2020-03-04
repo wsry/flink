@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.io.network.api;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
@@ -47,11 +48,18 @@ public class CheckpointBarrier extends RuntimeEvent {
 	private final long id;
 	private final long timestamp;
 	private final CheckpointOptions checkpointOptions;
+	private final boolean isExactlyOnceMode;
 
+	@VisibleForTesting
 	public CheckpointBarrier(long id, long timestamp, CheckpointOptions checkpointOptions) {
+		this(id, timestamp, checkpointOptions, true);
+	}
+
+	public CheckpointBarrier(long id, long timestamp, CheckpointOptions checkpointOptions, boolean isExactlyOnceMode) {
 		this.id = id;
 		this.timestamp = timestamp;
 		this.checkpointOptions = checkNotNull(checkpointOptions);
+		this.isExactlyOnceMode = isExactlyOnceMode;
 	}
 
 	public long getId() {
@@ -64,6 +72,10 @@ public class CheckpointBarrier extends RuntimeEvent {
 
 	public CheckpointOptions getCheckpointOptions() {
 		return checkpointOptions;
+	}
+
+	public boolean isExactlyOnceMode() {
+		return isExactlyOnceMode;
 	}
 
 	// ------------------------------------------------------------------------
@@ -105,12 +117,14 @@ public class CheckpointBarrier extends RuntimeEvent {
 		else {
 			CheckpointBarrier that = (CheckpointBarrier) other;
 			return that.id == this.id && that.timestamp == this.timestamp &&
-					this.checkpointOptions.equals(that.checkpointOptions);
+					this.checkpointOptions.equals(that.checkpointOptions) &&
+					this.isExactlyOnceMode == that.isExactlyOnceMode;
 		}
 	}
 
 	@Override
 	public String toString() {
-		return String.format("CheckpointBarrier %d @ %d Options: %s", id, timestamp, checkpointOptions);
+		return String.format("CheckpointBarrier %d @ %d Options: %s ExactlyOnce: %s",
+				id, timestamp, checkpointOptions, isExactlyOnceMode);
 	}
 }

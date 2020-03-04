@@ -152,7 +152,6 @@ public class CreditBasedPartitionRequestClientHandlerTest {
 		try {
 			final BufferPool bufferPool = networkBufferPool.createBufferPool(8, 8);
 			inputGate.setBufferPool(bufferPool);
-			inputGate.assignExclusiveSegments();
 
 			final CreditBasedPartitionRequestClientHandler handler = new CreditBasedPartitionRequestClientHandler();
 			handler.addInputChannel(inputChannel);
@@ -163,7 +162,6 @@ public class CreditBasedPartitionRequestClientHandlerTest {
 			handler.channelRead(mock(ChannelHandlerContext.class), bufferResponse);
 
 			assertEquals(1, inputChannel.getNumberOfQueuedBuffers());
-			assertEquals(2, inputChannel.getSenderBacklog());
 		} finally {
 			releaseResource(inputGate, networkBufferPool);
 		}
@@ -185,7 +183,6 @@ public class CreditBasedPartitionRequestClientHandlerTest {
 		try {
 			BufferPool bufferPool = networkBufferPool.createBufferPool(8, 8);
 			inputGate.setBufferPool(bufferPool);
-			inputGate.assignExclusiveSegments();
 
 			CreditBasedPartitionRequestClientHandler handler = new CreditBasedPartitionRequestClientHandler();
 			handler.addInputChannel(inputChannel);
@@ -292,7 +289,6 @@ public class CreditBasedPartitionRequestClientHandlerTest {
 		try {
 			final BufferPool bufferPool = networkBufferPool.createBufferPool(6, 6);
 			inputGate.setBufferPool(bufferPool);
-			inputGate.assignExclusiveSegments();
 
 			inputChannel1.requestSubpartition(0);
 			inputChannel2.requestSubpartition(0);
@@ -302,12 +298,10 @@ public class CreditBasedPartitionRequestClientHandlerTest {
 			Object readFromOutbound = channel.readOutbound();
 			assertThat(readFromOutbound, instanceOf(PartitionRequest.class));
 			assertEquals(inputChannel1.getInputChannelId(), ((PartitionRequest) readFromOutbound).receiverId);
-			assertEquals(2, ((PartitionRequest) readFromOutbound).credit);
 
 			readFromOutbound = channel.readOutbound();
 			assertThat(readFromOutbound, instanceOf(PartitionRequest.class));
 			assertEquals(inputChannel2.getInputChannelId(), ((PartitionRequest) readFromOutbound).receiverId);
-			assertEquals(2, ((PartitionRequest) readFromOutbound).credit);
 
 			// The buffer response will take one available buffer from input channel, and it will trigger
 			// requesting (backlog + numExclusiveBuffers - numAvailableBuffers) floating buffers
@@ -387,14 +381,12 @@ public class CreditBasedPartitionRequestClientHandlerTest {
 		try {
 			final BufferPool bufferPool = networkBufferPool.createBufferPool(6, 6);
 			inputGate.setBufferPool(bufferPool);
-			inputGate.assignExclusiveSegments();
 
 			inputChannel.requestSubpartition(0);
 
 			// This should send the partition request
 			Object readFromOutbound = channel.readOutbound();
 			assertThat(readFromOutbound, instanceOf(PartitionRequest.class));
-			assertEquals(2, ((PartitionRequest) readFromOutbound).credit);
 
 			// Trigger request floating buffers via buffer response to notify credits available
 			final BufferResponse bufferResponse = createBufferResponse(

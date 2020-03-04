@@ -37,6 +37,10 @@ public class TestingPartitionRequestClient implements PartitionRequestClient {
 	}
 
 	@Override
+	public void resumeConsumption(RemoteInputChannel inputChannel) {
+	}
+
+	@Override
 	public void notifyCreditAvailable(RemoteInputChannel inputChannel) {
 	}
 

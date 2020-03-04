@@ -18,7 +18,6 @@
 
 package org.apache.flink.runtime.io.network.partition;
 
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.api.serialization.EventSerializer;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
@@ -32,6 +31,7 @@ import javax.annotation.concurrent.GuardedBy;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
@@ -61,9 +61,7 @@ class PipelinedSubpartition extends ResultSubpartition {
 	/** All buffers of this subpartition. Access to the buffers is synchronized on this object. */
 	private final ArrayDeque<BufferConsumer> buffers = new ArrayDeque<>();
 
-	/** The number of non-event buffers currently in this subpartition. */
-	@GuardedBy("buffers")
-	private int buffersInBacklog;
+	private final AtomicInteger unannouncedBacklog = new AtomicInteger(0);
 
 	/** The read view to consume this subpartition. */
 	private PipelinedSubpartitionView readView;
@@ -113,8 +111,15 @@ class PipelinedSubpartition extends ResultSubpartition {
 			// Add the bufferConsumer and update the stats
 			buffers.add(bufferConsumer);
 			updateStatistics(bufferConsumer);
-			increaseBuffersInBacklog(bufferConsumer);
+			if (bufferConsumer.isBuffer()) {
+				unannouncedBacklog.getAndIncrement();
+			}
 			notifyDataAvailable = shouldNotifyDataAvailable() || finish;
+
+			BufferConsumer firstBuffer = buffers.peekFirst();
+			if (notifyDataAvailable && firstBuffer.getCurrentReaderPosition() > 0 && firstBuffer.isDataAvailable()) {
+				unannouncedBacklog.getAndIncrement();
+			}
 
 			isFinished |= finish;
 		}
@@ -165,8 +170,10 @@ class PipelinedSubpartition extends ResultSubpartition {
 				flushRequested = false;
 			}
 
+			boolean shouldBlocking = false;
 			while (!buffers.isEmpty()) {
 				BufferConsumer bufferConsumer = buffers.peek();
+				shouldBlocking = bufferConsumer.isBlockingEvent();
 
 				buffer = bufferConsumer.build();
 
@@ -180,7 +187,6 @@ class PipelinedSubpartition extends ResultSubpartition {
 
 				if (bufferConsumer.isFinished()) {
 					buffers.pop().close();
-					decreaseBuffersInBacklogUnsafe(bufferConsumer.isBuffer());
 				}
 
 				if (buffer.readableBytes() > 0) {
@@ -204,8 +210,9 @@ class PipelinedSubpartition extends ResultSubpartition {
 			return new BufferAndBacklog(
 				buffer,
 				isAvailableUnsafe(),
-				getBuffersInBacklog(),
-				nextBufferIsEventUnsafe());
+				getAndResetUnannouncedBacklog(),
+				nextBufferIsEventUnsafe(),
+				shouldBlocking);
 		}
 	}
 
@@ -288,8 +295,8 @@ class PipelinedSubpartition extends ResultSubpartition {
 		}
 
 		return String.format(
-			"PipelinedSubpartition#%d [number of buffers: %d (%d bytes), number of buffers in backlog: %d, finished? %s, read view? %s]",
-			index, numBuffers, numBytes, getBuffersInBacklog(), finished, hasReadView);
+			"PipelinedSubpartition#%d [number of buffers: %d (%d bytes), unannounced backlog: %d, finished? %s," +
+				" read view? %s]", index, numBuffers, numBytes, unannouncedBacklog.get(), finished, hasReadView);
 	}
 
 	@Override
@@ -299,16 +306,25 @@ class PipelinedSubpartition extends ResultSubpartition {
 	}
 
 	@Override
+	public int getAndResetUnannouncedBacklog() {
+		return unannouncedBacklog.getAndSet(0);
+	}
+
+	@Override
 	public void flush() {
 		final boolean notifyDataAvailable;
 		synchronized (buffers) {
-			if (buffers.isEmpty()) {
+			if (buffers.isEmpty() || readView == null) {
 				return;
 			}
 			// if there is more then 1 buffer, we already notified the reader
 			// (at the latest when adding the second buffer)
-			notifyDataAvailable = !flushRequested && buffers.size() == 1 && buffers.peek().isDataAvailable();
+			BufferConsumer buffer = buffers.peek();
+			notifyDataAvailable = !flushRequested && buffers.size() == 1 && buffer.isDataAvailable();
 			flushRequested = flushRequested || buffers.size() > 1 || notifyDataAvailable;
+			if (notifyDataAvailable && buffer.getCurrentReaderPosition() > 0) {
+				unannouncedBacklog.getAndIncrement();
+			}
 		}
 		if (notifyDataAvailable) {
 			notifyDataAvailable();
@@ -335,43 +351,6 @@ class PipelinedSubpartition extends ResultSubpartition {
 
 	private void updateStatistics(Buffer buffer) {
 		totalNumberOfBytes += buffer.getSize();
-	}
-
-	@GuardedBy("buffers")
-	private void decreaseBuffersInBacklogUnsafe(boolean isBuffer) {
-		assert Thread.holdsLock(buffers);
-		if (isBuffer) {
-			buffersInBacklog--;
-		}
-	}
-
-	/**
-	 * Increases the number of non-event buffers by one after adding a non-event
-	 * buffer into this subpartition.
-	 */
-	@GuardedBy("buffers")
-	private void increaseBuffersInBacklog(BufferConsumer buffer) {
-		assert Thread.holdsLock(buffers);
-
-		if (buffer != null && buffer.isBuffer()) {
-			buffersInBacklog++;
-		}
-	}
-
-	/**
-	 * Gets the number of non-event buffers in this subpartition.
-	 *
-	 * <p><strong>Beware:</strong> This method should only be used in tests in non-concurrent access
-	 * scenarios since it does not make any concurrency guarantees.
-	 */
-	@SuppressWarnings("FieldAccessNotGuarded")
-	@VisibleForTesting
-	public int getBuffersInBacklog() {
-		if (flushRequested || isFinished) {
-			return buffersInBacklog;
-		} else {
-			return Math.max(buffersInBacklog - 1, 0);
-		}
 	}
 
 	private boolean shouldNotifyDataAvailable() {

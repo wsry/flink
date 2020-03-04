@@ -49,7 +49,6 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -91,15 +90,13 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 	/** The initial number of exclusive buffers assigned to this channel. */
 	private int initialCredit;
 
+	private final AtomicInteger numRequiredBuffers = new AtomicInteger(0);
+
 	/** The available buffer queue wraps both exclusive and requested floating buffers. */
 	private final AvailableBufferQueue bufferQueue = new AvailableBufferQueue();
 
 	/** The number of available buffers that have not been announced to the producer yet. */
 	private final AtomicInteger unannouncedCredit = new AtomicInteger(0);
-
-	/** The number of required buffers that equals to sender's backlog plus initial credit. */
-	@GuardedBy("bufferQueue")
-	private int numRequiredBuffers;
 
 	/** The tag indicates whether this channel is waiting for additional floating buffers from the buffer pool. */
 	@GuardedBy("bufferQueue")
@@ -137,14 +134,14 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 			"already been set for this input channel.");
 
 		Collection<MemorySegment> segments = checkNotNull(memorySegmentProvider.requestMemorySegments());
-		checkArgument(!segments.isEmpty(), "The number of exclusive buffers per channel should be larger than 0.");
-
 		initialCredit = segments.size();
-		numRequiredBuffers = segments.size();
 
-		synchronized (bufferQueue) {
-			for (MemorySegment segment : segments) {
-				bufferQueue.addExclusiveBuffer(new NetworkBuffer(segment, this), numRequiredBuffers);
+		if (!segments.isEmpty()) {
+			synchronized (bufferQueue) {
+				for (MemorySegment segment : segments) {
+					bufferQueue.addExclusiveBuffer(new NetworkBuffer(segment, this), numRequiredBuffers.get());
+				}
+				numRequiredBuffers.getAndAdd(-initialCredit);
 			}
 		}
 	}
@@ -203,7 +200,8 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 
 		numBytesIn.inc(next.getSize());
 		numBuffersIn.inc();
-		return Optional.of(new BufferAndAvailability(next, moreAvailable, getSenderBacklog()));
+		// TODO change number of buffers in backlog
+		return Optional.of(new BufferAndAvailability(next, moreAvailable, getNumberOfRequiredBuffers()));
 	}
 
 	// ------------------------------------------------------------------------
@@ -298,8 +296,6 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 	 */
 	@Override
 	public void recycle(MemorySegment segment) {
-		int numAddedBuffers;
-
 		synchronized (bufferQueue) {
 			// Similar to notifyBufferAvailable(), make sure that we never add a buffer
 			// after releaseAllResources() released all buffers (see below for details).
@@ -311,11 +307,15 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 					ExceptionUtils.rethrow(t);
 				}
 			}
-			numAddedBuffers = bufferQueue.addExclusiveBuffer(new NetworkBuffer(segment, this), numRequiredBuffers);
-		}
+			int numAddedBuffers = bufferQueue.addExclusiveBuffer(new NetworkBuffer(segment, this), numRequiredBuffers.get());
 
-		if (numAddedBuffers > 0 && unannouncedCredit.getAndAdd(numAddedBuffers) == 0) {
-			notifyCreditAvailable();
+			if (numAddedBuffers > 0) {
+				numRequiredBuffers.getAndAdd(-numAddedBuffers);
+
+				if (!blockedByCheckpoint && unannouncedCredit.getAndAdd(numAddedBuffers) == 0) {
+					notifyCreditAvailable();
+				}
+			}
 		}
 	}
 
@@ -326,11 +326,7 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 	}
 
 	public int getNumberOfRequiredBuffers() {
-		return numRequiredBuffers;
-	}
-
-	public int getSenderBacklog() {
-		return numRequiredBuffers - initialCredit;
+		return numRequiredBuffers.get();
 	}
 
 	@VisibleForTesting
@@ -358,6 +354,9 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 		NotificationResult notificationResult = NotificationResult.BUFFER_NOT_USED;
 		try {
 			synchronized (bufferQueue) {
+				if (blockedByCheckpoint) {
+					return notificationResult;
+				}
 				checkState(isWaitingForFloatingBuffers,
 					"This channel should be waiting for floating buffers.");
 
@@ -368,28 +367,85 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 				// 2) releaseAllResources() did not yet release buffers from bufferQueue
 				// -> we may or may not have set isReleased yet but will always wait for the
 				// lock on bufferQueue to release buffers
-				if (isReleased.get() || bufferQueue.getAvailableBufferSize() >= numRequiredBuffers) {
+				if (isReleased.get() || numRequiredBuffers.get() <= 0) {
 					isWaitingForFloatingBuffers = false;
 					return notificationResult;
 				}
 
 				bufferQueue.addFloatingBuffer(buffer);
 
-				if (bufferQueue.getAvailableBufferSize() == numRequiredBuffers) {
+				if (numRequiredBuffers.decrementAndGet() == 0) {
 					isWaitingForFloatingBuffers = false;
 					notificationResult = NotificationResult.BUFFER_USED_NO_NEED_MORE;
 				} else {
 					notificationResult = NotificationResult.BUFFER_USED_NEED_MORE;
 				}
-			}
 
-			if (unannouncedCredit.getAndAdd(1) == 0) {
-				notifyCreditAvailable();
+				if (unannouncedCredit.getAndAdd(1) == 0) {
+					notifyCreditAvailable();
+				}
 			}
 		} catch (Throwable t) {
 			setError(t);
 		}
 		return notificationResult;
+	}
+
+	@Override
+	public void onBlockingCheckpointBarrier(long checkpointId) {
+		synchronized (bufferQueue) {
+			checkState(!blockedByCheckpoint, "Already blocked.");
+
+			if (isWaitingForFloatingBuffers) {
+				inputGate.getBufferProvider().removeBufferListener(this);
+				isWaitingForFloatingBuffers = false;
+			}
+
+			int numFloatingBuffers = bufferQueue.floatingBuffers.size();
+			if (numFloatingBuffers > 0) {
+				numRequiredBuffers.getAndAdd(numFloatingBuffers);
+				bufferQueue.releaseAllFloatingBuffers();
+			}
+
+			blockedByCheckpoint = true;
+		}
+	}
+
+	@Override
+	public void unblockCheckpointBarrier(long checkpointId) {
+		synchronized (bufferQueue) {
+			checkState(blockedByCheckpoint, "Should be in blocked state.");
+
+			partitionRequestClient.resumeConsumption(this);
+		}
+	}
+
+	public int resumeConsumptionAfterCheckpoint() throws IOException {
+		synchronized (bufferQueue) {
+			checkState(blockedByCheckpoint, "Should be in blocked state.");
+			checkState(bufferQueue.floatingBuffers.isEmpty(), "Should be no floating buffers.");
+			checkState(unannouncedCredit.get() == 0, "Should be no unannounced credits.");
+			checkState(bufferQueue.exclusiveBuffers.size() == initialCredit, "Illegal number of exclusive buffers.");
+
+			blockedByCheckpoint = false;
+
+			int numRequestedBuffers = 0;
+			int numBuffersNeeded = numRequiredBuffers.get();
+			if (numBuffersNeeded > 0) {
+				numRequestedBuffers = requestBuffers(numBuffersNeeded);
+			}
+
+			if (numRequestedBuffers > 0) {
+				numRequiredBuffers.getAndAdd(-numRequestedBuffers);
+			}
+
+			int numCredit = bufferQueue.getAvailableBufferSize();
+			if (numCredit == 0 && numBuffersNeeded <= 0) {
+				return -1;
+			}
+
+			return numCredit;
+		}
 	}
 
 	@Override
@@ -480,7 +536,7 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 	 *
 	 * @param backlog The number of unsent buffers in the producer's sub partition.
 	 */
-	void onSenderBacklog(int backlog) throws IOException {
+	public void onSenderBacklog(int backlog) throws IOException {
 		int numRequestedBuffers = 0;
 
 		synchronized (bufferQueue) {
@@ -490,23 +546,34 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 				return;
 			}
 
-			numRequiredBuffers = backlog + initialCredit;
-			while (bufferQueue.getAvailableBufferSize() < numRequiredBuffers && !isWaitingForFloatingBuffers) {
-				Buffer buffer = inputGate.getBufferPool().requestBuffer();
-				if (buffer != null) {
-					bufferQueue.addFloatingBuffer(buffer);
-					numRequestedBuffers++;
-				} else if (inputGate.getBufferProvider().addBufferListener(this)) {
-					// If the channel has not got enough buffers, register it as listener to wait for more floating buffers.
-					isWaitingForFloatingBuffers = true;
-					break;
-				}
+			int buffersToRequest = numRequiredBuffers.addAndGet(backlog);
+			if (buffersToRequest > 0 && !blockedByCheckpoint) {
+				numRequestedBuffers = requestBuffers(buffersToRequest);
+				numRequiredBuffers.getAndAdd(-numRequestedBuffers);
+			}
+
+			if (numRequestedBuffers > 0 && unannouncedCredit.getAndAdd(numRequestedBuffers) == 0) {
+				notifyCreditAvailable();
 			}
 		}
+	}
 
-		if (numRequestedBuffers > 0 && unannouncedCredit.getAndAdd(numRequestedBuffers) == 0) {
-			notifyCreditAvailable();
+	int requestBuffers(int numRequiredBuffers) throws IOException {
+		assert Thread.holdsLock(bufferQueue);
+
+		int numRequestedBuffers = 0;
+		while (bufferQueue.getAvailableBufferSize() < numRequiredBuffers && !isWaitingForFloatingBuffers) {
+			Buffer buffer = inputGate.getBufferPool().requestBuffer();
+			if (buffer != null) {
+				bufferQueue.addFloatingBuffer(buffer);
+				numRequestedBuffers++;
+			} else if (inputGate.getBufferProvider().addBufferListener(this)) {
+				// If the channel has not got enough buffers, register it as listener to wait for more floating buffers.
+				isWaitingForFloatingBuffers = true;
+				break;
+			}
 		}
+		return numRequestedBuffers;
 	}
 
 	public void onBuffer(Buffer buffer, int sequenceNumber, int backlog) throws IOException {
@@ -624,13 +691,12 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 		 */
 		int addExclusiveBuffer(Buffer buffer, int numRequiredBuffers) {
 			exclusiveBuffers.add(buffer);
-			if (getAvailableBufferSize() > numRequiredBuffers) {
-				Buffer floatingBuffer = floatingBuffers.poll();
-				floatingBuffer.recycleBuffer();
-				return 0;
-			} else {
+			if (numRequiredBuffers > 0 || floatingBuffers.isEmpty()) {
 				return 1;
 			}
+			Buffer floatingBuffer = floatingBuffers.poll();
+			floatingBuffer.recycleBuffer();
+			return 0;
 		}
 
 		void addFloatingBuffer(Buffer buffer) {
@@ -666,6 +732,13 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 			}
 			while ((buffer = exclusiveBuffers.poll()) != null) {
 				exclusiveSegments.add(buffer.getMemorySegment());
+			}
+		}
+
+		void releaseAllFloatingBuffers() {
+			Buffer buffer;
+			while ((buffer = floatingBuffers.poll()) != null) {
+				buffer.recycleBuffer();
 			}
 		}
 

@@ -28,6 +28,7 @@ import org.apache.flink.runtime.io.network.netty.exception.LocalTransportExcepti
 import org.apache.flink.runtime.io.network.netty.exception.RemoteTransportException;
 import org.apache.flink.runtime.io.network.netty.exception.TransportException;
 import org.apache.flink.runtime.io.network.netty.NettyMessage.AddCredit;
+import org.apache.flink.runtime.io.network.netty.NettyMessage.ResumeConsumption;
 import org.apache.flink.runtime.io.network.partition.PartitionNotFoundException;
 import org.apache.flink.runtime.io.network.partition.consumer.InputChannelID;
 import org.apache.flink.runtime.io.network.partition.consumer.RemoteInputChannel;
@@ -63,7 +64,7 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 	private final ConcurrentMap<InputChannelID, RemoteInputChannel> inputChannels = new ConcurrentHashMap<>();
 
 	/** Channels, which will notify the producers about unannounced credit. */
-	private final ArrayDeque<RemoteInputChannel> inputChannelsWithCredit = new ArrayDeque<>();
+	private final ArrayDeque<ChannelWithCreditOrToResume> channelsWithCreditOrToResume = new ArrayDeque<>();
 
 	private final AtomicReference<Throwable> channelError = new AtomicReference<>();
 
@@ -110,7 +111,14 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 
 	@Override
 	public void notifyCreditAvailable(final RemoteInputChannel inputChannel) {
-		ctx.executor().execute(() -> ctx.pipeline().fireUserEventTriggered(inputChannel));
+		ctx.executor().execute(() ->
+			ctx.pipeline().fireUserEventTriggered(new ChannelWithCreditOrToResume(inputChannel, false)));
+	}
+
+	@Override
+	public void resumeConsumption(RemoteInputChannel inputChannel) {
+		ctx.executor().execute(() ->
+			ctx.pipeline().fireUserEventTriggered(new ChannelWithCreditOrToResume(inputChannel, true)));
 	}
 
 	// ------------------------------------------------------------------------
@@ -186,10 +194,10 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 	 */
 	@Override
 	public void userEventTriggered(ChannelHandlerContext ctx, Object msg) throws Exception {
-		if (msg instanceof RemoteInputChannel) {
-			boolean triggerWrite = inputChannelsWithCredit.isEmpty();
+		if (msg instanceof ChannelWithCreditOrToResume) {
+			boolean triggerWrite = channelsWithCreditOrToResume.isEmpty();
 
-			inputChannelsWithCredit.add((RemoteInputChannel) msg);
+			channelsWithCreditOrToResume.add((ChannelWithCreditOrToResume) msg);
 
 			if (triggerWrite) {
 				writeAndFlushNextMessageIfPossible(ctx.channel());
@@ -215,7 +223,7 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 				LOG.warn("An Exception was thrown during error notification of a remote input channel.", t);
 			} finally {
 				inputChannels.clear();
-				inputChannelsWithCredit.clear();
+				channelsWithCreditOrToResume.clear();
 
 				if (ctx != null) {
 					ctx.close();
@@ -259,6 +267,11 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 
 			decodeBufferOrEvent(inputChannel, bufferOrEvent);
 
+		} else if (msgClazz == NettyMessage.AddBacklog.class) {
+			NettyMessage.AddBacklog addBacklog = (NettyMessage.AddBacklog) msg;
+
+			RemoteInputChannel inputChannel = inputChannels.get(addBacklog.receiverId);
+			inputChannel.onSenderBacklog(addBacklog.backlog);
 		} else if (msgClazz == NettyMessage.ErrorResponse.class) {
 			// ---- Error ---------------------------------------------------------
 			NettyMessage.ErrorResponse error = (NettyMessage.ErrorResponse) msg;
@@ -336,32 +349,43 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 	 * <p>This method may be called by the first input channel enqueuing, or the complete
 	 * future's callback in previous input channel, or the channel writability changed event.
 	 */
-	private void writeAndFlushNextMessageIfPossible(Channel channel) {
+	private void writeAndFlushNextMessageIfPossible(Channel channel) throws IOException {
 		if (channelError.get() != null || !channel.isWritable()) {
 			return;
 		}
 
 		while (true) {
-			RemoteInputChannel inputChannel = inputChannelsWithCredit.poll();
+			ChannelWithCreditOrToResume channelWithCreditOrToResume = channelsWithCreditOrToResume.poll();
 
 			// The input channel may be null because of the write callbacks
 			// that are executed after each write.
-			if (inputChannel == null) {
+			if (channelWithCreditOrToResume == null) {
 				return;
 			}
+
+			RemoteInputChannel inputChannel = channelWithCreditOrToResume.channel;
 
 			//It is no need to notify credit for the released channel.
-			if (!inputChannel.isReleased()) {
-				AddCredit msg = new AddCredit(
+			if (inputChannel.isReleased()) {
+				continue;
+			}
+
+			Object msg;
+			if (channelWithCreditOrToResume.toResume) {
+				msg = new ResumeConsumption(
+					inputChannel.resumeConsumptionAfterCheckpoint(),
+					inputChannel.getInputChannelId());
+			} else {
+				msg = new AddCredit(
 					inputChannel.getAndResetUnannouncedCredit(),
 					inputChannel.getInputChannelId());
-
-				// Write and flush and wait until this is done before
-				// trying to continue with the next input channel.
-				channel.writeAndFlush(msg).addListener(writeListener);
-
-				return;
 			}
+
+			// Write and flush and wait until this is done before
+			// trying to continue with the next input channel.
+			channel.writeAndFlush(msg).addListener(writeListener);
+
+			return;
 		}
 	}
 
@@ -380,6 +404,16 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 			} catch (Throwable t) {
 				notifyAllChannelsOfErrorAndClose(t);
 			}
+		}
+	}
+
+	private static class ChannelWithCreditOrToResume {
+		private final RemoteInputChannel channel;
+		private final boolean toResume;
+
+		private ChannelWithCreditOrToResume(RemoteInputChannel channel, boolean toResume) {
+			this.channel = channel;
+			this.toResume = toResume;
 		}
 	}
 }

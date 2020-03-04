@@ -42,6 +42,7 @@ import java.util.ArrayDeque;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import static org.apache.flink.runtime.io.network.netty.NettyMessage.AddBacklog;
 import static org.apache.flink.runtime.io.network.netty.NettyMessage.BufferResponse;
 
 /**
@@ -53,6 +54,8 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 	private static final Logger LOG = LoggerFactory.getLogger(PartitionRequestQueue.class);
 
 	private final ChannelFutureListener writeListener = new WriteAndFlushNextMessageIfPossibleListener();
+
+	private final ChannelFutureListener announceBacklogListener = new announceBacklogListener();
 
 	/** The readers which are already enqueued available for transferring data. */
 	private final ArrayDeque<NetworkSequenceViewReader> availableReaders = new ArrayDeque<>();
@@ -161,13 +164,38 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 		}
 	}
 
+	void resumeConsumption(int credit, InputChannelID receiverId) throws Exception {
+		if (fatalError) {
+			return;
+		}
+
+		NetworkSequenceViewReader reader = allReaders.get(receiverId);
+		if (reader != null) {
+			reader.resumeConsumption();
+
+			if (credit > 0) {
+				addCredit(receiverId, credit);
+			} else if (credit < 0) {
+				announceBacklogIfNeeded(reader);
+			}
+		} else {
+			throw new IllegalStateException("No reader for receiverId = " + receiverId + " exists.");
+		}
+	}
+
 	@Override
 	public void userEventTriggered(ChannelHandlerContext ctx, Object msg) throws Exception {
 		// The user event triggered event loop callback is used for thread-safe
 		// hand over of reader queues and cancelled producers.
 
 		if (msg instanceof NetworkSequenceViewReader) {
-			enqueueAvailableReader((NetworkSequenceViewReader) msg);
+			NetworkSequenceViewReader reader = (NetworkSequenceViewReader) msg;
+
+			if (reader.getNumCreditsAvailable() == 0) {
+				announceBacklogIfNeeded(reader);
+			}
+
+			enqueueAvailableReader(reader);
 		} else if (msg.getClass() == InputChannelID.class) {
 			// Release partition view that get a cancel request.
 			InputChannelID toCancel = (InputChannelID) msg;
@@ -188,6 +216,14 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 	@Override
 	public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
 		writeAndFlushNextMessageIfPossible(ctx.channel());
+	}
+
+	private void announceBacklogIfNeeded(NetworkSequenceViewReader reader) {
+		int backlog = reader.getAndResetUnannouncedBacklog();
+		if (backlog > 0) {
+			AddBacklog addBacklog = new AddBacklog(backlog, reader.getReceiverId());
+			ctx.channel().writeAndFlush(addBacklog).addListener(announceBacklogListener);
+		}
 	}
 
 	private void writeAndFlushNextMessageIfPossible(final Channel channel) throws IOException {
@@ -322,6 +358,20 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 				}
 			} catch (Throwable t) {
 				handleException(future.channel(), t);
+			}
+		}
+	}
+
+	private class announceBacklogListener implements ChannelFutureListener {
+
+		@Override
+		public void operationComplete(ChannelFuture future) throws Exception {
+			if (!future.isSuccess()) {
+				if (future.cause() != null) {
+					handleException(future.channel(), future.cause());
+				} else {
+					handleException(future.channel(), new IllegalStateException("AddBacklog cancelled by user."));
+				}
 			}
 		}
 	}

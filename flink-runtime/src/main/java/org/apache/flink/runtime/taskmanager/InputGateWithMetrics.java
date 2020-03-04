@@ -61,6 +61,21 @@ public class InputGateWithMetrics extends InputGate {
 	}
 
 	@Override
+	public void unblockAllChannels(long checkpointId) throws Exception {
+		inputGate.unblockAllChannels(checkpointId);
+	}
+
+	@Override
+	public void unblockAllChannelsExceptFor(long checkpointId, int channelIndex) throws Exception {
+		inputGate.unblockAllChannelsExceptFor(checkpointId, channelIndex);
+	}
+
+	@Override
+	public void unblockChannel(long checkpointId, int channelIndex) throws Exception {
+		inputGate.unblockChannel(checkpointId, channelIndex);
+	}
+
+	@Override
 	public void setup() throws IOException, InterruptedException {
 		inputGate.setup();
 	}

@@ -92,6 +92,7 @@ public class BufferBuilderTestUtils {
 		return new BufferConsumer(
 			MemorySegmentFactory.allocateUnpooledSegment(size),
 			FreeingBufferRecycler.INSTANCE,
+			false,
 			false);
 	}
 

@@ -37,6 +37,7 @@ import org.apache.flink.runtime.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventDispatcher;
 import org.apache.flink.runtime.plugable.SerializationDelegate;
+import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.collector.selector.CopyingDirectedOutput;
 import org.apache.flink.streaming.api.collector.selector.DirectedOutput;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
@@ -248,8 +249,16 @@ public class OperatorChain<OUT, OP extends StreamOperator<OUT>> implements Strea
 		}
 	}
 
-	public void broadcastCheckpointBarrier(long id, long timestamp, CheckpointOptions checkpointOptions) throws IOException {
-		CheckpointBarrier barrier = new CheckpointBarrier(id, timestamp, checkpointOptions);
+	public void broadcastCheckpointBarrier(
+			long id,
+			long timestamp,
+			CheckpointOptions checkpointOptions,
+			CheckpointingMode checkpointingMode) throws IOException {
+		CheckpointBarrier barrier = new CheckpointBarrier(
+			id,
+			timestamp,
+			checkpointOptions,
+			checkpointingMode == CheckpointingMode.EXACTLY_ONCE);
 		for (RecordWriterOutput<?> streamOutput : streamOutputs) {
 			streamOutput.broadcastEvent(barrier);
 		}

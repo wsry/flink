@@ -24,6 +24,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointMetaData;
 import org.apache.flink.runtime.checkpoint.CheckpointMetrics;
 import org.apache.flink.runtime.io.network.api.CancelCheckpointMarker;
 import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
+import org.apache.flink.runtime.io.network.partition.consumer.UnblockCheckpointListener;
 import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -57,7 +58,7 @@ public abstract class CheckpointBarrierHandler {
 	/**
 	 * @return true if some blocked data should be unblocked/rolled over.
 	 */
-	public abstract boolean processBarrier(CheckpointBarrier receivedBarrier, int channelIndex, long bufferedBytes) throws Exception;
+	public abstract boolean processBarrier(CheckpointBarrier receivedBarrier, CheckpointedInputGate inputGate, int channelIndex) throws Exception;
 
 	/**
 	 * @return true if some blocked data should be unblocked/rolled over.
@@ -69,6 +70,10 @@ public abstract class CheckpointBarrierHandler {
 	 */
 	public abstract boolean processEndOfPartition() throws Exception;
 
+	public void registerUnblockCheckpointListener(UnblockCheckpointListener listener) {
+		// the default empty implementation
+	}
+
 	public abstract long getLatestCheckpointId();
 
 	public abstract long getAlignmentDurationNanos();
@@ -77,14 +82,11 @@ public abstract class CheckpointBarrierHandler {
 		return latestCheckpointStartDelayNanos;
 	}
 
-	public abstract void checkpointSizeLimitExceeded(long maxBufferedBytes) throws Exception;
-
-	protected void notifyCheckpoint(CheckpointBarrier checkpointBarrier, long bufferedBytes, long alignmentDurationNanos) throws Exception {
+	protected void notifyCheckpoint(CheckpointBarrier checkpointBarrier, long alignmentDurationNanos) throws Exception {
 		CheckpointMetaData checkpointMetaData =
 			new CheckpointMetaData(checkpointBarrier.getId(), checkpointBarrier.getTimestamp());
 
 		CheckpointMetrics checkpointMetrics = new CheckpointMetrics()
-			.setBytesBufferedInAlignment(bufferedBytes)
 			.setAlignmentDurationNanos(alignmentDurationNanos)
 			.setCheckpointStartDelayNanos(latestCheckpointStartDelayNanos);
 

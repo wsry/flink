@@ -298,7 +298,7 @@ public class RemoteInputChannelTest {
 	public void testOnFailedPartitionRequest() throws Exception {
 		final ConnectionManager connectionManager = mock(ConnectionManager.class);
 		when(connectionManager.createPartitionRequestClient(any(ConnectionID.class)))
-				.thenReturn(mock(PartitionRequestClient.class));
+			.thenReturn(mock(PartitionRequestClient.class));
 
 		final ResultPartitionID partitionId = new ResultPartitionID();
 
@@ -319,7 +319,7 @@ public class RemoteInputChannelTest {
 
 		ConnectionManager connManager = mock(ConnectionManager.class);
 		when(connManager.createPartitionRequestClient(any(ConnectionID.class)))
-				.thenReturn(mock(PartitionRequestClient.class));
+			.thenReturn(mock(PartitionRequestClient.class));
 
 		final RemoteInputChannel ch = InputChannelTestUtils.createRemoteInputChannel(mock(SingleInputGate.class), 0, connManager);
 
@@ -1062,7 +1062,7 @@ public class RemoteInputChannelTest {
 		throws IOException, InterruptedException {
 
 		return createRemoteInputChannel(
-				inputGate, mock(PartitionRequestClient.class), 0, 0, memorySegmentProvider);
+			inputGate, mock(PartitionRequestClient.class), 0, 0, memorySegmentProvider);
 	}
 
 	private RemoteInputChannel createRemoteInputChannel(
@@ -1086,7 +1086,7 @@ public class RemoteInputChannelTest {
 
 		final ConnectionManager connectionManager = mock(ConnectionManager.class);
 		when(connectionManager.createPartitionRequestClient(any(ConnectionID.class)))
-				.thenReturn(partitionRequestClient);
+			.thenReturn(partitionRequestClient);
 
 		return InputChannelBuilder.newBuilder()
 			.setConnectionManager(connectionManager)

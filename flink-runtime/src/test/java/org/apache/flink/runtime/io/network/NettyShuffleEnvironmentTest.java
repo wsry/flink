@@ -44,8 +44,6 @@ import java.io.IOException;
 import static org.apache.flink.runtime.io.network.partition.InputChannelTestUtils.createDummyConnectionManager;
 import static org.apache.flink.runtime.io.network.partition.PartitionTestUtils.createPartition;
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.powermock.api.mockito.PowerMockito.spy;
 
 /**
@@ -167,11 +165,6 @@ public class NettyShuffleEnvironmentTest extends TestLogger {
 		assertEquals(floatingBuffers, ig2.getBufferPool().getMaxNumberOfMemorySegments());
 		assertEquals(floatingBuffers, ig3.getBufferPool().getMaxNumberOfMemorySegments());
 		assertEquals(floatingBuffers, ig4.getBufferPool().getMaxNumberOfMemorySegments());
-
-		verify(ig1, times(1)).assignExclusiveSegments();
-		verify(ig2, times(1)).assignExclusiveSegments();
-		verify(ig3, times(1)).assignExclusiveSegments();
-		verify(ig4, times(1)).assignExclusiveSegments();
 
 		for (ResultPartition rp : resultPartitions) {
 			rp.release();

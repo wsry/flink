@@ -91,6 +91,11 @@ class PipelinedSubpartitionView implements ResultSubpartitionView {
 	}
 
 	@Override
+	public int getAndResetUnannouncedBacklog() {
+		return parent.getAndResetUnannouncedBacklog();
+	}
+
+	@Override
 	public String toString() {
 		return String.format("PipelinedSubpartitionView(index: %d) of ResultPartition %s",
 				parent.index,
