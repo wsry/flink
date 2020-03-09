@@ -138,18 +138,22 @@ public class NettyShuffleEnvironmentOptions {
 			.withDescription("Maximum memory size for network buffers.");
 
 	/**
-	 * Number of network buffers to use for each outgoing/incoming channel (subpartition/input channel).
-	 *
-	 * <p>Reasoning: 1 buffer for in-flight data in the subpartition + 1 buffer for parallel serialization.
+	 * Maximum number of network buffers to use for each outgoing channel (subpartition).
+	 */
+	@Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
+	public static final ConfigOption<Integer> NETWORK_BUFFERS_PER_SUBPARTITION =
+		key("taskmanager.network.memory.buffers-per-subpartition")
+			.defaultValue(2)
+			.withDescription("Maximum number of network buffers to use for each outgoing channel (subpartition).");
+
+	/**
+	 * Maximum number of network buffers to use for each incoming channel (input channel).
 	 */
 	@Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
 	public static final ConfigOption<Integer> NETWORK_BUFFERS_PER_CHANNEL =
 		key("taskmanager.network.memory.buffers-per-channel")
-			.defaultValue(2)
-			.withDescription("Maximum number of network buffers to use for each outgoing/incoming channel (subpartition/input channel)." +
-				"In credit-based flow control mode, this indicates how many credits are exclusive in each input channel. It should be" +
-				" configured at least 2 for good performance. 1 buffer is for receiving in-flight data in the subpartition and 1 buffer is" +
-				" for parallel serialization.");
+			.defaultValue(0)
+			.withDescription("Maximum number of network buffers to use for each incoming channel (input channel).");
 
 	/**
 	 * Number of extra network buffers to use for each outgoing/incoming gate (result partition/input gate).

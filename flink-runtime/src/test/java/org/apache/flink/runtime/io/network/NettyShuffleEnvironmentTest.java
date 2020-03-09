@@ -77,7 +77,7 @@ public class NettyShuffleEnvironmentTest extends TestLogger {
 	public void testRegisterTaskWithLimitedBuffers() throws Exception {
 		// outgoing: 1 buffer per channel (always)
 		// incoming: 2 exclusive buffers per channel
-		final int bufferCount = 14 + 10 * NettyShuffleEnvironmentOptions.NETWORK_BUFFERS_PER_CHANNEL.defaultValue();
+		final int bufferCount = 14 + 10 * NettyShuffleEnvironmentOptions.NETWORK_BUFFERS_PER_SUBPARTITION.defaultValue();
 
 		testRegisterTaskWithLimitedBuffers(bufferCount);
 	}
@@ -90,7 +90,7 @@ public class NettyShuffleEnvironmentTest extends TestLogger {
 	public void testRegisterTaskWithInsufficientBuffers() throws Exception {
 		// outgoing: 1 buffer per channel (always)
 		// incoming: 2 exclusive buffers per channel
-		final int bufferCount = 10 + 10 * NettyShuffleEnvironmentOptions.NETWORK_BUFFERS_PER_CHANNEL.defaultValue() - 1;
+		final int bufferCount = 10 + 10 * NettyShuffleEnvironmentOptions.NETWORK_BUFFERS_PER_SUBPARTITION.defaultValue() - 1;
 
 		expectedException.expect(IOException.class);
 		expectedException.expectMessage("Insufficient number of network buffers");

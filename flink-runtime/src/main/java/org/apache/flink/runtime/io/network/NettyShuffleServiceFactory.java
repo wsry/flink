@@ -102,7 +102,7 @@ public class NettyShuffleServiceFactory implements ShuffleServiceFactory<NettySh
 			fileChannelManager,
 			networkBufferPool,
 			config.getBlockingSubpartitionType(),
-			config.networkBuffersPerChannel(),
+			config.networkBuffersPerSubpartition(),
 			config.floatingNetworkBuffersPerGate(),
 			config.networkBufferSize(),
 			config.isForcePartitionReleaseOnConsumption(),

@@ -47,6 +47,8 @@ public class NettyShuffleEnvironmentBuilder {
 
 	private int networkBuffersPerChannel = 2;
 
+	private int networkBuffersPerSubpartition = 2;
+
 	private int floatingNetworkBuffersPerGate = 8;
 
 	private boolean blockingShuffleCompressionEnabled = false;
@@ -84,6 +86,11 @@ public class NettyShuffleEnvironmentBuilder {
 		return this;
 	}
 
+	public NettyShuffleEnvironmentBuilder setNetworkBuffersPerSubpartition(int networkBuffersPerSubpartition) {
+		this.networkBuffersPerSubpartition = networkBuffersPerSubpartition;
+		return this;
+	}
+
 	public NettyShuffleEnvironmentBuilder setFloatingNetworkBuffersPerGate(int floatingNetworkBuffersPerGate) {
 		this.floatingNetworkBuffersPerGate = floatingNetworkBuffersPerGate;
 		return this;
@@ -117,6 +124,7 @@ public class NettyShuffleEnvironmentBuilder {
 				partitionRequestInitialBackoff,
 				partitionRequestMaxBackoff,
 				networkBuffersPerChannel,
+				networkBuffersPerSubpartition,
 				floatingNetworkBuffersPerGate,
 				DEFAULT_REQUEST_SEGMENTS_TIMEOUT,
 				false,
