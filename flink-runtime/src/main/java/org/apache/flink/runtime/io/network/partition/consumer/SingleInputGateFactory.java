@@ -72,7 +72,7 @@ public class SingleInputGateFactory {
 	@Nonnull
 	protected final NetworkBufferPool networkBufferPool;
 
-	private final int networkBuffersPerChannel;
+	private final int networkBuffersPerInputChannel;
 
 	private final int floatingNetworkBuffersPerGate;
 
@@ -92,7 +92,7 @@ public class SingleInputGateFactory {
 		this.taskExecutorResourceId = taskExecutorResourceId;
 		this.partitionRequestInitialBackoff = networkConfig.partitionRequestInitialBackoff();
 		this.partitionRequestMaxBackoff = networkConfig.partitionRequestMaxBackoff();
-		this.networkBuffersPerChannel = networkConfig.networkBuffersPerChannel();
+		this.networkBuffersPerInputChannel = networkConfig.networkBuffersPerInputChannel();
 		this.floatingNetworkBuffersPerGate = networkConfig.floatingNetworkBuffersPerGate();
 		this.blockingShuffleCompressionEnabled = networkConfig.isBlockingShuffleCompressionEnabled();
 		this.compressionCodec = networkConfig.getCompressionCodec();
@@ -114,7 +114,7 @@ public class SingleInputGateFactory {
 			@Nonnull InputChannelMetrics metrics) {
 		SupplierWithException<BufferPool, IOException> bufferPoolFactory = createBufferPoolFactory(
 			networkBufferPool,
-			networkBuffersPerChannel,
+			networkBuffersPerInputChannel,
 			floatingNetworkBuffersPerGate,
 			igdd.getShuffleDescriptors().length,
 			igdd.getConsumedPartitionType());

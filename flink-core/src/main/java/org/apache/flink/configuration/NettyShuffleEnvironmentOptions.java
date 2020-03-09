@@ -161,6 +161,28 @@ public class NettyShuffleEnvironmentOptions {
 				" 1 buffer is for receiving in-flight data in the subpartition and 1 buffer is for parallel serialization.");
 
 	/**
+	 * Number of network buffers to use for each outgoing channel (subpartition).
+	 */
+	@Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
+	public static final ConfigOption<Integer> NETWORK_BUFFERS_PER_OUTGOING_CHANNEL =
+		key("taskmanager.network.memory.buffers-per-outgoing-channel")
+			.defaultValue(-1)
+			.withDescription("Number of network buffers to use for each outgoing channel (subpartition). If a negative " +
+				"value is set, value of " + NETWORK_BUFFERS_PER_CHANNEL.key() + " will be used. If a non-negative value" +
+				" is set, value of " + NETWORK_BUFFERS_PER_CHANNEL.key() + " will be ignored.");
+
+	/**
+	 * Number of network buffers to use for each incoming channel (input channel).
+	 */
+	@Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
+	public static final ConfigOption<Integer> NETWORK_BUFFERS_PER_INCOMING_CHANNEL =
+		key("taskmanager.network.memory.buffers-per-incoming-channel")
+			.defaultValue(-1)
+			.withDescription("Number of network buffers to use for each incoming channel (input channel). If a negative " +
+				"value is set, value of " + NETWORK_BUFFERS_PER_CHANNEL.key() + " will be used. If a non-negative value " +
+				"is set, value of " + NETWORK_BUFFERS_PER_CHANNEL.key() + " will be ignored.");
+
+	/**
 	 * Number of extra network buffers to use for each outgoing/incoming gate (result partition/input gate).
 	 */
 	@Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)

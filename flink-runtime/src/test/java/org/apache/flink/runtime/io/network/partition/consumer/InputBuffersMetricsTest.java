@@ -68,7 +68,7 @@ public class InputBuffersMetricsTest extends TestLogger {
 		int numberOfBuffersPerGate = 8;
 
 		NettyShuffleEnvironment network = new NettyShuffleEnvironmentBuilder()
-			.setNetworkBuffersPerChannel(numberOfBufferPerChannel)
+			.setNetworkBuffersPerInputChannel(numberOfBufferPerChannel)
 			.setFloatingNetworkBuffersPerGate(numberOfBuffersPerGate)
 			.build();
 		closeableRegistry.registerCloseable(network::close);
@@ -109,7 +109,7 @@ public class InputBuffersMetricsTest extends TestLogger {
 		int extraNetworkBuffersPerGate = 8;
 
 		NettyShuffleEnvironment network = new NettyShuffleEnvironmentBuilder()
-			.setNetworkBuffersPerChannel(buffersPerChannel)
+			.setNetworkBuffersPerInputChannel(buffersPerChannel)
 			.setFloatingNetworkBuffersPerGate(extraNetworkBuffersPerGate)
 			.build();
 		closeableRegistry.registerCloseable(network::close);
@@ -173,7 +173,7 @@ public class InputBuffersMetricsTest extends TestLogger {
 		int extraNetworkBuffersPerGate = 8;
 
 		NettyShuffleEnvironment network = new NettyShuffleEnvironmentBuilder()
-			.setNetworkBuffersPerChannel(buffersPerChannel)
+			.setNetworkBuffersPerInputChannel(buffersPerChannel)
 			.setFloatingNetworkBuffersPerGate(extraNetworkBuffersPerGate)
 			.build();
 		closeableRegistry.registerCloseable(network::close);

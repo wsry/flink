@@ -52,8 +52,11 @@ public class NettyShuffleEnvironmentConfiguration {
 
 	private final int partitionRequestMaxBackoff;
 
-	/** Number of network buffers to use for each outgoing/incoming channel (subpartition/input channel). */
-	private final int networkBuffersPerChannel;
+	/** Number of network buffers to use for each incoming channel. */
+	private final int networkBuffersPerInputChannel;
+
+	/** Number of network buffers to use for each outgoing channel. */
+	private final int networkBuffersPerSubpartition;
 
 	/** Number of extra network buffers to use for each outgoing/incoming gate (result partition/input gate). */
 	private final int floatingNetworkBuffersPerGate;
@@ -81,7 +84,8 @@ public class NettyShuffleEnvironmentConfiguration {
 			int networkBufferSize,
 			int partitionRequestInitialBackoff,
 			int partitionRequestMaxBackoff,
-			int networkBuffersPerChannel,
+			int networkBuffersPerInputChannel,
+			int networkBuffersPerSubpartition,
 			int floatingNetworkBuffersPerGate,
 			Duration requestSegmentsTimeout,
 			boolean isNetworkDetailedMetrics,
@@ -97,7 +101,8 @@ public class NettyShuffleEnvironmentConfiguration {
 		this.networkBufferSize = networkBufferSize;
 		this.partitionRequestInitialBackoff = partitionRequestInitialBackoff;
 		this.partitionRequestMaxBackoff = partitionRequestMaxBackoff;
-		this.networkBuffersPerChannel = networkBuffersPerChannel;
+		this.networkBuffersPerInputChannel = networkBuffersPerInputChannel;
+		this.networkBuffersPerSubpartition = networkBuffersPerSubpartition;
 		this.floatingNetworkBuffersPerGate = floatingNetworkBuffersPerGate;
 		this.requestSegmentsTimeout = Preconditions.checkNotNull(requestSegmentsTimeout);
 		this.isNetworkDetailedMetrics = isNetworkDetailedMetrics;
@@ -128,8 +133,12 @@ public class NettyShuffleEnvironmentConfiguration {
 		return partitionRequestMaxBackoff;
 	}
 
-	public int networkBuffersPerChannel() {
-		return networkBuffersPerChannel;
+	public int networkBuffersPerInputChannel() {
+		return networkBuffersPerInputChannel;
+	}
+
+	public int networkBuffersPerSubpartition() {
+		return networkBuffersPerSubpartition;
 	}
 
 	public int floatingNetworkBuffersPerGate() {
@@ -205,6 +214,8 @@ public class NettyShuffleEnvironmentConfiguration {
 		int maxRequestBackoff = configuration.getInteger(NettyShuffleEnvironmentOptions.NETWORK_REQUEST_BACKOFF_MAX);
 
 		int buffersPerChannel = configuration.getInteger(NettyShuffleEnvironmentOptions.NETWORK_BUFFERS_PER_CHANNEL);
+		int buffersPerInputChannel = configuration.getInteger(NettyShuffleEnvironmentOptions.NETWORK_BUFFERS_PER_INCOMING_CHANNEL);
+		int buffersPerSubpartition = configuration.getInteger(NettyShuffleEnvironmentOptions.NETWORK_BUFFERS_PER_OUTGOING_CHANNEL);
 		int extraBuffersPerGate = configuration.getInteger(NettyShuffleEnvironmentOptions.NETWORK_EXTRA_BUFFERS_PER_GATE);
 
 		int maxBuffersPerChannel = configuration.getInteger(NettyShuffleEnvironmentOptions.NETWORK_MAX_BUFFERS_PER_CHANNEL);
@@ -230,7 +241,8 @@ public class NettyShuffleEnvironmentConfiguration {
 			pageSize,
 			initialRequestBackoff,
 			maxRequestBackoff,
-			buffersPerChannel,
+			buffersPerInputChannel < 0 ? buffersPerChannel : buffersPerInputChannel,
+			buffersPerSubpartition < 0 ? buffersPerChannel : buffersPerSubpartition,
 			extraBuffersPerGate,
 			requestSegmentsTimeout,
 			isNetworkDetailedMetrics,
@@ -354,7 +366,8 @@ public class NettyShuffleEnvironmentConfiguration {
 		result = 31 * result + networkBufferSize;
 		result = 31 * result + partitionRequestInitialBackoff;
 		result = 31 * result + partitionRequestMaxBackoff;
-		result = 31 * result + networkBuffersPerChannel;
+		result = 31 * result + networkBuffersPerInputChannel;
+		result = 31 * result + networkBuffersPerSubpartition;
 		result = 31 * result + floatingNetworkBuffersPerGate;
 		result = 31 * result + requestSegmentsTimeout.hashCode();
 		result = 31 * result + (nettyConfig != null ? nettyConfig.hashCode() : 0);
@@ -381,7 +394,8 @@ public class NettyShuffleEnvironmentConfiguration {
 					this.networkBufferSize == that.networkBufferSize &&
 					this.partitionRequestInitialBackoff == that.partitionRequestInitialBackoff &&
 					this.partitionRequestMaxBackoff == that.partitionRequestMaxBackoff &&
-					this.networkBuffersPerChannel == that.networkBuffersPerChannel &&
+					this.networkBuffersPerInputChannel == that.networkBuffersPerInputChannel &&
+					this.networkBuffersPerSubpartition == that.networkBuffersPerSubpartition &&
 					this.floatingNetworkBuffersPerGate == that.floatingNetworkBuffersPerGate &&
 					this.requestSegmentsTimeout.equals(that.requestSegmentsTimeout) &&
 					(nettyConfig != null ? nettyConfig.equals(that.nettyConfig) : that.nettyConfig == null) &&
@@ -400,7 +414,8 @@ public class NettyShuffleEnvironmentConfiguration {
 				", networkBufferSize=" + networkBufferSize +
 				", partitionRequestInitialBackoff=" + partitionRequestInitialBackoff +
 				", partitionRequestMaxBackoff=" + partitionRequestMaxBackoff +
-				", networkBuffersPerChannel=" + networkBuffersPerChannel +
+				", networkBuffersPerInputChannel=" + networkBuffersPerInputChannel +
+				", networkBuffersPerSubpartition=" + networkBuffersPerSubpartition +
 				", floatingNetworkBuffersPerGate=" + floatingNetworkBuffersPerGate +
 				", requestSegmentsTimeout=" + requestSegmentsTimeout +
 				", nettyConfig=" + nettyConfig +

@@ -407,7 +407,7 @@ public class ResultPartitionTest {
 		final ResultPartition partition = new ResultPartitionBuilder()
 			.setResultPartitionType(type)
 			.setFileChannelManager(fileChannelManager)
-			.setNetworkBuffersPerChannel(networkBuffersPerChannel)
+			.setNetworkBuffersPerSubpartition(networkBuffersPerChannel)
 			.setFloatingNetworkBuffersPerGate(floatingNetworkBuffersPerGate)
 			.setNetworkBufferPool(globalPool)
 			.build();

@@ -96,7 +96,7 @@ public class SingleInputGateBuilder {
 		NettyShuffleEnvironmentConfiguration config = environment.getConfiguration();
 		this.bufferPoolFactory = SingleInputGateFactory.createBufferPoolFactory(
 			environment.getNetworkBufferPool(),
-			config.networkBuffersPerChannel(),
+			config.networkBuffersPerInputChannel(),
 			config.floatingNetworkBuffersPerGate(),
 			numberOfChannels,
 			partitionType);
