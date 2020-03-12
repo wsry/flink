@@ -240,7 +240,7 @@ public class SingleInputGateFactory {
 			int floatingNetworkBuffersPerGate,
 			int size,
 			ResultPartitionType type) {
-		return () -> bufferPoolFactory.createBufferPool(0, floatingNetworkBuffersPerGate);
+		return () -> bufferPoolFactory.createBufferPool(networkBuffersPerChannel > 0 ? 0 : floatingNetworkBuffersPerGate, floatingNetworkBuffersPerGate);
 	}
 
 	/**

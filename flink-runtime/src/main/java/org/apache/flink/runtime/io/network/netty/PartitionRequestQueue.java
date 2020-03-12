@@ -96,9 +96,9 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 	 * <p>NOTE: Only one thread would trigger the actual enqueue after checking the reader's
 	 * availability, so there is no race condition here.
 	 */
-	private void enqueueAvailableReader(final NetworkSequenceViewReader reader) throws Exception {
+	private boolean enqueueAvailableReader(final NetworkSequenceViewReader reader) throws Exception {
 		if (reader.isRegisteredAsAvailable() || !reader.isAvailable()) {
-			return;
+			return false;
 		}
 		// Queue an available reader for consumption. If the queue is empty,
 		// we try trigger the actual write. Otherwise this will be handled by
@@ -109,6 +109,7 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 		if (triggerWrite) {
 			writeAndFlushNextMessageIfPossible(ctx.channel());
 		}
+		return true;
 	}
 
 	/**
@@ -174,8 +175,10 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 			reader.resumeConsumption();
 
 			if (credit > 0) {
-				addCredit(receiverId, credit);
-			} else if (credit < 0) {
+				reader.addCredit(credit);
+			}
+
+			if (!enqueueAvailableReader(reader) && credit < 0) {
 				announceBacklogIfNeeded(reader);
 			}
 		} else {
@@ -189,13 +192,11 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 		// hand over of reader queues and cancelled producers.
 
 		if (msg instanceof NetworkSequenceViewReader) {
-			NetworkSequenceViewReader reader = (NetworkSequenceViewReader) msg;
+			CreditBasedSequenceNumberingViewReader reader = (CreditBasedSequenceNumberingViewReader) msg;
 
-			if (reader.getNumCreditsAvailable() == 0) {
+			if (!enqueueAvailableReader(reader)) {
 				announceBacklogIfNeeded(reader);
 			}
-
-			enqueueAvailableReader(reader);
 		} else if (msg.getClass() == InputChannelID.class) {
 			// Release partition view that get a cancel request.
 			InputChannelID toCancel = (InputChannelID) msg;
@@ -219,6 +220,9 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 	}
 
 	private void announceBacklogIfNeeded(NetworkSequenceViewReader reader) {
+		if (reader.getInitialCredit() > 0) {
+			return;
+		}
 		int backlog = reader.getAndResetUnannouncedBacklog();
 		if (backlog > 0) {
 			AddBacklog addBacklog = new AddBacklog(backlog, reader.getReceiverId());

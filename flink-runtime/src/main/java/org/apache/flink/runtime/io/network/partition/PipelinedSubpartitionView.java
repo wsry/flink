@@ -71,8 +71,8 @@ class PipelinedSubpartitionView implements ResultSubpartitionView {
 	}
 
 	@Override
-	public boolean nextBufferIsEvent() {
-		return parent.nextBufferIsEvent();
+	public boolean nextBufferIsFinishedEmptyOrEvent() {
+		return parent.nextBufferIsFinishedEmptyOrEvent();
 	}
 
 	@Override

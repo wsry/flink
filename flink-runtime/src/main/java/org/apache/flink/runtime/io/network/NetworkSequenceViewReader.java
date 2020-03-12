@@ -51,6 +51,8 @@ public interface NetworkSequenceViewReader {
 
 	int getNumCreditsAvailable();
 
+	int getInitialCredit();
+
 	/**
 	 * Checks whether this reader is available or not.
 	 *

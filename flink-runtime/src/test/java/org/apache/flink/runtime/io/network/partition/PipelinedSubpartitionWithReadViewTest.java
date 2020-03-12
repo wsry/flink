@@ -213,14 +213,14 @@ public class PipelinedSubpartitionWithReadViewTest {
 	@Test
 	public void testBasicPipelinedProduceConsumeLogic() throws Exception {
 		// Empty => should return null
-		assertFalse(readView.nextBufferIsEvent());
+		assertFalse(readView.nextBufferIsFinishedEmptyOrEvent());
 		assertNoNextBuffer(readView);
-		assertFalse(readView.nextBufferIsEvent()); // also after getNextBuffer()
+		assertFalse(readView.nextBufferIsFinishedEmptyOrEvent()); // also after getNextBuffer()
 		assertEquals(0, availablityListener.getNumNotifications());
 
 		// Add data to the queue...
 		subpartition.add(createFilledFinishedBufferConsumer(BUFFER_SIZE));
-		assertFalse(readView.nextBufferIsEvent());
+		assertFalse(readView.nextBufferIsFinishedEmptyOrEvent());
 
 		assertEquals(1, subpartition.getTotalNumberOfBuffers());
 		assertEquals(0, subpartition.getTotalNumberOfBytes()); // only updated when getting the buffer
@@ -234,7 +234,7 @@ public class PipelinedSubpartitionWithReadViewTest {
 
 		// Add data to the queue...
 		subpartition.add(createFilledFinishedBufferConsumer(BUFFER_SIZE));
-		assertFalse(readView.nextBufferIsEvent());
+		assertFalse(readView.nextBufferIsFinishedEmptyOrEvent());
 
 		assertEquals(2, subpartition.getTotalNumberOfBuffers());
 		assertEquals(BUFFER_SIZE, subpartition.getTotalNumberOfBytes()); // only updated when getting the buffer
@@ -248,11 +248,11 @@ public class PipelinedSubpartitionWithReadViewTest {
 
 		// fill with: buffer, event, and buffer
 		subpartition.add(createFilledFinishedBufferConsumer(BUFFER_SIZE));
-		assertFalse(readView.nextBufferIsEvent());
+		assertFalse(readView.nextBufferIsFinishedEmptyOrEvent());
 		subpartition.add(createEventBufferConsumer(BUFFER_SIZE));
-		assertFalse(readView.nextBufferIsEvent());
+		assertFalse(readView.nextBufferIsFinishedEmptyOrEvent());
 		subpartition.add(createFilledFinishedBufferConsumer(BUFFER_SIZE));
-		assertFalse(readView.nextBufferIsEvent());
+		assertFalse(readView.nextBufferIsFinishedEmptyOrEvent());
 
 		assertEquals(5, subpartition.getTotalNumberOfBuffers());
 		assertEquals(2 * BUFFER_SIZE, subpartition.getTotalNumberOfBytes()); // only updated when getting the buffer
@@ -391,7 +391,7 @@ public class PipelinedSubpartitionWithReadViewTest {
 			assertEquals("next is event", expectedNextBufferIsEvent,
 					bufferAndBacklog.nextBufferIsEvent());
 			assertEquals("next is event", expectedNextBufferIsEvent,
-					readView.nextBufferIsEvent());
+					readView.nextBufferIsFinishedEmptyOrEvent());
 
 			assertFalse("not recycled", bufferAndBacklog.buffer().isRecycled());
 		} finally {

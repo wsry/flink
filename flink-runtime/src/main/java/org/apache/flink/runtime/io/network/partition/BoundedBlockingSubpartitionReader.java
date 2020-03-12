@@ -144,7 +144,7 @@ final class BoundedBlockingSubpartitionReader implements ResultSubpartitionView 
 	}
 
 	@Override
-	public boolean nextBufferIsEvent() {
+	public boolean nextBufferIsFinishedEmptyOrEvent() {
 		return nextBuffer != null && !nextBuffer.isBuffer();
 	}
 

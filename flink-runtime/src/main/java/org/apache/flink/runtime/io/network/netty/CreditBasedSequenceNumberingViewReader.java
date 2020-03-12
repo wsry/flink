@@ -141,7 +141,7 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 			return subpartitionView.isAvailable();
 		}
 		else {
-			return subpartitionView.nextBufferIsEvent();
+			return subpartitionView.nextBufferIsFinishedEmptyOrEvent();
 		}
 	}
 
@@ -181,6 +181,11 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 	@Override
 	public int getNumCreditsAvailable() {
 		return numCreditsAvailable;
+	}
+
+	@Override
+	public int getInitialCredit() {
+		return initialCredit;
 	}
 
 	@VisibleForTesting

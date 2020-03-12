@@ -211,7 +211,7 @@ public class CancelPartitionRequestTest {
 		}
 
 		@Override
-		public boolean nextBufferIsEvent() {
+		public boolean nextBufferIsFinishedEmptyOrEvent() {
 			return false;
 		}
 

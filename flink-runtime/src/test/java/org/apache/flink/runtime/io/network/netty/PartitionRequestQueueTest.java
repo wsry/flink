@@ -304,7 +304,7 @@ public class PartitionRequestQueueTest {
 
 	private static class NextIsEventResultSubpartitionView extends NoOpResultSubpartitionView {
 		@Override
-		public boolean nextBufferIsEvent() {
+		public boolean nextBufferIsFinishedEmptyOrEvent() {
 			return true;
 		}
 

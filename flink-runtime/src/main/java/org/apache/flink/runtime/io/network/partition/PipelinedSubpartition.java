@@ -31,7 +31,6 @@ import javax.annotation.concurrent.GuardedBy;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
@@ -61,7 +60,7 @@ class PipelinedSubpartition extends ResultSubpartition {
 	/** All buffers of this subpartition. Access to the buffers is synchronized on this object. */
 	private final ArrayDeque<BufferConsumer> buffers = new ArrayDeque<>();
 
-	private final AtomicInteger unannouncedBacklog = new AtomicInteger(0);
+	private int unannouncedBacklog = 0;
 
 	/** The read view to consume this subpartition. */
 	private PipelinedSubpartitionView readView;
@@ -80,6 +79,8 @@ class PipelinedSubpartition extends ResultSubpartition {
 
 	/** The total number of bytes (both data and event buffers). */
 	private long totalNumberOfBytes;
+
+	private boolean alreadyNotifiedAvailable = false;
 
 	// ------------------------------------------------------------------------
 
@@ -112,13 +113,13 @@ class PipelinedSubpartition extends ResultSubpartition {
 			buffers.add(bufferConsumer);
 			updateStatistics(bufferConsumer);
 			if (bufferConsumer.isBuffer()) {
-				unannouncedBacklog.getAndIncrement();
+				++unannouncedBacklog;
 			}
-			notifyDataAvailable = shouldNotifyDataAvailable() || finish;
 
-			BufferConsumer firstBuffer = buffers.peekFirst();
-			if (notifyDataAvailable && firstBuffer.getCurrentReaderPosition() > 0 && firstBuffer.isDataAvailable()) {
-				unannouncedBacklog.getAndIncrement();
+			notifyDataAvailable = shouldNotifyDataAvailable();
+			alreadyNotifiedAvailable = alreadyNotifiedAvailable || notifyDataAvailable;
+			if (notifyDataAvailable && buffers.size() == 2 && isPartialBufferAndDataAvailable(buffers.peekFirst())) {
+				++unannouncedBacklog;
 			}
 
 			isFinished |= finish;
@@ -165,12 +166,12 @@ class PipelinedSubpartition extends ResultSubpartition {
 	BufferAndBacklog pollBuffer() {
 		synchronized (buffers) {
 			Buffer buffer = null;
+			boolean shouldBlocking = false;
 
 			if (buffers.isEmpty()) {
 				flushRequested = false;
 			}
 
-			boolean shouldBlocking = false;
 			while (!buffers.isEmpty()) {
 				BufferConsumer bufferConsumer = buffers.peek();
 				shouldBlocking = bufferConsumer.isBlockingEvent();
@@ -199,6 +200,8 @@ class PipelinedSubpartition extends ResultSubpartition {
 				}
 			}
 
+			boolean nextBufferIsEvent = nextBufferIsEventUnsafe();
+			alreadyNotifiedAvailable = buffers.size() > 1 || flushRequested || nextBufferIsEvent;
 			if (buffer == null) {
 				return null;
 			}
@@ -209,16 +212,16 @@ class PipelinedSubpartition extends ResultSubpartition {
 			// will be 2 or more.
 			return new BufferAndBacklog(
 				buffer,
-				isAvailableUnsafe(),
-				getAndResetUnannouncedBacklog(),
-				nextBufferIsEventUnsafe(),
+				alreadyNotifiedAvailable,
+				getAndResetUnannouncedBacklogUnsafe(),
+				nextBufferIsEvent,
 				shouldBlocking);
 		}
 	}
 
-	boolean nextBufferIsEvent() {
+	boolean nextBufferIsFinishedEmptyOrEvent() {
 		synchronized (buffers) {
-			return nextBufferIsEventUnsafe();
+			return nextBufferIsEventUnsafe() || nextBufferIsFinishedEmptyUnsafe();
 		}
 	}
 
@@ -226,6 +229,12 @@ class PipelinedSubpartition extends ResultSubpartition {
 		assert Thread.holdsLock(buffers);
 
 		return !buffers.isEmpty() && !buffers.peekFirst().isBuffer();
+	}
+
+	private boolean nextBufferIsFinishedEmptyUnsafe() {
+		assert Thread.holdsLock(buffers);
+
+		return buffers.size() > 1 && !buffers.peekFirst().isDataAvailable();
 	}
 
 	@Override
@@ -253,7 +262,8 @@ class PipelinedSubpartition extends ResultSubpartition {
 				parent.getOwningTaskName(), index, parent.getPartitionId());
 
 			readView = new PipelinedSubpartitionView(this, availabilityListener);
-			notifyDataAvailable = !buffers.isEmpty();
+			notifyDataAvailable = shouldNotifyDataAvailable();
+			alreadyNotifiedAvailable = notifyDataAvailable;
 		}
 		if (notifyDataAvailable) {
 			notifyDataAvailable();
@@ -264,12 +274,8 @@ class PipelinedSubpartition extends ResultSubpartition {
 
 	public boolean isAvailable() {
 		synchronized (buffers) {
-			return isAvailableUnsafe();
+			return alreadyNotifiedAvailable;
 		}
-	}
-
-	private boolean isAvailableUnsafe() {
-		return flushRequested || getNumberOfFinishedBuffers() > 0;
 	}
 
 	// ------------------------------------------------------------------------
@@ -296,7 +302,7 @@ class PipelinedSubpartition extends ResultSubpartition {
 
 		return String.format(
 			"PipelinedSubpartition#%d [number of buffers: %d (%d bytes), unannounced backlog: %d, finished? %s," +
-				" read view? %s]", index, numBuffers, numBytes, unannouncedBacklog.get(), finished, hasReadView);
+				" read view? %s]", index, numBuffers, numBytes, unannouncedBacklog, finished, hasReadView);
 	}
 
 	@Override
@@ -307,23 +313,36 @@ class PipelinedSubpartition extends ResultSubpartition {
 
 	@Override
 	public int getAndResetUnannouncedBacklog() {
-		return unannouncedBacklog.getAndSet(0);
+		synchronized (buffers) {
+			return getAndResetUnannouncedBacklogUnsafe();
+		}
+	}
+
+	private int getAndResetUnannouncedBacklogUnsafe() {
+		assert Thread.holdsLock(buffers);
+
+		int backlog = unannouncedBacklog;
+		unannouncedBacklog = 0;
+		return backlog;
 	}
 
 	@Override
 	public void flush() {
 		final boolean notifyDataAvailable;
 		synchronized (buffers) {
-			if (buffers.isEmpty() || readView == null) {
+			flushRequested = true;
+
+			if (buffers.isEmpty() || readView == null || alreadyNotifiedAvailable) {
 				return;
 			}
 			// if there is more then 1 buffer, we already notified the reader
 			// (at the latest when adding the second buffer)
-			BufferConsumer buffer = buffers.peek();
-			notifyDataAvailable = !flushRequested && buffers.size() == 1 && buffer.isDataAvailable();
-			flushRequested = flushRequested || buffers.size() > 1 || notifyDataAvailable;
-			if (notifyDataAvailable && buffer.getCurrentReaderPosition() > 0) {
-				unannouncedBacklog.getAndIncrement();
+			checkState(buffers.size() == 1);
+			BufferConsumer buffer = buffers.peekFirst();
+			notifyDataAvailable = buffer.isDataAvailable();
+			alreadyNotifiedAvailable = notifyDataAvailable;
+			if (notifyDataAvailable && isPartialBuffer(buffer)) {
+				++unannouncedBacklog;
 			}
 		}
 		if (notifyDataAvailable) {
@@ -355,7 +374,7 @@ class PipelinedSubpartition extends ResultSubpartition {
 
 	private boolean shouldNotifyDataAvailable() {
 		// Notify only when we added first finished buffer.
-		return readView != null && !flushRequested && getNumberOfFinishedBuffers() == 1;
+		return readView != null && !alreadyNotifiedAvailable && (buffers.size() > 1 || nextBufferIsEventUnsafe());
 	}
 
 	private void notifyDataAvailable() {
@@ -364,17 +383,11 @@ class PipelinedSubpartition extends ResultSubpartition {
 		}
 	}
 
-	private int getNumberOfFinishedBuffers() {
-		assert Thread.holdsLock(buffers);
+	private boolean isPartialBuffer(BufferConsumer bufferConsumer) {
+		return bufferConsumer.isBuffer() && bufferConsumer.getCurrentReaderPosition() > 0;
+	}
 
-		// NOTE: isFinished() is not guaranteed to provide the most up-to-date state here
-		// worst-case: a single finished buffer sits around until the next flush() call
-		// (but we do not offer stronger guarantees anyway)
-		if (buffers.size() == 1 && buffers.peekLast().isFinished()) {
-			return 1;
-		}
-
-		// We assume that only last buffer is not finished.
-		return Math.max(0, buffers.size() - 1);
+	private boolean isPartialBufferAndDataAvailable(BufferConsumer bufferConsumer) {
+		return isPartialBuffer(bufferConsumer) && bufferConsumer.isDataAvailable();
 	}
 }

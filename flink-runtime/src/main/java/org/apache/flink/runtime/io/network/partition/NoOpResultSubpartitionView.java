@@ -49,7 +49,7 @@ public class NoOpResultSubpartitionView implements ResultSubpartitionView {
 	}
 
 	@Override
-	public boolean nextBufferIsEvent() {
+	public boolean nextBufferIsFinishedEmptyOrEvent() {
 		return false;
 	}
 
