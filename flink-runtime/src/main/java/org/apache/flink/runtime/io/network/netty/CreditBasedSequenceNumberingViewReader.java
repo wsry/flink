@@ -20,6 +20,7 @@ package org.apache.flink.runtime.io.network.netty;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.io.network.NetworkSequenceViewReader;
+import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.partition.BufferAvailabilityListener;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionProvider;
@@ -197,9 +198,12 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 	public BufferAndAvailability getNextBuffer() throws IOException, InterruptedException {
 		BufferAndBacklog next = subpartitionView.getNextBuffer();
 		if (next != null) {
-			sequenceNumber++;
+			Buffer buffer = next.buffer();
+			if (buffer.readableBytes() > 0) {
+				sequenceNumber++;
+			}
 
-			if (next.buffer().isBuffer() && --numCreditsAvailable < 0) {
+			if (buffer.isBuffer() && buffer.readableBytes() > 0 && --numCreditsAvailable < 0) {
 				throw new IllegalStateException("no credit available");
 			}
 
@@ -209,7 +213,7 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 			}
 
 			return new BufferAndAvailability(
-				next.buffer(), isAvailable(next), next.unannouncedBacklog());
+				buffer, isAvailable(next), next.unannouncedBacklog());
 		} else {
 			return null;
 		}

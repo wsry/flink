@@ -271,15 +271,17 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 						registerAvailableReader(reader);
 					}
 
-					BufferResponse msg = new BufferResponse(
-						next.buffer(),
-						reader.getSequenceNumber(),
-						reader.getReceiverId(),
-						next.buffersInBacklog());
+					if (next.buffer().readableBytes() > 0) {
+						BufferResponse msg = new BufferResponse(
+							next.buffer(),
+							reader.getSequenceNumber(),
+							reader.getReceiverId(),
+							next.buffersInBacklog());
 
-					// Write and flush and wait until this is done before
-					// trying to continue with the next buffer.
-					channel.writeAndFlush(msg).addListener(writeListener);
+						// Write and flush and wait until this is done before
+						// trying to continue with the next buffer.
+						channel.writeAndFlush(msg).addListener(writeListener);
+					}
 
 					return;
 				}

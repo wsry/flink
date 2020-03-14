@@ -118,7 +118,7 @@ class PipelinedSubpartition extends ResultSubpartition {
 
 			notifyDataAvailable = shouldNotifyDataAvailable();
 			alreadyNotifiedAvailable = alreadyNotifiedAvailable || notifyDataAvailable;
-			if (notifyDataAvailable && buffers.size() == 2 && isPartialBufferAndDataAvailable(buffers.peekFirst())) {
+			if (notifyDataAvailable && isPartialBufferAndDataAvailable(buffers.peekFirst())) {
 				++unannouncedBacklog;
 			}
 
@@ -165,46 +165,21 @@ class PipelinedSubpartition extends ResultSubpartition {
 	@Nullable
 	BufferAndBacklog pollBuffer() {
 		synchronized (buffers) {
-			Buffer buffer = null;
-			boolean shouldBlocking = false;
+			checkState(!buffers.isEmpty());
 
-			if (buffers.isEmpty()) {
-				flushRequested = false;
-			}
+			BufferConsumer bufferConsumer = buffers.peek();
+			boolean shouldBlocking = bufferConsumer.isBlockingEvent();
+			Buffer buffer = bufferConsumer.build();
 
-			while (!buffers.isEmpty()) {
-				BufferConsumer bufferConsumer = buffers.peek();
-				shouldBlocking = bufferConsumer.isBlockingEvent();
+			checkState(bufferConsumer.isFinished() || (buffers.size() == 1 && buffer.readableBytes() > 0),
+				"When there are multiple buffers, an unfinished bufferConsumer can not be at the head of the buffers queue.");
 
-				buffer = bufferConsumer.build();
-
-				checkState(bufferConsumer.isFinished() || buffers.size() == 1,
-					"When there are multiple buffers, an unfinished bufferConsumer can not be at the head of the buffers queue.");
-
-				if (buffers.size() == 1) {
-					// turn off flushRequested flag if we drained all of the available data
-					flushRequested = false;
-				}
-
-				if (bufferConsumer.isFinished()) {
-					buffers.pop().close();
-				}
-
-				if (buffer.readableBytes() > 0) {
-					break;
-				}
-				buffer.recycleBuffer();
-				buffer = null;
-				if (!bufferConsumer.isFinished()) {
-					break;
-				}
+			if (bufferConsumer.isFinished()) {
+				buffers.pop().close();
 			}
 
 			boolean nextBufferIsEvent = nextBufferIsEventUnsafe();
-			alreadyNotifiedAvailable = buffers.size() > 1 || flushRequested || nextBufferIsEvent;
-			if (buffer == null) {
-				return null;
-			}
+			alreadyNotifiedAvailable = buffers.size() > 1 || nextBufferIsEvent;
 
 			updateStatistics(buffer);
 			// Do not report last remaining buffer on buffers as available to read (assuming it's unfinished).
