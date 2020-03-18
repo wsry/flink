@@ -143,10 +143,9 @@ public class CheckpointBarrierUnaligner extends CheckpointBarrierHandler {
 	 * <p>Note this is also suitable for the trigger case of local input channel.
 	 */
 	@Override
-	public boolean processBarrier(
+	public void processBarrier(
 			CheckpointBarrier receivedBarrier,
-			int channelIndex,
-			long bufferedBytes) throws Exception {
+			int channelIndex) throws Exception {
 		long barrierId = receivedBarrier.getId();
 		if (currentConsumedCheckpointId < barrierId) {
 			currentConsumedCheckpointId = barrierId;
@@ -161,11 +160,10 @@ public class CheckpointBarrierUnaligner extends CheckpointBarrierHandler {
 		// buffer queues
 		// to avoid replicating any logic, we simply call notifyBarrierReceived here as well
 		threadSafeUnaligner.notifyBarrierReceived(receivedBarrier, channelInfos[channelIndex]);
-		return false;
 	}
 
 	@Override
-	public boolean processCancellationBarrier(CancelCheckpointMarker cancelBarrier) throws Exception {
+	public void processCancellationBarrier(CancelCheckpointMarker cancelBarrier) throws Exception {
 		final long barrierId = cancelBarrier.getCheckpointId();
 
 		if (numBarrierConsumed > 0) {
@@ -214,15 +212,10 @@ public class CheckpointBarrierUnaligner extends CheckpointBarrierHandler {
 
 			notifyAbortOnCancellationBarrier(barrierId);
 		}
-
-		// else: trailing barrier from either
-		//   - a previous (subsumed) checkpoint
-		//   - the current checkpoint if it was already canceled
-		return false;
 	}
 
 	@Override
-	public boolean processEndOfPartition() throws Exception {
+	public void processEndOfPartition() throws Exception {
 		threadSafeUnaligner.onChannelClosed();
 
 		if (numBarrierConsumed > 0) {
@@ -233,7 +226,6 @@ public class CheckpointBarrierUnaligner extends CheckpointBarrierHandler {
 			// no chance to complete this checkpoint
 			releaseBlocksAndResetBarriers();
 		}
-		return false;
 	}
 
 	@Override
@@ -249,10 +241,6 @@ public class CheckpointBarrierUnaligner extends CheckpointBarrierHandler {
 	@Override
 	public String toString() {
 		return String.format("%s: last checkpoint: %d", taskName, currentConsumedCheckpointId);
-	}
-
-	@Override
-	public void checkpointSizeLimitExceeded(long maxBufferedBytes) {
 	}
 
 	@Override
@@ -338,7 +326,7 @@ public class CheckpointBarrierUnaligner extends CheckpointBarrierHandler {
 
 			if (currentReceivedCheckpointId < barrierId) {
 				handleNewCheckpoint(barrier);
-				handler.executeInTaskThread(() -> handler.notifyCheckpoint(barrier, 0, 0), "notifyCheckpoint");
+				handler.executeInTaskThread(() -> handler.notifyCheckpoint(barrier, 0), "notifyCheckpoint");
 			}
 
 			int channelIndex = handler.getFlattenedChannelIndex(channelInfo);

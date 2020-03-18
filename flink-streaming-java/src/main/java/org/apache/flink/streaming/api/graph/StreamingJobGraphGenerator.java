@@ -950,6 +950,7 @@ public class StreamingJobGraphGenerator {
 				cfg.getMaxConcurrentCheckpoints(),
 				retentionAfterTermination,
 				getCheckpointingMode(cfg) == CheckpointingMode.EXACTLY_ONCE,
+				cfg.isUnalignedCheckpointsEnabled(),
 				cfg.isPreferCheckpointForRecovery(),
 				cfg.getTolerableCheckpointFailureNumber()),
 			serializedStateBackend,
