@@ -25,6 +25,7 @@ import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.api.EndOfSuperstepEvent;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
+import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
 import org.apache.flink.runtime.io.network.util.TestTaskEvent;
 
 import org.junit.Test;
@@ -62,6 +63,30 @@ public class EventSerializerTest {
 					EventSerializer.fromSerializedEvent(serializedEvent, getClass().getClassLoader());
 			assertNotNull(deserialized);
 			assertEquals(evt, deserialized);
+		}
+	}
+
+	@Test
+	public void testToBufferConsumer() throws IOException {
+		AbstractEvent[] events = {
+			EndOfPartitionEvent.INSTANCE,
+			EndOfSuperstepEvent.INSTANCE,
+			new CheckpointBarrier(1678L, 4623784L, CheckpointOptions.forCheckpointWithDefaultLocation()),
+			new TestTaskEvent(Math.random(), 12361231273L),
+			new CancelCheckpointMarker(287087987329842L)
+		};
+
+		for (AbstractEvent evt : events) {
+			BufferConsumer bufferConsumer = EventSerializer.toBufferConsumer(evt);
+
+			assertFalse(bufferConsumer.isBuffer());
+			assertTrue(bufferConsumer.isFinished());
+			assertTrue(bufferConsumer.isDataAvailable());
+			assertFalse(bufferConsumer.isRecycled());
+
+			if (evt instanceof CheckpointBarrier) {
+				assertTrue(Buffer.DataType.isAlignedExactlyOnceCheckpointBarrier(bufferConsumer.build()));
+			}
 		}
 	}
 
