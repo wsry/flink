@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.io.network.api.writer;
 
 import org.apache.flink.core.io.IOReadableWritable;
+import org.apache.flink.runtime.io.network.api.serialization.RecordSerializer;
 import org.apache.flink.runtime.io.network.buffer.BufferBuilder;
 
 import java.io.IOException;
@@ -73,17 +74,12 @@ public final class ChannelSelectorRecordWriter<T extends IOReadableWritable> ext
 	public void broadcastEmit(T record) throws IOException, InterruptedException {
 		checkErroneous();
 
-		serializer.serializeRecord(record);
-
-		boolean pruneAfterCopying = false;
 		for (int targetChannel = 0; targetChannel < numberOfChannels; targetChannel++) {
-			if (copyFromSerializerToTargetChannel(targetChannel)) {
-				pruneAfterCopying = true;
+			RecordSerializer<T> serializer = serializers[targetChannel];
+			serializer.serializeRecord(record);
+			if (serializer.shouldCopyToBufferBuilder(flushAlways) && copyFromSerializerToTargetChannel(serializer, targetChannel)) {
+				serializer.prune();
 			}
-		}
-
-		if (pruneAfterCopying) {
-			serializer.prune();
 		}
 	}
 
@@ -108,6 +104,15 @@ public final class ChannelSelectorRecordWriter<T extends IOReadableWritable> ext
 
 	@Override
 	public void tryFinishCurrentBufferBuilder(int targetChannel) {
+		RecordSerializer<T> serializer = serializers[targetChannel];
+		if (serializer.shouldCopyToBufferBuilder(true)) {
+			try {
+				copyFromSerializerToTargetChannel(serializer, targetChannel);
+			} catch (Exception e) {
+				throw new RuntimeException("Failed to finish current buffer builder.", e);
+			}
+		}
+
 		if (bufferBuilders[targetChannel] == null) {
 			return;
 		}
@@ -123,17 +128,9 @@ public final class ChannelSelectorRecordWriter<T extends IOReadableWritable> ext
 	}
 
 	@Override
-	public void closeBufferBuilder(int targetChannel) {
-		if (bufferBuilders[targetChannel] != null) {
-			bufferBuilders[targetChannel].finish();
-			bufferBuilders[targetChannel] = null;
-		}
-	}
-
-	@Override
 	public void clearBuffers() {
 		for (int index = 0; index < numberOfChannels; index++) {
-			closeBufferBuilder(index);
+			tryFinishCurrentBufferBuilder(index);
 		}
 	}
 }

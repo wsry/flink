@@ -70,7 +70,7 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 
 	protected final int numberOfChannels;
 
-	protected final RecordSerializer<T> serializer;
+	protected final RecordSerializer<T>[] serializers;
 
 	protected final Random rng = new XORShiftRandom();
 
@@ -78,7 +78,13 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 
 	private Counter numBuffersOut = new SimpleCounter();
 
-	private final boolean flushAlways;
+	protected final boolean flushAlways;
+
+	/**
+	 * The flag for judging whether {@link #requestNewBufferBuilder(int)} and {@link #flushTargetPartition(int)}
+	 * is triggered by {@link #randomEmit(IOReadableWritable)} or not.
+	 */
+	protected boolean randomTriggered = false;
 
 	/** The thread that periodically flushes the output, to give an upper latency bound. */
 	@Nullable
@@ -91,7 +97,10 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 		this.targetPartition = writer;
 		this.numberOfChannels = writer.getNumberOfSubpartitions();
 
-		this.serializer = new SpanningRecordSerializer<T>();
+		this.serializers = new SpanningRecordSerializer[numberOfChannels];
+		for (int i = 0; i < numberOfChannels; ++i) {
+			this.serializers[i] = new SpanningRecordSerializer<>(writer.getRecordSerializerCopyThreshold());
+		}
 
 		checkArgument(timeout >= -1);
 		this.flushAlways = (timeout == 0);
@@ -110,10 +119,12 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 	protected void emit(T record, int targetChannel) throws IOException, InterruptedException {
 		checkErroneous();
 
+		RecordSerializer<T> serializer = serializers[targetChannel];
 		serializer.serializeRecord(record);
 
 		// Make sure we don't hold onto the large intermediate serialization buffer for too long
-		if (copyFromSerializerToTargetChannel(targetChannel)) {
+		if (serializer.shouldCopyToBufferBuilder(flushAlways || randomTriggered)
+				&& copyFromSerializerToTargetChannel(serializer, targetChannel)) {
 			serializer.prune();
 		}
 	}
@@ -122,7 +133,9 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 	 * @param targetChannel
 	 * @return <tt>true</tt> if the intermediate serialization buffer should be pruned
 	 */
-	protected boolean copyFromSerializerToTargetChannel(int targetChannel) throws IOException, InterruptedException {
+	protected boolean copyFromSerializerToTargetChannel(
+			RecordSerializer<T> serializer,
+			int targetChannel) throws IOException, InterruptedException {
 		// We should reset the initial position of the intermediate serialization buffer before
 		// copying, so the serialization results can be copied to multiple target buffers.
 		serializer.reset();
@@ -147,6 +160,7 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 		}
 		checkState(!serializer.hasSerializedData(), "All data should be written at once");
 
+		serializer.clear();
 		if (flushAlways) {
 			flushTargetPartition(targetChannel);
 		}
@@ -229,11 +243,6 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 	 * Marks the current {@link BufferBuilder} as empty for the target channel.
 	 */
 	abstract void emptyCurrentBufferBuilder(int targetChannel);
-
-	/**
-	 * Marks the current {@link BufferBuilder} as finished and releases the resources for the target channel.
-	 */
-	abstract void closeBufferBuilder(int targetChannel);
 
 	/**
 	 * Closes the {@link BufferBuilder}s for all the channels.

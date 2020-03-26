@@ -348,7 +348,7 @@ public class DataOutputSerializer implements DataOutputView, MemorySegmentWritab
 	@Override
 	public void skipBytesToWrite(int numBytes) throws IOException {
 		if (buffer.length - this.position < numBytes){
-			throw new EOFException("Could not skip " + numBytes + " bytes.");
+			resize(numBytes + this.position - buffer.length);
 		}
 
 		this.position += numBytes;

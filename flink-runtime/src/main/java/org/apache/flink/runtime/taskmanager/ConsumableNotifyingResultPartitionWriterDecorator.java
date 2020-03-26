@@ -84,6 +84,11 @@ public class ConsumableNotifyingResultPartitionWriterDecorator implements Result
 	}
 
 	@Override
+	public int getRecordSerializerCopyThreshold() {
+		return partitionWriter.getRecordSerializerCopyThreshold();
+	}
+
+	@Override
 	public void setup() throws IOException {
 		partitionWriter.setup();
 	}

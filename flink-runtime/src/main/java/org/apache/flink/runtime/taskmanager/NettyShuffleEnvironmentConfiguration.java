@@ -48,6 +48,8 @@ public class NettyShuffleEnvironmentConfiguration {
 
 	private final int networkBufferSize;
 
+	private final int recordSerializerCopyThreshold;
+
 	private final int partitionRequestInitialBackoff;
 
 	private final int partitionRequestMaxBackoff;
@@ -83,6 +85,7 @@ public class NettyShuffleEnvironmentConfiguration {
 	public NettyShuffleEnvironmentConfiguration(
 			int numNetworkBuffers,
 			int networkBufferSize,
+			int recordSerializerCopyThreshold,
 			int partitionRequestInitialBackoff,
 			int partitionRequestMaxBackoff,
 			int networkBuffersPerChannel,
@@ -100,6 +103,7 @@ public class NettyShuffleEnvironmentConfiguration {
 
 		this.numNetworkBuffers = numNetworkBuffers;
 		this.networkBufferSize = networkBufferSize;
+		this.recordSerializerCopyThreshold = recordSerializerCopyThreshold;
 		this.partitionRequestInitialBackoff = partitionRequestInitialBackoff;
 		this.partitionRequestMaxBackoff = partitionRequestMaxBackoff;
 		this.networkBuffersPerChannel = networkBuffersPerChannel;
@@ -124,6 +128,10 @@ public class NettyShuffleEnvironmentConfiguration {
 
 	public int networkBufferSize() {
 		return networkBufferSize;
+	}
+
+	public int recordSerializerCopyThreshold() {
+		return recordSerializerCopyThreshold;
 	}
 
 	public int partitionRequestInitialBackoff() {
@@ -211,6 +219,8 @@ public class NettyShuffleEnvironmentConfiguration {
 			networkMemorySize,
 			pageSize);
 
+		int recordSerializerCopyThreshold = configuration.getInteger(NettyShuffleEnvironmentOptions.RECORD_SERIALIZER_COPY_THRESHOLD);
+
 		int initialRequestBackoff = configuration.getInteger(NettyShuffleEnvironmentOptions.NETWORK_REQUEST_BACKOFF_INITIAL);
 		int maxRequestBackoff = configuration.getInteger(NettyShuffleEnvironmentOptions.NETWORK_REQUEST_BACKOFF_MAX);
 
@@ -240,6 +250,7 @@ public class NettyShuffleEnvironmentConfiguration {
 		return new NettyShuffleEnvironmentConfiguration(
 			numberOfNetworkBuffers,
 			pageSize,
+			recordSerializerCopyThreshold,
 			initialRequestBackoff,
 			maxRequestBackoff,
 			buffersPerChannel,
@@ -365,6 +376,7 @@ public class NettyShuffleEnvironmentConfiguration {
 		int result = 1;
 		result = 31 * result + numNetworkBuffers;
 		result = 31 * result + networkBufferSize;
+		result = 31 * result + recordSerializerCopyThreshold;
 		result = 31 * result + partitionRequestInitialBackoff;
 		result = 31 * result + partitionRequestMaxBackoff;
 		result = 31 * result + networkBuffersPerChannel;
@@ -393,6 +405,7 @@ public class NettyShuffleEnvironmentConfiguration {
 
 			return this.numNetworkBuffers == that.numNetworkBuffers &&
 					this.networkBufferSize == that.networkBufferSize &&
+					this.recordSerializerCopyThreshold == that.recordSerializerCopyThreshold &&
 					this.partitionRequestInitialBackoff == that.partitionRequestInitialBackoff &&
 					this.partitionRequestMaxBackoff == that.partitionRequestMaxBackoff &&
 					this.networkBuffersPerChannel == that.networkBuffersPerChannel &&
@@ -413,6 +426,7 @@ public class NettyShuffleEnvironmentConfiguration {
 		return "NettyShuffleEnvironmentConfiguration{" +
 				", numNetworkBuffers=" + numNetworkBuffers +
 				", networkBufferSize=" + networkBufferSize +
+				", recordSerializerCopyThreshold=" + recordSerializerCopyThreshold +
 				", partitionRequestInitialBackoff=" + partitionRequestInitialBackoff +
 				", partitionRequestMaxBackoff=" + partitionRequestMaxBackoff +
 				", networkBuffersPerChannel=" + networkBuffersPerChannel +
