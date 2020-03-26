@@ -101,7 +101,7 @@ public class StreamTestSingleInputGate<T> extends TestSingleInputGate {
 					Object inputElement = input.getStreamRecord();
 
 					delegate.setInstance(inputElement);
-					recordSerializer.serializeRecord(delegate);
+					recordSerializer.serializeRecord(delegate, true);
 					BufferBuilder bufferBuilder = createBufferBuilder(bufferSize);
 					BufferConsumer bufferConsumer = bufferBuilder.createBufferConsumer();
 					recordSerializer.copyToBufferBuilder(bufferBuilder);

@@ -138,7 +138,7 @@ public class StreamTaskNetworkInputTest {
 			new SerializationDelegate<>(
 				new StreamElementSerializer<>(LongSerializer.INSTANCE));
 		serializationDelegate.setInstance(new StreamRecord<>(value));
-		serializer.serializeRecord(serializationDelegate);
+		serializer.serializeRecord(serializationDelegate, true);
 
 		assertFalse(serializer.copyToBufferBuilder(bufferBuilder).isFullBuffer());
 	}

@@ -20,6 +20,7 @@ package org.apache.flink.runtime.io.network.api.writer;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.core.io.IOReadableWritable;
+import org.apache.flink.runtime.io.network.api.serialization.RecordSerializer;
 import org.apache.flink.runtime.io.network.buffer.BufferBuilder;
 import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
 
@@ -43,12 +44,6 @@ public final class BroadcastRecordWriter<T extends IOReadableWritable> extends R
 	/** The current buffer builder shared for all the channels. */
 	@Nullable
 	private BufferBuilder bufferBuilder;
-
-	/**
-	 * The flag for judging whether {@link #requestNewBufferBuilder(int)} and {@link #flushTargetPartition(int)}
-	 * is triggered by {@link #randomEmit(IOReadableWritable)} or not.
-	 */
-	private boolean randomTriggered;
 
 	BroadcastRecordWriter(
 			ResultPartitionWriter writer,
@@ -145,6 +140,15 @@ public final class BroadcastRecordWriter<T extends IOReadableWritable> extends R
 
 	@Override
 	public void tryFinishCurrentBufferBuilder(int targetChannel) {
+		RecordSerializer<T> serializer = serializers[0];
+		if (serializer.buildDataBuffer()) {
+			try {
+				copyFromSerializerToTargetChannel(serializer, 0);
+			} catch (Exception e) {
+				throw new RuntimeException("Failed to finish current buffer builder.", e);
+			}
+		}
+
 		if (bufferBuilder == null) {
 			return;
 		}
@@ -161,19 +165,7 @@ public final class BroadcastRecordWriter<T extends IOReadableWritable> extends R
 	}
 
 	@Override
-	public void closeBufferBuilder(int targetChannel) {
-		closeBufferBuilder();
-	}
-
-	@Override
 	public void clearBuffers() {
-		closeBufferBuilder();
-	}
-
-	private void closeBufferBuilder() {
-		if (bufferBuilder != null) {
-			bufferBuilder.finish();
-			bufferBuilder = null;
-		}
+		tryFinishCurrentBufferBuilder(0);
 	}
 }

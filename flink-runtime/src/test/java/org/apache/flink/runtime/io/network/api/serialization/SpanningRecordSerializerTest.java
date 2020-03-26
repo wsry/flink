@@ -46,7 +46,7 @@ public class SpanningRecordSerializerTest {
 
 		Assert.assertFalse(serializer.hasSerializedData());
 
-		serializer.serializeRecord(randomIntRecord);
+		serializer.serializeRecord(randomIntRecord, true);
 		Assert.assertTrue(serializer.hasSerializedData());
 
 		final BufferBuilder bufferBuilder1 = createBufferBuilder(16);
@@ -102,7 +102,7 @@ public class SpanningRecordSerializerTest {
 			}
 		};
 
-		serializer.serializeRecord(emptyRecord);
+		serializer.serializeRecord(emptyRecord, true);
 		Assert.assertEquals(RecordSerializer.SerializationResult.FULL_RECORD, serializer.copyToBufferBuilder(bufferBuilder1));
 
 		serializer.reset();
@@ -170,7 +170,7 @@ public class SpanningRecordSerializerTest {
 		BufferBuilder bufferBuilder = createBufferBuilder(segmentSize);
 		int numBytes = 0;
 		for (SerializationTestType record : records) {
-			serializer.serializeRecord(record);
+			serializer.serializeRecord(record, true);
 			RecordSerializer.SerializationResult result = serializer.copyToBufferBuilder(bufferBuilder);
 			numBytes += record.length() + serializationOverhead;
 

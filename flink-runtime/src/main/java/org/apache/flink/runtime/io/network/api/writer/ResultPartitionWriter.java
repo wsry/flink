@@ -48,6 +48,10 @@ public interface ResultPartitionWriter extends AutoCloseable, AvailabilityProvid
 
 	int getNumTargetKeyGroups();
 
+	default int getRecordSerializerCopyThreshold() {
+		return 1;
+	}
+
 	/**
 	 * Requests a {@link BufferBuilder} from this partition for writing data.
 	 */

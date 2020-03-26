@@ -37,6 +37,8 @@ public class SpanningRecordSerializer<T extends IOReadableWritable> implements R
 	/** Flag to enable/disable checks, if buffer not set/full or pending serialization. */
 	private static final boolean CHECKED = false;
 
+	private final int copyThreshold;
+
 	/** Intermediate data serialization. */
 	private final DataOutputSerializer serializationBuffer;
 
@@ -44,7 +46,13 @@ public class SpanningRecordSerializer<T extends IOReadableWritable> implements R
 	private ByteBuffer dataBuffer;
 
 	public SpanningRecordSerializer() {
-		serializationBuffer = new DataOutputSerializer(128);
+		this(1);
+	}
+
+	public SpanningRecordSerializer(int copyThreshold) {
+		this.copyThreshold = copyThreshold;
+
+		serializationBuffer = new DataOutputSerializer(2 * 1024);
 
 		// ensure initial state with hasRemaining false (for correct continueWritingWithNextBufferBuilder logic)
 		dataBuffer = serializationBuffer.wrapAsByteBuffer();
@@ -56,26 +64,31 @@ public class SpanningRecordSerializer<T extends IOReadableWritable> implements R
 	 * @param record the record to serialize
 	 */
 	@Override
-	public void serializeRecord(T record) throws IOException {
+	public boolean serializeRecord(T record, boolean needCopy) throws IOException {
 		if (CHECKED) {
 			if (dataBuffer.hasRemaining()) {
 				throw new IllegalStateException("Pending serialization of previous record.");
 			}
 		}
 
-		serializationBuffer.clear();
+		int writePosition = serializationBuffer.length();
+
 		// the initial capacity of the serialization buffer should be no less than 4
 		serializationBuffer.skipBytesToWrite(4);
 
 		// write data and length
 		record.write(serializationBuffer);
 
-		int len = serializationBuffer.length() - 4;
-		serializationBuffer.setPosition(0);
+		int len = serializationBuffer.length() - writePosition - 4;
+		serializationBuffer.setPosition(writePosition);
 		serializationBuffer.writeInt(len);
 		serializationBuffer.skipBytesToWrite(len);
 
-		dataBuffer = serializationBuffer.wrapAsByteBuffer();
+		if (needCopy || serializationBuffer.length() >= copyThreshold) {
+			dataBuffer = serializationBuffer.wrapAsByteBuffer();
+			return true;
+		}
+		return false;
 	}
 
 	/**
@@ -108,6 +121,11 @@ public class SpanningRecordSerializer<T extends IOReadableWritable> implements R
 	}
 
 	@Override
+	public void clear() {
+		serializationBuffer.clear();
+	}
+
+	@Override
 	public void prune() {
 		serializationBuffer.pruneBuffer();
 		dataBuffer = serializationBuffer.wrapAsByteBuffer();
@@ -116,5 +134,11 @@ public class SpanningRecordSerializer<T extends IOReadableWritable> implements R
 	@Override
 	public boolean hasSerializedData() {
 		return dataBuffer.hasRemaining();
+	}
+
+	@Override
+	public boolean buildDataBuffer() {
+		dataBuffer = serializationBuffer.wrapAsByteBuffer();
+		return hasSerializedData();
 	}
 }

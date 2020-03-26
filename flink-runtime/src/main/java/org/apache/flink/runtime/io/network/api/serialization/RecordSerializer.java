@@ -70,7 +70,7 @@ public interface RecordSerializer<T extends IOReadableWritable> {
 	 *
 	 * @param record the record to serialize
 	 */
-	void serializeRecord(T record) throws IOException;
+	boolean serializeRecord(T record, boolean needCopy) throws IOException;
 
 	/**
 	 * Copies the intermediate data serialization buffer to the given target buffer.
@@ -84,7 +84,7 @@ public interface RecordSerializer<T extends IOReadableWritable> {
 	/**
 	 * Clears the buffer and checks to decrease the size of intermediate data serialization buffer
 	 * after finishing the whole serialization process including
-	 * {@link #serializeRecord(IOReadableWritable)} and {@link #copyToBufferBuilder(BufferBuilder)}.
+	 * {@link #serializeRecord(IOReadableWritable, boolean)} and {@link #copyToBufferBuilder(BufferBuilder)}.
 	 */
 	void prune();
 
@@ -94,8 +94,12 @@ public interface RecordSerializer<T extends IOReadableWritable> {
 	 */
 	void reset();
 
+	void clear();
+
 	/**
 	 * @return <tt>true</tt> if has some serialized data pending copying to the result {@link BufferBuilder}.
 	 */
 	boolean hasSerializedData();
+
+	boolean buildDataBuffer();
 }

@@ -98,6 +98,7 @@ public class ResultPartitionFactoryTest extends TestLogger {
 			1,
 			1,
 			SEGMENT_SIZE,
+			1,
 			releasePartitionOnConsumption,
 			false,
 			"LZ4");

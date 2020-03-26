@@ -278,6 +278,11 @@ public class NettyShuffleEnvironmentOptions {
 	//  Partition Request Options
 	// ------------------------------------------------------------------------
 
+	@Documentation.ExcludeFromDocumentation("For performance test.")
+	public static final ConfigOption<Integer> RECORD_SERIALIZER_COPY_THRESHOLD =
+		key("taskmanager.network.record-serializer.copy-threshold")
+			.defaultValue(1);
+
 	/**
 	 * Minimum backoff for partition requests of input channels.
 	 */

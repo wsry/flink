@@ -74,7 +74,7 @@ public class IteratorWrappingTestSingleInputGate<T extends IOReadableWritable> e
 			@Override
 			public Optional<BufferAndAvailability> getBufferAvailability() throws IOException {
 				if (hasData) {
-					serializer.serializeRecord(reuse);
+					serializer.serializeRecord(reuse, true);
 					BufferBuilder bufferBuilder = createBufferBuilder(bufferSize);
 					BufferConsumer bufferConsumer = bufferBuilder.createBufferConsumer();
 					serializer.copyToBufferBuilder(bufferBuilder);
