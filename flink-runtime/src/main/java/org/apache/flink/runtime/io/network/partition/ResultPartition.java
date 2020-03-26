@@ -79,6 +79,8 @@ public class ResultPartition implements ResultPartitionWriter, BufferPoolOwner {
 
 	private final int partitionIndex;
 
+	private final int recordSerializerCopyThreshold;
+
 	protected final ResultPartitionID partitionId;
 
 	/** Type of this partition. Defines the concrete subpartition implementation to use. */
@@ -110,6 +112,7 @@ public class ResultPartition implements ResultPartitionWriter, BufferPoolOwner {
 	public ResultPartition(
 		String owningTaskName,
 		int partitionIndex,
+		int recordSerializerCopyThreshold,
 		ResultPartitionID partitionId,
 		ResultPartitionType partitionType,
 		ResultSubpartition[] subpartitions,
@@ -121,6 +124,7 @@ public class ResultPartition implements ResultPartitionWriter, BufferPoolOwner {
 		this.owningTaskName = checkNotNull(owningTaskName);
 		Preconditions.checkArgument(0 <= partitionIndex, "The partition index must be positive.");
 		this.partitionIndex = partitionIndex;
+		this.recordSerializerCopyThreshold = recordSerializerCopyThreshold;
 		this.partitionId = checkNotNull(partitionId);
 		this.partitionType = checkNotNull(partitionType);
 		this.subpartitions = checkNotNull(subpartitions);
@@ -308,6 +312,11 @@ public class ResultPartition implements ResultPartitionWriter, BufferPoolOwner {
 	@Override
 	public int getNumTargetKeyGroups() {
 		return numTargetKeyGroups;
+	}
+
+	@Override
+	public int getRecordSerializerCopyThreshold() {
+		return recordSerializerCopyThreshold;
 	}
 
 	/**

@@ -39,6 +39,8 @@ public class NettyShuffleEnvironmentBuilder {
 	private static final String[] DEFAULT_TEMP_DIRS = {EnvironmentInformation.getTemporaryFileDirectory()};
 	private static final Duration DEFAULT_REQUEST_SEGMENTS_TIMEOUT = Duration.ofMillis(30000L);
 
+	private int recordSerializerCopyThreshold = 1;
+
 	private int numNetworkBuffers = DEFAULT_NUM_NETWORK_BUFFERS;
 
 	private int partitionRequestInitialBackoff;
@@ -58,6 +60,11 @@ public class NettyShuffleEnvironmentBuilder {
 	private NettyConfig nettyConfig;
 
 	private MetricGroup metricGroup = UnregisteredMetricGroups.createUnregisteredTaskManagerMetricGroup();
+
+	public NettyShuffleEnvironmentBuilder setRecordSerializerCopyThreshold(int recordSerializerCopyThreshold) {
+		this.recordSerializerCopyThreshold = recordSerializerCopyThreshold;
+		return this;
+	}
 
 	public NettyShuffleEnvironmentBuilder setTaskManagerLocation(ResourceID taskManagerLocation) {
 		this.taskManagerLocation = taskManagerLocation;
@@ -114,6 +121,7 @@ public class NettyShuffleEnvironmentBuilder {
 			new NettyShuffleEnvironmentConfiguration(
 				numNetworkBuffers,
 				DEFAULT_NETWORK_BUFFER_SIZE,
+				recordSerializerCopyThreshold,
 				partitionRequestInitialBackoff,
 				partitionRequestMaxBackoff,
 				networkBuffersPerChannel,

@@ -20,6 +20,7 @@ package org.apache.flink.streaming.runtime.io.benchmark;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.NettyShuffleEnvironmentOptions;
 import org.apache.flink.core.io.IOReadableWritable;
 import org.apache.flink.metrics.SimpleCounter;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
@@ -216,6 +217,7 @@ public class StreamNetworkBenchmarkEnvironment<T extends IOReadableWritable> {
 			config);
 		return new NettyShuffleEnvironmentBuilder()
 			.setNumNetworkBuffers(bufferPoolSize)
+			.setRecordSerializerCopyThreshold(config.getInteger(NettyShuffleEnvironmentOptions.RECORD_SERIALIZER_COPY_THRESHOLD))
 			.setNettyConfig(nettyConfig)
 			.build();
 	}

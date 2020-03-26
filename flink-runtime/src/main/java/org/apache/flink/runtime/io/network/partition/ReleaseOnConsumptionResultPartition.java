@@ -49,6 +49,7 @@ public class ReleaseOnConsumptionResultPartition extends ResultPartition {
 	ReleaseOnConsumptionResultPartition(
 			String owningTaskName,
 			int partitionIndex,
+			int recordSerializerCopyThreshold,
 			ResultPartitionID partitionId,
 			ResultPartitionType partitionType,
 			ResultSubpartition[] subpartitions,
@@ -59,6 +60,7 @@ public class ReleaseOnConsumptionResultPartition extends ResultPartition {
 		super(
 			owningTaskName,
 			partitionIndex,
+			recordSerializerCopyThreshold,
 			partitionId,
 			partitionType,
 			subpartitions,
