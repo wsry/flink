@@ -63,6 +63,11 @@ public final class Watermark extends StreamElement {
 		return timestamp;
 	}
 
+	@Override
+	public int getType() {
+		return 1;
+	}
+
 	// ------------------------------------------------------------------------
 
 	@Override

@@ -163,85 +163,81 @@ public final class StreamElementSerializer<T> extends TypeSerializer<StreamEleme
 
 	@Override
 	public void serialize(StreamElement value, DataOutputView target) throws IOException {
-		if (value.isRecord()) {
-			StreamRecord<T> record = value.asRecord();
+		switch (value.getType()) {
+			case 0:
+				StreamRecord<T> record = value.asRecord();
 
-			if (record.hasTimestamp()) {
-				target.write(TAG_REC_WITH_TIMESTAMP);
-				target.writeLong(record.getTimestamp());
-			} else {
-				target.write(TAG_REC_WITHOUT_TIMESTAMP);
-			}
-			typeSerializer.serialize(record.getValue(), target);
-		}
-		else if (value.isWatermark()) {
-			target.write(TAG_WATERMARK);
-			target.writeLong(value.asWatermark().getTimestamp());
-		}
-		else if (value.isStreamStatus()) {
-			target.write(TAG_STREAM_STATUS);
-			target.writeInt(value.asStreamStatus().getStatus());
-		}
-		else if (value.isLatencyMarker()) {
-			target.write(TAG_LATENCY_MARKER);
-			target.writeLong(value.asLatencyMarker().getMarkedTime());
-			target.writeLong(value.asLatencyMarker().getOperatorId().getLowerPart());
-			target.writeLong(value.asLatencyMarker().getOperatorId().getUpperPart());
-			target.writeInt(value.asLatencyMarker().getSubtaskIndex());
-		}
-		else {
-			throw new RuntimeException();
+				if (record.hasTimestamp()) {
+					target.write(TAG_REC_WITH_TIMESTAMP);
+					target.writeLong(record.getTimestamp());
+				} else {
+					target.write(TAG_REC_WITHOUT_TIMESTAMP);
+				}
+				typeSerializer.serialize(record.getValue(), target);
+				break;
+			case 1:
+				target.write(TAG_WATERMARK);
+				target.writeLong(value.asWatermark().getTimestamp());
+				break;
+			case 2:
+				target.write(TAG_STREAM_STATUS);
+				target.writeInt(value.asStreamStatus().getStatus());
+				break;
+			case 3:
+				target.write(TAG_LATENCY_MARKER);
+				target.writeLong(value.asLatencyMarker().getMarkedTime());
+				target.writeLong(value.asLatencyMarker().getOperatorId().getLowerPart());
+				target.writeLong(value.asLatencyMarker().getOperatorId().getUpperPart());
+				target.writeInt(value.asLatencyMarker().getSubtaskIndex());
+				break;
+			default:
+				throw new RuntimeException();
 		}
 	}
 
 	@Override
 	public StreamElement deserialize(DataInputView source) throws IOException {
 		int tag = source.readByte();
-		if (tag == TAG_REC_WITH_TIMESTAMP) {
-			long timestamp = source.readLong();
-			return new StreamRecord<T>(typeSerializer.deserialize(source), timestamp);
-		}
-		else if (tag == TAG_REC_WITHOUT_TIMESTAMP) {
-			return new StreamRecord<T>(typeSerializer.deserialize(source));
-		}
-		else if (tag == TAG_WATERMARK) {
-			return new Watermark(source.readLong());
-		}
-		else if (tag == TAG_STREAM_STATUS) {
-			return new StreamStatus(source.readInt());
-		}
-		else if (tag == TAG_LATENCY_MARKER) {
-			return new LatencyMarker(source.readLong(), new OperatorID(source.readLong(), source.readLong()), source.readInt());
-		}
-		else {
-			throw new IOException("Corrupt stream, found tag: " + tag);
+		switch (tag) {
+			case TAG_REC_WITH_TIMESTAMP:
+				long timestamp = source.readLong();
+				return new StreamRecord<T>(typeSerializer.deserialize(source), timestamp);
+			case TAG_REC_WITHOUT_TIMESTAMP:
+				return new StreamRecord<T>(typeSerializer.deserialize(source));
+			case TAG_WATERMARK:
+				return new Watermark(source.readLong());
+			case TAG_LATENCY_MARKER:
+				return new LatencyMarker(source.readLong(), new OperatorID(source.readLong(), source.readLong()), source.readInt());
+			case TAG_STREAM_STATUS:
+				return new StreamStatus(source.readInt());
+			default:
+				throw new IOException("Corrupt stream, found tag: " + tag);
 		}
 	}
 
 	@Override
 	public StreamElement deserialize(StreamElement reuse, DataInputView source) throws IOException {
 		int tag = source.readByte();
-		if (tag == TAG_REC_WITH_TIMESTAMP) {
-			long timestamp = source.readLong();
-			T value = typeSerializer.deserialize(source);
-			StreamRecord<T> reuseRecord = reuse.asRecord();
-			reuseRecord.replace(value, timestamp);
-			return reuseRecord;
-		}
-		else if (tag == TAG_REC_WITHOUT_TIMESTAMP) {
-			T value = typeSerializer.deserialize(source);
-			StreamRecord<T> reuseRecord = reuse.asRecord();
-			reuseRecord.replace(value);
-			return reuseRecord;
-		}
-		else if (tag == TAG_WATERMARK) {
-			return new Watermark(source.readLong());
-		}
-		else if (tag == TAG_LATENCY_MARKER) {
-			return new LatencyMarker(source.readLong(), new OperatorID(source.readLong(), source.readLong()), source.readInt());
-		}
-		else {
-			throw new IOException("Corrupt stream, found tag: " + tag);
+		switch (tag) {
+			case TAG_REC_WITH_TIMESTAMP: {
+				long timestamp = source.readLong();
+				T value = typeSerializer.deserialize(source);
+				StreamRecord<T> reuseRecord = reuse.asRecord();
+				reuseRecord.replace(value, timestamp);
+				return reuseRecord;
+			}
+			case TAG_REC_WITHOUT_TIMESTAMP: {
+				T value = typeSerializer.deserialize(source);
+				StreamRecord<T> reuseRecord = reuse.asRecord();
+				reuseRecord.replace(value);
+				return reuseRecord;
+			}
+			case TAG_WATERMARK:
+				return new Watermark(source.readLong());
+			case TAG_LATENCY_MARKER:
+				return new LatencyMarker(source.readLong(), new OperatorID(source.readLong(), source.readLong()), source.readInt());
+			default:
+				throw new IOException("Corrupt stream, found tag: " + tag);
 		}
 	}
 

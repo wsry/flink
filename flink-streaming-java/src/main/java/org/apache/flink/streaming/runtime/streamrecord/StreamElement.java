@@ -60,6 +60,8 @@ public abstract class StreamElement {
 		return getClass() == LatencyMarker.class;
 	}
 
+	public abstract int getType();
+
 	/**
 	 * Casts this element into a StreamRecord.
 	 * @return This element as a stream record.

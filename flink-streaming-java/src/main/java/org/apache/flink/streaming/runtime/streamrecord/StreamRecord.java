@@ -60,6 +60,11 @@ public final class StreamRecord<T> extends StreamElement {
 	//  Accessors
 	// ------------------------------------------------------------------------
 
+	@Override
+	public int getType() {
+		return 0;
+	}
+
 	/**
 	 * Returns the value wrapped in this stream value.
 	 */

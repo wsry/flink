@@ -64,6 +64,11 @@ public final class LatencyMarker extends StreamElement {
 		return subtaskIndex;
 	}
 
+	@Override
+	public int getType() {
+		return 3;
+	}
+
 	// ------------------------------------------------------------------------
 
 	@Override

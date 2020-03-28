@@ -108,6 +108,11 @@ public final class StreamStatus extends StreamElement {
 	}
 
 	@Override
+	public int getType() {
+		return 2;
+	}
+
+	@Override
 	public boolean equals(Object o) {
 		return this == o ||
 			o != null && o.getClass() == StreamStatus.class && ((StreamStatus) o).status == this.status;
