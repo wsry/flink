@@ -47,6 +47,7 @@ public class StreamSourceContexts {
 			TimeCharacteristic timeCharacteristic,
 			ProcessingTimeService processingTimeService,
 			Object checkpointLock,
+			boolean checkpointingEnabled,
 			StreamStatusMaintainer streamStatusMaintainer,
 			Output<StreamRecord<OUT>> output,
 			long watermarkInterval,
@@ -74,7 +75,7 @@ public class StreamSourceContexts {
 
 				break;
 			case ProcessingTime:
-				ctx = new NonTimestampContext<>(checkpointLock, output);
+				ctx = new NonTimestampContext<>(checkpointLock, checkpointingEnabled, output);
 				break;
 			default:
 				throw new IllegalArgumentException(String.valueOf(timeCharacteristic));
@@ -89,18 +90,24 @@ public class StreamSourceContexts {
 	private static class NonTimestampContext<T> implements SourceFunction.SourceContext<T> {
 
 		private final Object lock;
+		private final boolean checkpointingEnabled;
 		private final Output<StreamRecord<T>> output;
 		private final StreamRecord<T> reuse;
 
-		private NonTimestampContext(Object checkpointLock, Output<StreamRecord<T>> output) {
+		private NonTimestampContext(Object checkpointLock, boolean checkpointingEnabled, Output<StreamRecord<T>> output) {
 			this.lock = Preconditions.checkNotNull(checkpointLock, "The checkpoint lock cannot be null.");
+			this.checkpointingEnabled = checkpointingEnabled;
 			this.output = Preconditions.checkNotNull(output, "The output cannot be null.");
 			this.reuse = new StreamRecord<>(null);
 		}
 
 		@Override
 		public void collect(T element) {
-			synchronized (lock) {
+			if (checkpointingEnabled) {
+				synchronized (lock) {
+					output.collect(reuse.replace(element));
+				}
+			} else {
 				output.collect(reuse.replace(element));
 			}
 		}

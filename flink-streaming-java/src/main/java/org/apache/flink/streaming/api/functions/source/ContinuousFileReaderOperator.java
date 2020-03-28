@@ -266,6 +266,7 @@ class ContinuousFileReaderOperator<OUT> extends AbstractStreamOperator<OUT>
 			getOperatorConfig().getTimeCharacteristic(),
 			getProcessingTimeService(),
 			new Object(), // no actual locking needed
+			getOperatorConfig().isCheckpointingEnabled(),
 			getContainingTask().getStreamStatusMaintainer(),
 			output,
 			getRuntimeContext().getExecutionConfig().getAutoWatermarkInterval(),

@@ -91,6 +91,7 @@ public class StreamSource<OUT, SRC extends SourceFunction<OUT>> extends Abstract
 			timeCharacteristic,
 			getProcessingTimeService(),
 			lockingObject,
+			getOperatorConfig().isCheckpointingEnabled(),
 			streamStatusMaintainer,
 			collector,
 			watermarkInterval,
