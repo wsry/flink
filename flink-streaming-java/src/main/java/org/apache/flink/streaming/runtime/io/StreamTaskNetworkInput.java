@@ -126,7 +126,7 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 
 				if (result.isFullRecord()) {
 					processElement(deserializationDelegate.getInstance(), output);
-					return InputStatus.MORE_AVAILABLE;
+					continue;
 				}
 			}
 
