@@ -41,7 +41,9 @@ public class RoundRobinChannelSelector<T extends IOReadableWritable> implements 
 
 	@Override
 	public int selectChannel(final T record) {
-		nextChannelToSendTo = (nextChannelToSendTo + 1) % numberOfChannels;
+		if (++nextChannelToSendTo >= numberOfChannels) {
+			nextChannelToSendTo = 0;
+		}
 		return nextChannelToSendTo;
 	}
 
