@@ -134,7 +134,7 @@ public class PipelinedSubpartition extends ResultSubpartition {
 			buffers.add(bufferConsumer);
 			updateStatistics(bufferConsumer);
 			increaseBuffersInBacklog(bufferConsumer);
-			notifyDataAvailable = shouldNotifyDataAvailable() || finish;
+			notifyDataAvailable = shouldNotifyDataAvailable();
 
 			isFinished |= finish;
 		}
@@ -327,7 +327,8 @@ public class PipelinedSubpartition extends ResultSubpartition {
 			}
 			// if there is more then 1 buffer, we already notified the reader
 			// (at the latest when adding the second buffer)
-			notifyDataAvailable = !flushRequested && buffers.size() == 1 && buffers.peek().isDataAvailable();
+			BufferConsumer buffer = buffers.peek();
+			notifyDataAvailable = !flushRequested && buffers.size() == 1 && buffer.isBuffer() && buffer.isDataAvailable();
 			flushRequested = flushRequested || buffers.size() > 1 || notifyDataAvailable;
 		}
 		if (notifyDataAvailable) {
