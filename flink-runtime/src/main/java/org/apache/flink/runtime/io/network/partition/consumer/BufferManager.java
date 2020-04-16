@@ -41,7 +41,6 @@ import java.util.List;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * The general buffer manager used by {@link InputChannel} to request/recycle
@@ -62,7 +61,7 @@ public class BufferManager implements BufferListener, BufferRecycler {
 	@GuardedBy("bufferQueue")
 	private boolean isWaitingForFloatingBuffers;
 
-	/** The total number of required buffers for the respective input channel. */
+	/** The total number of floating buffers to request for the respective input channel. */
 	@GuardedBy("bufferQueue")
 	private int numRequiredBuffers;
 
@@ -115,7 +114,7 @@ public class BufferManager implements BufferListener, BufferRecycler {
 	private boolean shouldContinueRequest(BufferPool bufferPool) {
 		if (bufferPool.addBufferListener(this)) {
 			isWaitingForFloatingBuffers = true;
-			numRequiredBuffers = 1;
+			numRequiredBuffers++;
 			return false;
 		} else if (bufferPool.isDestroyed()) {
 			throw new CancelTaskException("Local buffer pool has already been released.");
@@ -129,7 +128,6 @@ public class BufferManager implements BufferListener, BufferRecycler {
 	 */
 	void requestExclusiveBuffers() throws IOException {
 		Collection<MemorySegment> segments = globalPool.requestMemorySegments();
-		checkArgument(!segments.isEmpty(), "The number of exclusive buffers per channel should be larger than 0.");
 
 		synchronized (bufferQueue) {
 			for (MemorySegment segment : segments) {
@@ -151,18 +149,26 @@ public class BufferManager implements BufferListener, BufferRecycler {
 				return numRequestedBuffers;
 			}
 
-			numRequiredBuffers = numRequired;
+			numRequiredBuffers += numRequired;
+			numRequestedBuffers = internalRequestFloatingBuffers(numRequiredBuffers);
+			numRequiredBuffers -= numRequestedBuffers;
+		}
+		return numRequestedBuffers;
+	}
 
-			while (bufferQueue.getAvailableBufferSize() < numRequiredBuffers && !isWaitingForFloatingBuffers) {
-				BufferPool bufferPool = inputChannel.inputGate.getBufferPool();
-				Buffer buffer = bufferPool.requestBuffer();
-				if (buffer != null) {
-					bufferQueue.addFloatingBuffer(buffer);
-					numRequestedBuffers++;
-				} else if (bufferPool.addBufferListener(this)) {
-					isWaitingForFloatingBuffers = true;
-					break;
-				}
+	private int internalRequestFloatingBuffers(int numBuffersToRequest) throws IOException {
+		assert Thread.holdsLock(bufferQueue);
+
+		int numRequestedBuffers = 0;
+		while (numRequestedBuffers < numBuffersToRequest && !isWaitingForFloatingBuffers) {
+			BufferPool bufferPool = inputChannel.inputGate.getBufferPool();
+			Buffer buffer = bufferPool.requestBuffer();
+			if (buffer != null) {
+				bufferQueue.addFloatingBuffer(buffer);
+				numRequestedBuffers++;
+			} else if (bufferPool.addBufferListener(this)) {
+				isWaitingForFloatingBuffers = true;
+				break;
 			}
 		}
 		return numRequestedBuffers;
@@ -189,6 +195,7 @@ public class BufferManager implements BufferListener, BufferRecycler {
 					globalPool.recycleMemorySegments(Collections.singletonList(segment));
 				} else {
 					numAddedBuffers = bufferQueue.addExclusiveBuffer(new NetworkBuffer(segment, this), numRequiredBuffers);
+					numRequiredBuffers -= numAddedBuffers;
 				}
 			} catch (Throwable t) {
 				ExceptionUtils.rethrow(t);
@@ -200,10 +207,19 @@ public class BufferManager implements BufferListener, BufferRecycler {
 		inputChannel.notifyBufferAvailable(numAddedBuffers);
 	}
 
-	void releaseFloatingBuffers() {
+	void releaseFloatingBuffers(boolean isTemporaryRelease) {
 		synchronized (bufferQueue) {
-			numRequiredBuffers = 0;
-			bufferQueue.releaseFloatingBuffers();
+			if (isWaitingForFloatingBuffers) {
+				inputChannel.inputGate.getBufferPool().removeBufferListener(this);
+				isWaitingForFloatingBuffers = false;
+			}
+
+			int numReleasedBuffers = bufferQueue.releaseFloatingBuffers();
+			if (isTemporaryRelease) {
+				numRequiredBuffers += numReleasedBuffers;
+			} else {
+				numRequiredBuffers = 0;
+			}
 		}
 	}
 
@@ -251,7 +267,9 @@ public class BufferManager implements BufferListener, BufferRecycler {
 		BufferListener.NotificationResult notificationResult = BufferListener.NotificationResult.BUFFER_NOT_USED;
 		try {
 			synchronized (bufferQueue) {
-				checkState(isWaitingForFloatingBuffers, "This channel should be waiting for floating buffers.");
+				if (!isWaitingForFloatingBuffers) {
+					return notificationResult;
+				}
 
 				// Important: make sure that we never add a buffer after releaseAllResources()
 				// released all buffers. Following scenarios exist:
@@ -260,7 +278,7 @@ public class BufferManager implements BufferListener, BufferRecycler {
 				// 2) releaseAllBuffers() did not yet release buffers from bufferQueue
 				// -> we may or may not have set isReleased yet but will always wait for the
 				// lock on bufferQueue to release buffers
-				if (inputChannel.isReleased() || bufferQueue.getAvailableBufferSize() >= numRequiredBuffers) {
+				if (inputChannel.isReleased() || numRequiredBuffers == 0) {
 					isWaitingForFloatingBuffers = false;
 					return notificationResult;
 				}
@@ -268,7 +286,7 @@ public class BufferManager implements BufferListener, BufferRecycler {
 				bufferQueue.addFloatingBuffer(buffer);
 				bufferQueue.notifyAll();
 
-				if (bufferQueue.getAvailableBufferSize() == numRequiredBuffers) {
+				if (--numRequiredBuffers == 0) {
 					isWaitingForFloatingBuffers = false;
 					notificationResult = BufferListener.NotificationResult.BUFFER_USED_NO_NEED_MORE;
 				} else {
@@ -294,16 +312,18 @@ public class BufferManager implements BufferListener, BufferRecycler {
 	// ------------------------------------------------------------------------
 
 	@VisibleForTesting
-	int unsynchronizedGetNumberOfRequiredBuffers() {
-		return numRequiredBuffers;
+	int getNumberOfRequiredBuffers() {
+		synchronized (bufferQueue) {
+			return numRequiredBuffers;
+		}
 	}
 
-	@VisibleForTesting
-	boolean unsynchronizedIsWaitingForFloatingBuffers() {
-		return isWaitingForFloatingBuffers;
+	boolean isWaitingForFloatingBuffers() {
+		synchronized (bufferQueue) {
+			return isWaitingForFloatingBuffers;
+		}
 	}
 
-	@VisibleForTesting
 	int getNumberOfAvailableBuffers() {
 		synchronized (bufferQueue) {
 			return bufferQueue.getAvailableBufferSize();
@@ -349,7 +369,7 @@ public class BufferManager implements BufferListener, BufferRecycler {
 		 */
 		int addExclusiveBuffer(Buffer buffer, int numRequiredBuffers) {
 			exclusiveBuffers.add(buffer);
-			if (getAvailableBufferSize() > numRequiredBuffers) {
+			if (numRequiredBuffers == 0) {
 				Buffer floatingBuffer = floatingBuffers.poll();
 				if (floatingBuffer != null) {
 					floatingBuffer.recycleBuffer();
@@ -395,11 +415,13 @@ public class BufferManager implements BufferListener, BufferRecycler {
 			}
 		}
 
-		void releaseFloatingBuffers() {
+		int releaseFloatingBuffers() {
+			int numBufferReleased = floatingBuffers.size();
 			Buffer buffer;
 			while ((buffer = floatingBuffers.poll()) != null) {
 				buffer.recycleBuffer();
 			}
+			return numBufferReleased;
 		}
 
 		int getAvailableBufferSize() {

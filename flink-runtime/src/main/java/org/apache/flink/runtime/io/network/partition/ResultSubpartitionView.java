@@ -52,6 +52,8 @@ public interface ResultSubpartitionView {
 
 	void resumeConsumption();
 
+	int getAndResetUnannouncedBacklog();
+
 	Throwable getFailureCause();
 
 	boolean isAvailable(int numCreditsAvailable);

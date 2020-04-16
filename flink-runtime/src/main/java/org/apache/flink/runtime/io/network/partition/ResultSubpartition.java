@@ -131,14 +131,8 @@ public abstract class ResultSubpartition {
 
 	public abstract boolean isReleased();
 
-	/**
-	 * Gets the number of non-event buffers in this subpartition.
-	 *
-	 * <p><strong>Beware:</strong> This method should only be used in tests in non-concurrent access
-	 * scenarios since it does not make any concurrency guarantees.
-	 */
 	@VisibleForTesting
-	abstract int getBuffersInBacklog();
+	abstract int getUnannouncedBacklog();
 
 	/**
 	 * Makes a best effort to get the current size of the queue.
@@ -150,19 +144,19 @@ public abstract class ResultSubpartition {
 	// ------------------------------------------------------------------------
 
 	/**
-	 * A combination of a {@link Buffer} and the backlog length indicating
-	 * how many non-event buffers are available in the subpartition.
+	 * A combination of a {@link Buffer} and the unannounced backlog in the subpartition to
+	 * be announced to the consumer.
 	 */
 	public static final class BufferAndBacklog {
 
 		private final Buffer buffer;
 		private final boolean isDataAvailable;
-		private final int buffersInBacklog;
+		private final int unannouncedBacklog;
 		private final boolean isEventAvailable;
 
-		public BufferAndBacklog(Buffer buffer, boolean isDataAvailable, int buffersInBacklog, boolean isEventAvailable) {
+		public BufferAndBacklog(Buffer buffer, boolean isDataAvailable, int unannouncedBacklog, boolean isEventAvailable) {
 			this.buffer = checkNotNull(buffer);
-			this.buffersInBacklog = buffersInBacklog;
+			this.unannouncedBacklog = unannouncedBacklog;
 			this.isDataAvailable = isDataAvailable;
 			this.isEventAvailable = isEventAvailable;
 		}
@@ -175,19 +169,19 @@ public abstract class ResultSubpartition {
 			return isDataAvailable;
 		}
 
-		public int buffersInBacklog() {
-			return buffersInBacklog;
+		public int unannouncedBacklog() {
+			return unannouncedBacklog;
 		}
 
 		public boolean isEventAvailable() {
 			return isEventAvailable;
 		}
 
-		public static BufferAndBacklog fromBufferAndLookahead(Buffer current, Buffer lookahead, int backlog) {
+		public static BufferAndBacklog fromBufferAndLookahead(Buffer current, Buffer lookahead, int unannouncedBacklog) {
 			return new BufferAndBacklog(
 					current,
 					lookahead != null,
-					backlog,
+					unannouncedBacklog,
 					lookahead != null && !lookahead.isBuffer());
 		}
 	}

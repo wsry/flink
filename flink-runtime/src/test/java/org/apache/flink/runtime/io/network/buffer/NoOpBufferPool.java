@@ -67,6 +67,11 @@ public class NoOpBufferPool implements BufferPool {
 	}
 
 	@Override
+	public void removeBufferListener(BufferListener listener) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
 	public boolean isDestroyed() {
 		throw new UnsupportedOperationException();
 	}

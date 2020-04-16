@@ -29,6 +29,7 @@ import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferProvider;
 import org.apache.flink.runtime.io.network.buffer.BufferReceivedListener;
+import org.apache.flink.runtime.io.network.netty.NettyMessage.ResumeConsumption;
 import org.apache.flink.runtime.io.network.partition.PartitionNotFoundException;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 
@@ -127,7 +128,9 @@ public class RemoteInputChannel extends InputChannel {
 		checkState(bufferManager.unsynchronizedGetAvailableExclusiveBuffers() == 0,
 			"Bug in input channel setup logic: exclusive buffers have already been set for this input channel.");
 
-		bufferManager.requestExclusiveBuffers();
+		if (initialCredit > 0) {
+			bufferManager.requestExclusiveBuffers();
+		}
 	}
 
 	// ------------------------------------------------------------------------
@@ -184,7 +187,7 @@ public class RemoteInputChannel extends InputChannel {
 
 		numBytesIn.inc(next.getSize());
 		numBuffersIn.inc();
-		return Optional.of(new BufferAndAvailability(next, moreAvailable, 0));
+		return Optional.of(new BufferAndAvailability(next, moreAvailable));
 	}
 
 	@Override
@@ -281,24 +284,17 @@ public class RemoteInputChannel extends InputChannel {
 		partitionRequestClient.notifyCreditAvailable(this);
 	}
 
-	@VisibleForTesting
 	public int getNumberOfAvailableBuffers() {
 		return bufferManager.getNumberOfAvailableBuffers();
 	}
 
 	@VisibleForTesting
 	public int getNumberOfRequiredBuffers() {
-		return bufferManager.unsynchronizedGetNumberOfRequiredBuffers();
+		return bufferManager.getNumberOfRequiredBuffers();
 	}
 
-	@VisibleForTesting
-	public int getSenderBacklog() {
-		return getNumberOfRequiredBuffers() - initialCredit;
-	}
-
-	@VisibleForTesting
 	boolean isWaitingForFloatingBuffers() {
-		return bufferManager.unsynchronizedIsWaitingForFloatingBuffers();
+		return bufferManager.isWaitingForFloatingBuffers();
 	}
 
 	@VisibleForTesting
@@ -327,6 +323,10 @@ public class RemoteInputChannel extends InputChannel {
 		}
 	}
 
+	private void onCheckpointBarrier() {
+		bufferManager.releaseFloatingBuffers(true);
+	}
+
 	@Override
 	public void resumeConsumption() {
 		checkState(!isReleased.get(), "Channel released.");
@@ -335,6 +335,22 @@ public class RemoteInputChannel extends InputChannel {
 		// notifies the producer that this channel is ready to
 		// unblock from checkpoint and resume data consumption
 		partitionRequestClient.resumeConsumption(this);
+	}
+
+	/**
+	 * Called by netty thread to request buffers and generate {@link ResumeConsumption} message.
+	 */
+	public ResumeConsumption getResumeConsumptionMessage() throws IOException {
+		checkState(unannouncedCredit.get() == 0, "Unannounced credit should be 0.");
+		checkState(getNumberOfAvailableBuffers() == initialCredit, "Illegal number of available buffers.");
+		checkState(!isWaitingForFloatingBuffers(), "Should not be waiting for floating buffers.");
+
+		if (initialCredit > 0) {
+			return new ResumeConsumption(id, initialCredit, bufferManager.getNumberOfRequiredBuffers() > 0);
+		}
+
+		int availableCredit = bufferManager.requestFloatingBuffers(0);
+		return new ResumeConsumption(id, availableCredit, bufferManager.getNumberOfRequiredBuffers() > 0);
 	}
 
 	// ------------------------------------------------------------------------
@@ -412,14 +428,14 @@ public class RemoteInputChannel extends InputChannel {
 	}
 
 	/**
-	 * Receives the backlog from the producer's buffer response. If the number of available
-	 * buffers is less than backlog + initialCredit, it will request floating buffers from
-	 * the buffer manager, and then notify unannounced credits to the producer.
+	 * Receives the backlog from the producer's buffer response. Floating buffers will
+	 * be requested from the {@link BufferManager} according to the announced backlog,
+	 * and then it will notify unannounced credits to the producer.
 	 *
-	 * @param backlog The number of unsent buffers in the producer's sub partition.
+	 * @param backlog Number of the announced backlog from producer.
 	 */
-	void onSenderBacklog(int backlog) throws IOException {
-		notifyBufferAvailable(bufferManager.requestFloatingBuffers(backlog + initialCredit));
+	public void onSenderBacklog(int backlog) throws IOException {
+		notifyBufferAvailable(bufferManager.requestFloatingBuffers(backlog));
 	}
 
 	public void onBuffer(Buffer buffer, int sequenceNumber, int backlog) throws IOException {
@@ -472,6 +488,10 @@ public class RemoteInputChannel extends InputChannel {
 				}
 			} else if (notifyReceivedBuffer != null) {
 				listener.notifyBufferReceived(notifyReceivedBuffer, channelInfo);
+			}
+
+			if (buffer.getDataType().isBlockingUpstream()) {
+				onCheckpointBarrier();
 			}
 		} finally {
 			if (recycleBuffer) {

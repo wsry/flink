@@ -78,6 +78,11 @@ public class PipelinedSubpartitionView implements ResultSubpartitionView {
 	}
 
 	@Override
+	public int getAndResetUnannouncedBacklog() {
+		return parent.getAndResetUnannouncedBacklog();
+	}
+
+	@Override
 	public boolean isAvailable(int numCreditsAvailable) {
 		return parent.isAvailable(numCreditsAvailable);
 	}

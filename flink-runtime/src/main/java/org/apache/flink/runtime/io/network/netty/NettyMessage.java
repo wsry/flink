@@ -726,14 +726,22 @@ public abstract class NettyMessage {
 	/**
 	 * Message to notify the producer to unblock from checkpoint.
 	 */
-	static class ResumeConsumption extends NettyMessage {
+	public static class ResumeConsumption extends NettyMessage {
 
 		private static final byte ID = 7;
 
 		final InputChannelID receiverId;
 
-		ResumeConsumption(InputChannelID receiverId) {
+		final int availableCredits;
+
+		final boolean hasUnfulfilledBacklog;
+
+		public ResumeConsumption(InputChannelID receiverId, int availableCredits, boolean hasUnfulfilledBacklog) {
+			checkArgument(availableCredits >= 0, "The available credits should be non-negative.");
+
 			this.receiverId = receiverId;
+			this.availableCredits = availableCredits;
+			this.hasUnfulfilledBacklog = hasUnfulfilledBacklog;
 		}
 
 		@Override
@@ -741,8 +749,10 @@ public abstract class NettyMessage {
 			ByteBuf result = null;
 
 			try {
-				result = allocateBuffer(allocator, ID, 16);
+				result = allocateBuffer(allocator, ID, 16 + 4 + 1);
 				receiverId.writeTo(result);
+				result.writeInt(availableCredits);
+				result.writeBoolean(hasUnfulfilledBacklog);
 
 				return result;
 			}
@@ -756,12 +766,66 @@ public abstract class NettyMessage {
 		}
 
 		static ResumeConsumption readFrom(ByteBuf buffer) {
-			return new ResumeConsumption(InputChannelID.fromByteBuf(buffer));
+			final InputChannelID receiverId = InputChannelID.fromByteBuf(buffer);
+			final int credit = buffer.readInt();
+			final boolean hasUnfulfilledBacklog = buffer.readBoolean();
+
+			return new ResumeConsumption(receiverId, credit, hasUnfulfilledBacklog);
 		}
 
 		@Override
 		public String toString() {
-			return String.format("ResumeConsumption(%s)", receiverId);
+			return String.format("ResumeConsumption(%s : %d : %b)", receiverId, availableCredits, hasUnfulfilledBacklog);
+		}
+	}
+
+	/**
+	 * Incremental backlog announcement from the server to the client.
+	 */
+	static class AddBacklog extends NettyMessage {
+
+		static final byte ID = 8;
+
+		final int backlog;
+
+		final InputChannelID receiverId;
+
+		AddBacklog(int backlog, InputChannelID receiverId) {
+			checkArgument(backlog > 0, "The announced backlog should be greater than 0");
+			this.backlog = backlog;
+			this.receiverId = receiverId;
+		}
+
+		@Override
+		ByteBuf write(ByteBufAllocator allocator) throws IOException {
+			ByteBuf result = null;
+
+			try {
+				result = allocateBuffer(allocator, ID, 4 + 16);
+				result.writeInt(backlog);
+				receiverId.writeTo(result);
+
+				return result;
+			}
+			catch (Throwable t) {
+				if (result != null) {
+					result.release();
+				}
+
+				throw new IOException(t);
+			}
+		}
+
+		static AddBacklog readFrom(ByteBuf buffer) {
+			int backlog = buffer.readInt();
+			InputChannelID receiverId = InputChannelID.fromByteBuf(buffer);
+
+			return new AddBacklog(backlog, receiverId);
+		}
+
+		@Override
+		public String toString() {
+			return String.format("AddBacklog(%s : %d)", receiverId, backlog);
 		}
 	}
 }

@@ -18,9 +18,9 @@
 
 package org.apache.flink.runtime.io.network;
 
+import org.apache.flink.runtime.io.network.netty.ServerOutboundMessage;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionProvider;
-import org.apache.flink.runtime.io.network.partition.consumer.InputChannel.BufferAndAvailability;
 import org.apache.flink.runtime.io.network.partition.consumer.InputChannelID;
 
 import java.io.IOException;
@@ -36,19 +36,24 @@ public interface NetworkSequenceViewReader {
 		ResultPartitionID resultPartitionId,
 		int subPartitionIndex) throws IOException;
 
-	BufferAndAvailability getNextBuffer() throws IOException;
+	ServerOutboundMessage getNextMessage() throws IOException;
 
 	/**
 	 * The credits from consumer are added in incremental way.
 	 *
 	 * @param creditDeltas The credit deltas
 	 */
-	void addCredit(int creditDeltas);
+	void addCredit(int creditDeltas) throws Exception;
+
+	boolean shouldAnnounceBacklog(boolean hasUnfulfilledBacklog);
 
 	/**
 	 * Resumes data consumption after an exactly once checkpoint.
+	 *
+	 * @param availableCredits Number of available credits of the consumer.
+	 * @param hasUnfulfilledBacklog Whether the consumer has unfulfilled backlog (buffers to request).
 	 */
-	void resumeConsumption();
+	void resumeConsumption(int availableCredits, boolean hasUnfulfilledBacklog) throws Exception;
 
 	/**
 	 * Checks whether this reader is available or not.
@@ -73,6 +78,4 @@ public interface NetworkSequenceViewReader {
 	Throwable getFailureCause();
 
 	InputChannelID getReceiverId();
-
-	int getSequenceNumber();
 }

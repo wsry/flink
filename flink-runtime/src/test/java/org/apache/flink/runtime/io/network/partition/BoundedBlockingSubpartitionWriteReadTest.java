@@ -111,7 +111,7 @@ public class BoundedBlockingSubpartitionWriteReadTest {
 
 		// test & check
 		final ResultSubpartitionView reader = subpartition.createReadView(() -> {});
-		readLongs(reader, numLongs, subpartition.getBuffersInBacklog(), compressionEnabled, decompressor);
+		readLongs(reader, numLongs, subpartition.getUnannouncedBacklog(), compressionEnabled, decompressor);
 
 		// cleanup
 		reader.releaseAllResources();
@@ -128,7 +128,7 @@ public class BoundedBlockingSubpartitionWriteReadTest {
 		// test & check
 		for (int i = 0; i < 10; i++) {
 			final ResultSubpartitionView reader = subpartition.createReadView(() -> {});
-			readLongs(reader, numLongs, subpartition.getBuffersInBacklog(), compressionEnabled, decompressor);
+			readLongs(reader, numLongs, subpartition.getUnannouncedBacklog(), compressionEnabled, decompressor);
 			reader.releaseAllResources();
 		}
 
@@ -145,7 +145,7 @@ public class BoundedBlockingSubpartitionWriteReadTest {
 
 		// test
 		final LongReader[] readerThreads = createSubpartitionLongReaders(
-				subpartition, 10, numLongs, subpartition.getBuffersInBacklog(), compressionEnabled);
+				subpartition, 10, numLongs, subpartition.getUnannouncedBacklog(), compressionEnabled);
 		for (CheckedThread t : readerThreads) {
 			t.start();
 		}
@@ -171,11 +171,11 @@ public class BoundedBlockingSubpartitionWriteReadTest {
 			BufferDecompressor decompressor) throws Exception {
 		BufferAndBacklog next;
 		long expectedNextLong = 0L;
-		int nextExpectedBacklog = numBuffers - 1;
+		int nextExpectedBacklog = numBuffers;
 
 		while ((next = reader.getNextBuffer()) != null && next.buffer().isBuffer()) {
 			assertTrue(next.isDataAvailable());
-			assertEquals(nextExpectedBacklog, next.buffersInBacklog());
+			assertEquals(nextExpectedBacklog, next.unannouncedBacklog());
 
 			ByteBuffer buffer = next.buffer().getNioBufferReadable();
 			if (compressionEnabled && next.buffer().isCompressed()) {
@@ -188,11 +188,11 @@ public class BoundedBlockingSubpartitionWriteReadTest {
 			}
 
 			next.buffer().recycleBuffer();
-			nextExpectedBacklog--;
+			nextExpectedBacklog = 0;
 		}
 
 		assertEquals(numLongs, expectedNextLong);
-		assertEquals(-1, nextExpectedBacklog);
+		assertEquals(0, nextExpectedBacklog);
 	}
 
 	// ------------------------------------------------------------------------

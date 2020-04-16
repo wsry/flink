@@ -49,8 +49,8 @@ final class BoundedBlockingSubpartitionReader implements ResultSubpartitionView 
 	@Nullable
 	private BoundedData.Reader dataReader;
 
-	/** The remaining number of data buffers (not events) in the result. */
-	private int dataBufferBacklog;
+	/** The number of non-event buffers in the result to be announced to the downstream. */
+	private int unannouncedBacklog;
 
 	/** Flag whether this reader is released. Atomic, to avoid double release. */
 	private boolean isReleased;
@@ -71,7 +71,7 @@ final class BoundedBlockingSubpartitionReader implements ResultSubpartitionView 
 		this.nextBuffer = dataReader.nextBuffer();
 
 		checkArgument(numDataBuffers >= 0);
-		this.dataBufferBacklog = numDataBuffers;
+		this.unannouncedBacklog = numDataBuffers;
 
 		this.availabilityListener = checkNotNull(availabilityListener);
 	}
@@ -86,14 +86,21 @@ final class BoundedBlockingSubpartitionReader implements ResultSubpartitionView 
 			// but also in case the reader is disposed (rather than throwing an exception)
 			return null;
 		}
-		if (current.isBuffer()) {
-			dataBufferBacklog--;
-		}
 
 		assert dataReader != null;
 		nextBuffer = dataReader.nextBuffer();
 
-		return BufferAndBacklog.fromBufferAndLookahead(current, nextBuffer, dataBufferBacklog);
+		return BufferAndBacklog.fromBufferAndLookahead(
+			current,
+			nextBuffer,
+			getAndResetUnannouncedBacklog());
+	}
+
+	@Override
+	public int getAndResetUnannouncedBacklog() {
+		int numBacklog = unannouncedBacklog;
+		unannouncedBacklog = 0;
+		return numBacklog;
 	}
 
 	/**

@@ -22,8 +22,8 @@ import org.apache.flink.runtime.io.network.NetworkClientHandler;
 import org.apache.flink.runtime.io.network.netty.exception.LocalTransportException;
 import org.apache.flink.runtime.io.network.netty.exception.RemoteTransportException;
 import org.apache.flink.runtime.io.network.netty.exception.TransportException;
+import org.apache.flink.runtime.io.network.netty.NettyMessage.AddBacklog;
 import org.apache.flink.runtime.io.network.netty.NettyMessage.AddCredit;
-import org.apache.flink.runtime.io.network.netty.NettyMessage.ResumeConsumption;
 import org.apache.flink.runtime.io.network.partition.PartitionNotFoundException;
 import org.apache.flink.runtime.io.network.partition.consumer.InputChannelID;
 import org.apache.flink.runtime.io.network.partition.consumer.RemoteInputChannel;
@@ -291,6 +291,11 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 					}
 				}
 			}
+		} else if (msgClazz == AddBacklog.class) {
+			AddBacklog addBacklog = (AddBacklog) msg;
+
+			RemoteInputChannel inputChannel = inputChannels.get(addBacklog.receiverId);
+			inputChannel.onSenderBacklog(addBacklog.backlog);
 		} else {
 			throw new IllegalStateException("Received unknown message from producer: " + msg.getClass());
 		}
@@ -312,7 +317,7 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 	 * <p>This method may be called by the first input channel enqueuing, or the complete
 	 * future's callback in previous input channel, or the channel writability changed event.
 	 */
-	private void writeAndFlushNextMessageIfPossible(Channel channel) {
+	private void writeAndFlushNextMessageIfPossible(Channel channel) throws IOException {
 		if (channelError.get() != null || !channel.isWritable()) {
 			return;
 		}
@@ -364,7 +369,7 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 			this.inputChannel = inputChannel;
 		}
 
-		abstract Object buildMessage();
+		abstract Object buildMessage() throws IOException;
 	}
 
 	private static class AddCreditMessage extends ClientOutboundMessage {
@@ -386,8 +391,8 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
 		}
 
 		@Override
-		Object buildMessage() {
-			return new ResumeConsumption(inputChannel.getInputChannelId());
+		Object buildMessage() throws IOException {
+			return inputChannel.getResumeConsumptionMessage();
 		}
 	}
 }

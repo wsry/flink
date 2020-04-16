@@ -215,6 +215,11 @@ public class CancelPartitionRequestTest {
 		}
 
 		@Override
+		public int getAndResetUnannouncedBacklog() {
+			return 0;
+		}
+
+		@Override
 		public boolean isAvailable(int numCreditsAvailable) {
 			return true;
 		}

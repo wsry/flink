@@ -18,7 +18,6 @@
 
 package org.apache.flink.runtime.io.network.partition;
 
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.checkpoint.channel.ChannelStateReader;
 import org.apache.flink.runtime.checkpoint.channel.ChannelStateReader.ReadResult;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
@@ -66,18 +65,15 @@ public class PipelinedSubpartition extends ResultSubpartition {
 	/** All buffers of this subpartition. Access to the buffers is synchronized on this object. */
 	private final ArrayDeque<BufferConsumer> buffers = new ArrayDeque<>();
 
-	/** The number of non-event buffers currently in this subpartition. */
+	/** The number of non-event buffers to be announced to the downstream. */
 	@GuardedBy("buffers")
-	private int buffersInBacklog;
+	private int unannouncedBacklog;
 
 	/** The read view to consume this subpartition. */
 	private PipelinedSubpartitionView readView;
 
 	/** Flag indicating whether the subpartition has been finished. */
 	private boolean isFinished;
-
-	@GuardedBy("buffers")
-	private boolean flushRequested;
 
 	/** Flag indicating whether the subpartition has been released. */
 	private volatile boolean isReleased;
@@ -149,11 +145,14 @@ public class PipelinedSubpartition extends ResultSubpartition {
 				return false;
 			}
 
+			BufferConsumer previousBuffer = tryRemoveFinishedEmptyBuffer(insertAsHead);
+
 			// Add the bufferConsumer and update the stats
 			handleAddingBarrier(bufferConsumer, insertAsHead);
 			updateStatistics(bufferConsumer);
-			increaseBuffersInBacklog(bufferConsumer);
-			notifyDataAvailable = insertAsHead || finish || shouldNotifyDataAvailable();
+			notifyDataAvailable = insertAsHead || finish || shouldNotifyDataAvailable(previousBuffer);
+
+			tryIncreaseUnannouncedBacklog(previousBuffer);
 
 			isFinished |= finish;
 		}
@@ -231,11 +230,6 @@ public class PipelinedSubpartition extends ResultSubpartition {
 			}
 
 			Buffer buffer = null;
-
-			if (buffers.isEmpty()) {
-				flushRequested = false;
-			}
-
 			while (!buffers.isEmpty()) {
 				BufferConsumer bufferConsumer = buffers.peek();
 
@@ -246,12 +240,11 @@ public class PipelinedSubpartition extends ResultSubpartition {
 
 				if (buffers.size() == 1) {
 					// turn off flushRequested flag if we drained all of the available data
-					flushRequested = false;
+					bufferConsumer.setFlushRequested(false);
 				}
 
 				if (bufferConsumer.isFinished()) {
 					buffers.pop().close();
-					decreaseBuffersInBacklogUnsafe(bufferConsumer.isBuffer());
 				}
 
 				if (buffer.readableBytes() > 0) {
@@ -279,7 +272,7 @@ public class PipelinedSubpartition extends ResultSubpartition {
 			return new BufferAndBacklog(
 				buffer,
 				isDataAvailableUnsafe(),
-				getBuffersInBacklog(),
+				getAndResetUnannouncedBacklogUnsafe(),
 				isEventAvailableUnsafe());
 		}
 	}
@@ -319,7 +312,7 @@ public class PipelinedSubpartition extends ResultSubpartition {
 				parent.getOwningTaskName(), getSubPartitionIndex(), parent.getPartitionId());
 
 			readView = new PipelinedSubpartitionView(this, availabilityListener);
-			notifyDataAvailable = !buffers.isEmpty();
+			notifyDataAvailable = isDataAvailableUnsafe();
 		}
 		if (notifyDataAvailable) {
 			notifyDataAvailable();
@@ -341,6 +334,7 @@ public class PipelinedSubpartition extends ResultSubpartition {
 	private boolean isDataAvailableUnsafe() {
 		assert Thread.holdsLock(buffers);
 
+		boolean flushRequested = !buffers.isEmpty() && buffers.peekFirst().isFlushRequested();
 		return !isBlockedByCheckpoint && (flushRequested || getNumberOfFinishedBuffers() > 0);
 	}
 
@@ -373,8 +367,8 @@ public class PipelinedSubpartition extends ResultSubpartition {
 		}
 
 		return String.format(
-			"PipelinedSubpartition#%d [number of buffers: %d (%d bytes), number of buffers in backlog: %d, finished? %s, read view? %s]",
-			getSubPartitionIndex(), numBuffers, numBytes, getBuffersInBacklog(), finished, hasReadView);
+			"PipelinedSubpartition#%d [number of buffers: %d (%d bytes), unannounced backlog: %d, finished? %s, read view? %s]",
+			getSubPartitionIndex(), numBuffers, numBytes, unannouncedBacklog, finished, hasReadView);
 	}
 
 	@Override
@@ -387,13 +381,24 @@ public class PipelinedSubpartition extends ResultSubpartition {
 	public void flush() {
 		final boolean notifyDataAvailable;
 		synchronized (buffers) {
-			if (buffers.isEmpty() || flushRequested) {
+			if (buffers.isEmpty()) {
 				return;
 			}
 			// if there is more then 1 buffer, we already notified the reader
-			// (at the latest when adding the second buffer)
-			notifyDataAvailable = !isBlockedByCheckpoint && buffers.size() == 1 && buffers.peek().isDataAvailable();
-			flushRequested = buffers.size() > 1 || notifyDataAvailable;
+			// (at the latest when adding the second buffer), so we just need
+			// to request the flushing of the last buffer in the queue if it
+			// has available data
+			BufferConsumer buffer = buffers.peekLast();
+			boolean flushRequested = buffer.isBuffer() && !buffer.isFlushRequested() && buffer.isDataAvailable();
+			notifyDataAvailable = !isBlockedByCheckpoint && buffers.size() == 1 && flushRequested;
+
+			// increase the number of backlog by one and set the flush-requested
+			// flag of the corresponding buffer to true if we request a flushing
+			// of the last buffer in the queue
+			if (flushRequested) {
+				buffer.setFlushRequested(true);
+				++unannouncedBacklog;
+			}
 		}
 		if (notifyDataAvailable) {
 			notifyDataAvailable();
@@ -422,46 +427,66 @@ public class PipelinedSubpartition extends ResultSubpartition {
 		totalNumberOfBytes += buffer.getSize();
 	}
 
-	@GuardedBy("buffers")
-	private void decreaseBuffersInBacklogUnsafe(boolean isBuffer) {
-		assert Thread.holdsLock(buffers);
-		if (isBuffer) {
-			buffersInBacklog--;
-		}
-	}
-
 	/**
-	 * Increases the number of non-event buffers by one after adding a non-event
-	 * buffer into this subpartition.
-	 */
-	@GuardedBy("buffers")
-	private void increaseBuffersInBacklog(BufferConsumer buffer) {
-		assert Thread.holdsLock(buffers);
-
-		if (buffer != null && buffer.isBuffer()) {
-			buffersInBacklog++;
-		}
-	}
-
-	/**
-	 * Gets the number of non-event buffers in this subpartition.
+	 * Removes and recycles the last buffer in the queue if it is an finished buffer without any consumable
+	 * data, after which, the reader does not need any available credit to handle this finished empty buffer.
+	 * For example, if the new buffer is an event and the previous buffer is finished but without any data,
+	 * after we remove the empty one, the reader is able to process the event without any available credit.
 	 *
-	 * <p><strong>Beware:</strong> This method should only be used in tests in non-concurrent access
-	 * scenarios since it does not make any concurrency guarantees.
+	 * @param insertAsHead Whether the new added buffer is a priority-event.
+	 * @return The last buffer in the queue before the new buffer is added if it is not removed.
 	 */
-	@SuppressWarnings("FieldAccessNotGuarded")
-	@VisibleForTesting
-	public int getBuffersInBacklog() {
-		if (flushRequested || isFinished) {
-			return buffersInBacklog;
-		} else {
-			return Math.max(buffersInBacklog - 1, 0);
+	@GuardedBy("buffers")
+	private BufferConsumer tryRemoveFinishedEmptyBuffer(boolean insertAsHead) {
+		assert Thread.holdsLock(buffers);
+
+		BufferConsumer prevBuffer = insertAsHead ? null : buffers.peekLast();
+		if (prevBuffer != null && prevBuffer.getCurrentReaderPosition() > 0 && !prevBuffer.isDataAvailable()) {
+			checkState(prevBuffer.isBuffer(), "The last buffer must not be an event.");
+			buffers.pollLast().close();
+			prevBuffer = null;
+		}
+		return prevBuffer;
+	}
+
+	/**
+	 * Tries to increase the number of unannounced backlog for the previous buffer after adding a new buffer.
+	 *
+	 * @param previousBuffer The last buffer in the queue before the new buffer is added.
+	 */
+	@GuardedBy("buffers")
+	private void tryIncreaseUnannouncedBacklog(BufferConsumer previousBuffer) {
+		assert Thread.holdsLock(buffers);
+
+		if (previousBuffer != null && !previousBuffer.isFlushRequested()) {
+			++unannouncedBacklog;
 		}
 	}
 
-	private boolean shouldNotifyDataAvailable() {
+	@Override
+	public int getUnannouncedBacklog() {
+		return unannouncedBacklog;
+	}
+
+	int getAndResetUnannouncedBacklog() {
+		synchronized (buffers) {
+			return getAndResetUnannouncedBacklogUnsafe();
+		}
+	}
+
+	private int getAndResetUnannouncedBacklogUnsafe() {
+		if (isBlockedByCheckpoint) {
+			return 0;
+		}
+		int numBacklog = unannouncedBacklog;
+		unannouncedBacklog = 0;
+		return numBacklog;
+	}
+
+	private boolean shouldNotifyDataAvailable(BufferConsumer previousBuffer) {
+		boolean noFlushRequested = previousBuffer == null || !previousBuffer.isFlushRequested();
 		// Notify only when we added first finished buffer.
-		return readView != null && !flushRequested && !isBlockedByCheckpoint && getNumberOfFinishedBuffers() == 1;
+		return readView != null && noFlushRequested && !isBlockedByCheckpoint && getNumberOfFinishedBuffers() == 1;
 	}
 
 	private void notifyDataAvailable() {

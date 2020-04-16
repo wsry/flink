@@ -82,6 +82,8 @@ public interface BufferProvider extends AvailabilityProvider {
 	 */
 	boolean addBufferListener(BufferListener listener);
 
+	void removeBufferListener(BufferListener listener);
+
 	/**
 	 * Returns whether the buffer provider has been destroyed.
 	 */

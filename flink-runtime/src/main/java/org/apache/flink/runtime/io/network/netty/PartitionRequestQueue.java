@@ -23,8 +23,8 @@ import org.apache.flink.runtime.io.network.NetworkSequenceViewReader;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.netty.NettyMessage.ErrorResponse;
 import org.apache.flink.runtime.io.network.partition.ProducerFailedException;
-import org.apache.flink.runtime.io.network.partition.consumer.InputChannel.BufferAndAvailability;
 import org.apache.flink.runtime.io.network.partition.consumer.InputChannelID;
+import org.apache.flink.util.concurrent.FutureConsumerWithException;
 
 import org.apache.flink.shaded.netty4.io.netty.channel.Channel;
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelFuture;
@@ -41,21 +41,19 @@ import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.function.Consumer;
-
-import static org.apache.flink.runtime.io.network.netty.NettyMessage.BufferResponse;
+import java.util.function.BooleanSupplier;
 
 /**
  * A nonEmptyReader of partition queues, which listens for channel writability changed
  * events before writing and flushing {@link Buffer} instances.
  */
-class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
+public class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 
 	private static final Logger LOG = LoggerFactory.getLogger(PartitionRequestQueue.class);
 
 	private final ChannelFutureListener writeListener = new WriteAndFlushNextMessageIfPossibleListener();
 
-	/** The readers which are already enqueued available for transferring data. */
+	/** The readers which are already enqueued available for transferring data or announcing backlog. */
 	private final ArrayDeque<NetworkSequenceViewReader> availableReaders = new ArrayDeque<>();
 
 	/** All the readers created for the consumers' partition requests. */
@@ -88,16 +86,17 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 	}
 
 	/**
-	 * Try to enqueue the reader once receiving credit notification from the consumer or receiving
-	 * non-empty reader notification from the producer.
+	 * Try to enqueue the reader once receiving credit or resume consumption notification from
+	 * the consumer or receiving non-empty reader notification from the producer.
 	 *
 	 * <p>NOTE: Only one thread would trigger the actual enqueue after checking the reader's
 	 * availability, so there is no race condition here.
 	 */
-	private void enqueueAvailableReader(final NetworkSequenceViewReader reader) throws Exception {
-		if (reader.isRegisteredAsAvailable() || !reader.isAvailable()) {
+	void enqueueAvailableReader(final NetworkSequenceViewReader reader, BooleanSupplier condition) throws Exception {
+		if (reader.isRegisteredAsAvailable() || !condition.getAsBoolean()) {
 			return;
 		}
+
 		// Queue an available reader for consumption. If the queue is empty,
 		// we try trigger the actual write. Otherwise this will be handled by
 		// the writeAndFlushNextMessageIfPossible calls.
@@ -114,7 +113,7 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 	 *
 	 * <p><strong>Do not use anywhere else!</strong>
 	 *
-	 * @return readers which are enqueued available for transferring data
+	 * @return readers which are enqueued available for transferring data or announcing backlog
 	 */
 	@VisibleForTesting
 	ArrayDeque<NetworkSequenceViewReader> getAvailableReaders() {
@@ -149,16 +148,14 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 	 */
 	void addCreditOrResumeConsumption(
 			InputChannelID receiverId,
-			Consumer<NetworkSequenceViewReader> operation) throws Exception {
+			FutureConsumerWithException<NetworkSequenceViewReader, Exception> operation) throws Exception {
 		if (fatalError) {
 			return;
 		}
 
 		NetworkSequenceViewReader reader = allReaders.get(receiverId);
 		if (reader != null) {
-			operation.accept(reader);
-
-			enqueueAvailableReader(reader);
+			operation.acceptWithException(reader);
 		} else {
 			throw new IllegalStateException("No reader for receiverId = " + receiverId + " exists.");
 		}
@@ -170,7 +167,8 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 		// hand over of reader queues and cancelled producers.
 
 		if (msg instanceof NetworkSequenceViewReader) {
-			enqueueAvailableReader((NetworkSequenceViewReader) msg);
+			NetworkSequenceViewReader reader = (NetworkSequenceViewReader) msg;
+			enqueueAvailableReader(reader, () -> (reader.isAvailable() || reader.shouldAnnounceBacklog(false)));
 		} else if (msg.getClass() == InputChannelID.class) {
 			// Release partition view that get a cancel request.
 			InputChannelID toCancel = (InputChannelID) msg;
@@ -202,7 +200,7 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 		// input channel logic. You can think of this class acting as the input
 		// gate and the consumed views as the local input channels.
 
-		BufferAndAvailability next = null;
+		ServerOutboundMessage next = null;
 		try {
 			while (true) {
 				NetworkSequenceViewReader reader = pollAvailableReader();
@@ -213,7 +211,7 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 					return;
 				}
 
-				next = reader.getNextBuffer();
+				next = reader.getNextMessage();
 				if (next == null) {
 					if (!reader.isReleased()) {
 						continue;
@@ -230,26 +228,20 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
 				} else {
 					// This channel was now removed from the available reader queue.
 					// We re-add it into the queue if it is still available
-					if (next.moreAvailable()) {
+					if (next.isMoreAvailable()) {
 						registerAvailableReader(reader);
 					}
 
-					BufferResponse msg = new BufferResponse(
-						next.buffer(),
-						reader.getSequenceNumber(),
-						reader.getReceiverId(),
-						next.buffersInBacklog());
-
 					// Write and flush and wait until this is done before
 					// trying to continue with the next buffer.
-					channel.writeAndFlush(msg).addListener(writeListener);
+					channel.writeAndFlush(next.build()).addListener(writeListener);
 
 					return;
 				}
 			}
 		} catch (Throwable t) {
 			if (next != null) {
-				next.buffer().recycleBuffer();
+				next.recycle();
 			}
 
 			throw new IOException(t.getMessage(), t);

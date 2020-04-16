@@ -48,6 +48,11 @@ public class NoOpResultSubpartitionView implements ResultSubpartitionView {
 	}
 
 	@Override
+	public int getAndResetUnannouncedBacklog() {
+		return 0;
+	}
+
+	@Override
 	public Throwable getFailureCause() {
 		return null;
 	}

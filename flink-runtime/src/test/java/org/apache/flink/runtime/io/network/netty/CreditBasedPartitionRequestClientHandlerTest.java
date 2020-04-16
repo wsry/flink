@@ -171,10 +171,11 @@ public class CreditBasedPartitionRequestClientHandlerTest {
 				inputChannel.getInputChannelId(),
 				backlog,
 				new NetworkBufferAllocator(handler));
-			handler.channelRead(mock(ChannelHandlerContext.class), bufferResponse);
+			handler.channelRead(null, bufferResponse);
 
 			assertEquals(1, inputChannel.getNumberOfQueuedBuffers());
-			assertEquals(2, inputChannel.getSenderBacklog());
+			assertEquals(0, inputChannel.getNumberOfRequiredBuffers());
+			assertEquals(3, inputChannel.getNumberOfAvailableBuffers());
 		} finally {
 			releaseResource(inputGate, networkBufferPool);
 		}
@@ -351,11 +352,11 @@ public class CreditBasedPartitionRequestClientHandlerTest {
 				inputChannels[1].getInputChannelId(),
 				1,
 				allocator);
-			handler.channelRead(mock(ChannelHandlerContext.class), bufferResponse1);
-			handler.channelRead(mock(ChannelHandlerContext.class), bufferResponse2);
+			handler.channelRead(null, bufferResponse1);
+			handler.channelRead(null, bufferResponse2);
 
-			assertEquals(2, inputChannels[0].getUnannouncedCredit());
-			assertEquals(2, inputChannels[1].getUnannouncedCredit());
+			assertEquals(1, inputChannels[0].getUnannouncedCredit());
+			assertEquals(1, inputChannels[1].getUnannouncedCredit());
 
 			channel.runPendingTasks();
 
@@ -363,12 +364,12 @@ public class CreditBasedPartitionRequestClientHandlerTest {
 			readFromOutbound = channel.readOutbound();
 			assertThat(readFromOutbound, instanceOf(AddCredit.class));
 			assertEquals(inputChannels[0].getInputChannelId(), ((AddCredit) readFromOutbound).receiverId);
-			assertEquals(2, ((AddCredit) readFromOutbound).credit);
+			assertEquals(1, ((AddCredit) readFromOutbound).credit);
 
 			readFromOutbound = channel.readOutbound();
 			assertThat(readFromOutbound, instanceOf(AddCredit.class));
 			assertEquals(inputChannels[1].getInputChannelId(), ((AddCredit) readFromOutbound).receiverId);
-			assertEquals(2, ((AddCredit) readFromOutbound).credit);
+			assertEquals(1, ((AddCredit) readFromOutbound).credit);
 			assertNull(channel.readOutbound());
 
 			ByteBuf channelBlockingBuffer = blockChannel(channel);
@@ -445,9 +446,9 @@ public class CreditBasedPartitionRequestClientHandlerTest {
 				inputChannel.getInputChannelId(),
 				1,
 				new NetworkBufferAllocator(handler));
-			handler.channelRead(mock(ChannelHandlerContext.class), bufferResponse);
+			handler.channelRead(null, bufferResponse);
 
-			assertEquals(2, inputChannel.getUnannouncedCredit());
+			assertEquals(1, inputChannel.getUnannouncedCredit());
 
 			// Release the input channel
 			inputGate.close();

@@ -128,7 +128,7 @@ public abstract class RecoveredInputChannel extends InputChannel {
 
 	private void finishReadRecoveredState() throws IOException {
 		onRecoveredStateBuffer(EventSerializer.toBuffer(EndOfChannelStateEvent.INSTANCE));
-		bufferManager.releaseFloatingBuffers();
+		bufferManager.releaseFloatingBuffers(false);
 		LOG.debug("{}/{} finished recovering input.", inputGate.getOwningTaskName(), channelInfo);
 	}
 
@@ -149,7 +149,7 @@ public abstract class RecoveredInputChannel extends InputChannel {
 			stateConsumedFuture.complete(null);
 			return null;
 		} else {
-			return new BufferAndAvailability(next, moreAvailable, 0);
+			return new BufferAndAvailability(next, moreAvailable);
 		}
 	}
 

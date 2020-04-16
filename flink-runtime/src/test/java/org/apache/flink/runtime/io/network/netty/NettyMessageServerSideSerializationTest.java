@@ -115,9 +115,14 @@ public class NettyMessageServerSideSerializationTest extends TestLogger {
 
 	@Test
 	public void testResumeConsumption() {
-		NettyMessage.ResumeConsumption expected = new NettyMessage.ResumeConsumption(new InputChannelID());
+		NettyMessage.ResumeConsumption expected = new NettyMessage.ResumeConsumption(
+			new InputChannelID(),
+			random.nextInt(Integer.MAX_VALUE),
+			random.nextBoolean());
 		NettyMessage.ResumeConsumption actual = encodeAndDecode(expected, channel);
 
 		assertEquals(expected.receiverId, actual.receiverId);
+		assertEquals(expected.availableCredits, actual.availableCredits);
+		assertEquals(expected.hasUnfulfilledBacklog, actual.hasUnfulfilledBacklog);
 	}
 }

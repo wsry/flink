@@ -122,7 +122,9 @@ class PartitionRequestServerHandler extends SimpleChannelInboundHandler<NettyMes
 			} else if (msgClazz == ResumeConsumption.class) {
 				ResumeConsumption request = (ResumeConsumption) msg;
 
-				outboundQueue.addCreditOrResumeConsumption(request.receiverId, NetworkSequenceViewReader::resumeConsumption);
+				outboundQueue.addCreditOrResumeConsumption(
+					request.receiverId,
+					reader -> reader.resumeConsumption(request.availableCredits, request.hasUnfulfilledBacklog));
 			} else {
 				LOG.warn("Received unexpected client request: {}", msg);
 			}

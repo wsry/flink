@@ -218,13 +218,12 @@ public class InputBuffersMetricsTest extends TestLogger {
 
 		remoteInputChannel1.onSenderBacklog(backlog);
 
-		assertEquals(totalRequestedBuffers, remoteInputChannel1.unsynchronizedGetFloatingBuffersAvailable());
+		assertEquals(backlog, remoteInputChannel1.unsynchronizedGetFloatingBuffersAvailable());
 
 		drainBuffer(totalRequestedBuffers, remoteInputChannel1);
 
 		assertEquals(0, remoteInputChannel1.unsynchronizedGetFloatingBuffersAvailable());
-		assertEquals((double) (buffersPerChannel + totalRequestedBuffers) / totalBuffers,
-			inputBuffersUsageGauge.getValue(), 0.0001);
+		assertEquals((double) totalRequestedBuffers / totalBuffers, inputBuffersUsageGauge.getValue(), 0.0001);
 	}
 
 	private void drainAndValidate(

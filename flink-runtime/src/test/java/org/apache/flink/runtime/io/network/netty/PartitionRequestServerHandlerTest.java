@@ -83,7 +83,7 @@ public class PartitionRequestServerHandlerTest extends TestLogger {
 		partitionRequestQueue.notifyReaderCreated(testViewReader);
 
 		// Write the message of resume consumption to server
-		channel.writeInbound(new ResumeConsumption(inputChannelID));
+		channel.writeInbound(new ResumeConsumption(inputChannelID, 2, false));
 		channel.runPendingTasks();
 
 		assertTrue(testViewReader.consumptionResumed);
@@ -97,7 +97,7 @@ public class PartitionRequestServerHandlerTest extends TestLogger {
 		}
 
 		@Override
-		public void resumeConsumption() {
+		public void resumeConsumption(int availableCredits, boolean hasUnfulfilledBacklog) {
 			consumptionResumed = true;
 		}
 	}

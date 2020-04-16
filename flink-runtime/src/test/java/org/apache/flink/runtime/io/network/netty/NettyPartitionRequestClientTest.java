@@ -161,6 +161,7 @@ public class NettyPartitionRequestClientTest {
 		try {
 			final BufferPool bufferPool = networkBufferPool.createBufferPool(6, 6);
 			inputGate.setBufferPool(bufferPool);
+			inputGate.setInputChannels(inputChannel);
 			inputGate.assignExclusiveSegments();
 			inputChannel.requestSubpartition(0);
 

@@ -99,7 +99,7 @@ public class NetworkBufferPool implements BufferPoolFactory, MemorySegmentProvid
 		this.totalNumberOfMemorySegments = numberOfSegmentsToAllocate;
 		this.memorySegmentSize = segmentSize;
 
-		checkArgument(numberOfSegmentsToRequest > 0, "The number of required buffers should be larger than 0.");
+		checkArgument(numberOfSegmentsToRequest >= 0, "The number of required buffers should be non-negative.");
 		this.numberOfSegmentsToRequest = numberOfSegmentsToRequest;
 
 		Preconditions.checkNotNull(requestSegmentsTimeout);
@@ -162,6 +162,10 @@ public class NetworkBufferPool implements BufferPoolFactory, MemorySegmentProvid
 
 	@Override
 	public List<MemorySegment> requestMemorySegments() throws IOException {
+		if (numberOfSegmentsToRequest == 0) {
+			return Collections.emptyList();
+		}
+
 		synchronized (factoryLock) {
 			if (isDestroyed) {
 				throw new IllegalStateException("Network buffer pool has already been destroyed.");

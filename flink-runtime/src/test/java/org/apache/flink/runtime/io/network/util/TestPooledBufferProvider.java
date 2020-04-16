@@ -111,6 +111,11 @@ public class TestPooledBufferProvider implements BufferProvider {
 	}
 
 	@Override
+	public void removeBufferListener(BufferListener listener) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
 	public boolean isDestroyed() {
 		return false;
 	}

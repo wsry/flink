@@ -44,6 +44,8 @@ public class BufferConsumer implements Closeable {
 
 	private int currentReaderPosition;
 
+	private boolean flushRequested = false;
+
 	/**
 	 * Constructs {@link BufferConsumer} instance with the initial reader position.
 	 */
@@ -129,6 +131,17 @@ public class BufferConsumer implements Closeable {
 		}
 	}
 
+	public void setFlushRequested(boolean flushRequested) {
+		// only the non-event buffer needs to be flushed
+		if (buffer.isBuffer()) {
+			this.flushRequested = flushRequested;
+		}
+	}
+
+	public boolean isFlushRequested() {
+		return flushRequested;
+	}
+
 	public boolean isRecycled() {
 		return buffer.isRecycled();
 	}
@@ -137,7 +150,7 @@ public class BufferConsumer implements Closeable {
 		return writerPosition.getCached();
 	}
 
-	int getCurrentReaderPosition() {
+	public int getCurrentReaderPosition() {
 		return currentReaderPosition;
 	}
 

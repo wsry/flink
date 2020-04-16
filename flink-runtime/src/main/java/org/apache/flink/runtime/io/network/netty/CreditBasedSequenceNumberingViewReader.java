@@ -20,12 +20,13 @@ package org.apache.flink.runtime.io.network.netty;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.runtime.io.network.NetworkSequenceViewReader;
+import org.apache.flink.runtime.io.network.netty.ServerOutboundMessage.AddBacklogMessage;
+import org.apache.flink.runtime.io.network.netty.ServerOutboundMessage.BufferResponseMessage;
 import org.apache.flink.runtime.io.network.partition.BufferAvailabilityListener;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionProvider;
 import org.apache.flink.runtime.io.network.partition.ResultSubpartition.BufferAndBacklog;
 import org.apache.flink.runtime.io.network.partition.ResultSubpartitionView;
-import org.apache.flink.runtime.io.network.partition.consumer.InputChannel.BufferAndAvailability;
 import org.apache.flink.runtime.io.network.partition.consumer.InputChannelID;
 import org.apache.flink.runtime.io.network.partition.consumer.LocalInputChannel;
 
@@ -44,6 +45,8 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 	private final InputChannelID receiverId;
 
 	private final PartitionRequestQueue requestQueue;
+
+	private final boolean withoutExclusiveCredits;
 
 	private volatile ResultSubpartitionView subpartitionView;
 
@@ -69,6 +72,7 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 		this.receiverId = receiverId;
 		this.numCreditsAvailable = initialCredit;
 		this.requestQueue = requestQueue;
+		this.withoutExclusiveCredits = initialCredit == 0;
 	}
 
 	@Override
@@ -94,13 +98,22 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 	}
 
 	@Override
-	public void addCredit(int creditDeltas) {
+	public void addCredit(int creditDeltas) throws Exception {
 		numCreditsAvailable += creditDeltas;
+		requestQueue.enqueueAvailableReader(this, this::isAvailable);
 	}
 
 	@Override
-	public void resumeConsumption() {
+	public boolean shouldAnnounceBacklog(boolean hasUnfulfilledBacklog) {
+		return !hasUnfulfilledBacklog && withoutExclusiveCredits && numCreditsAvailable == 0;
+	}
+
+	@Override
+	public void resumeConsumption(int availableCredits, boolean hasUnfulfilledBacklog) throws Exception {
+		// reset the available credit
+		numCreditsAvailable = availableCredits;
 		subpartitionView.resumeConsumption();
+		requestQueue.enqueueAvailableReader(this, () -> (isAvailable() || shouldAnnounceBacklog(hasUnfulfilledBacklog)));
 	}
 
 	@Override
@@ -148,11 +161,6 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 		return receiverId;
 	}
 
-	@Override
-	public int getSequenceNumber() {
-		return sequenceNumber;
-	}
-
 	@VisibleForTesting
 	int getNumCreditsAvailable() {
 		return numCreditsAvailable;
@@ -163,8 +171,15 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 		return subpartitionView.isAvailable(Integer.MAX_VALUE);
 	}
 
-	@Override
-	public BufferAndAvailability getNextBuffer() throws IOException {
+	private AddBacklogMessage getAddBacklogMessage() {
+		int backlog = subpartitionView.getAndResetUnannouncedBacklog();
+		if (backlog > 0) {
+			return new AddBacklogMessage(receiverId, backlog);
+		}
+		return null;
+	}
+
+	private BufferResponseMessage getBufferResponseMessage() throws IOException {
 		BufferAndBacklog next = subpartitionView.getNextBuffer();
 		if (next != null) {
 			sequenceNumber++;
@@ -173,11 +188,27 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 				throw new IllegalStateException("no credit available");
 			}
 
-			return new BufferAndAvailability(
-				next.buffer(), isAvailable(next), next.buffersInBacklog());
+			return new BufferResponseMessage(
+				next.buffer(), receiverId, sequenceNumber, next.unannouncedBacklog(), isAvailable(next));
 		} else {
 			return null;
 		}
+	}
+
+	/**
+	 * BufferResponse is processed with higher priority than AddBacklog. It is no need to send addBacklog
+	 * message in below three scenarios:
+	 * 1. It has exclusive credits to guarantee that the backlog can be always carried via BufferResponse.
+	 * 2. It has available credits (no matter with exclusive or not) for now to guarantee backlog can be
+	 *    carried by BufferResponse.
+	 * 3. Next Buffer is an event which does not consume any credit.
+	 */
+	@Override
+	public ServerOutboundMessage getNextMessage() throws IOException {
+		if (!withoutExclusiveCredits || numCreditsAvailable > 0 || subpartitionView.isAvailable(0)) {
+			return getBufferResponseMessage();
+		}
+		return getAddBacklogMessage();
 	}
 
 	@Override
@@ -205,6 +236,7 @@ class CreditBasedSequenceNumberingViewReader implements BufferAvailabilityListen
 		return "CreditBasedSequenceNumberingViewReader{" +
 			"requestLock=" + requestLock +
 			", receiverId=" + receiverId +
+			", withoutExclusiveCredits=" + withoutExclusiveCredits +
 			", sequenceNumber=" + sequenceNumber +
 			", numCreditsAvailable=" + numCreditsAvailable +
 			", isRegisteredAsAvailable=" + isRegisteredAsAvailable +

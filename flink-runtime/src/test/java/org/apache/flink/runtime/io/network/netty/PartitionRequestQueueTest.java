@@ -56,6 +56,7 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 
 import static org.apache.flink.runtime.io.network.buffer.BufferBuilderTestUtils.createEventBufferConsumer;
 import static org.hamcrest.Matchers.contains;
@@ -205,8 +206,11 @@ public class PartitionRequestQueueTest {
 		/** Number of buffer in the backlog to report with every {@link #getNextBuffer()} call. */
 		private final AtomicInteger buffersInBacklog;
 
+		private final AtomicInteger unannouncedBacklog;
+
 		private DefaultBufferResultSubpartitionView(int buffersInBacklog) {
 			this.buffersInBacklog = new AtomicInteger(buffersInBacklog);
+			this.unannouncedBacklog = new AtomicInteger(buffersInBacklog);
 		}
 
 		@Nullable
@@ -216,7 +220,7 @@ public class PartitionRequestQueueTest {
 			return new BufferAndBacklog(
 				TestBufferFactory.createBuffer(10),
 				buffers > 0,
-				buffers,
+				getAndResetUnannouncedBacklog(),
 				false);
 		}
 
@@ -227,6 +231,11 @@ public class PartitionRequestQueueTest {
 			}
 
 			return false;
+		}
+
+		@Override
+		public int getAndResetUnannouncedBacklog() {
+			return unannouncedBacklog.getAndSet(0);
 		}
 	}
 
@@ -242,7 +251,7 @@ public class PartitionRequestQueueTest {
 			return new BufferAndBacklog(
 				nextBuffer.buffer().readOnlySlice(),
 				nextBuffer.isDataAvailable(),
-				nextBuffer.buffersInBacklog(),
+				nextBuffer.unannouncedBacklog(),
 				nextBuffer.isEventAvailable());
 		}
 	}
@@ -272,7 +281,7 @@ public class PartitionRequestQueueTest {
 	}
 
 	/**
-	 * Tests {@link PartitionRequestQueue#enqueueAvailableReader(NetworkSequenceViewReader)},
+	 * Tests {@link PartitionRequestQueue#enqueueAvailableReader(NetworkSequenceViewReader, BooleanSupplier)},
 	 * verifying the reader would be enqueued in the pipeline if the next sending buffer is an event
 	 * even though it has no available credits.
 	 */
@@ -321,7 +330,7 @@ public class PartitionRequestQueueTest {
 	}
 
 	/**
-	 * Tests {@link PartitionRequestQueue#enqueueAvailableReader(NetworkSequenceViewReader)},
+	 * Tests {@link PartitionRequestQueue#enqueueAvailableReader(NetworkSequenceViewReader, BooleanSupplier)},
 	 * verifying the reader would be enqueued in the pipeline iff it has both available credits and buffers.
 	 */
 	@Test
@@ -334,11 +343,13 @@ public class PartitionRequestQueueTest {
 
 		final InputChannelID receiverId = new InputChannelID();
 		final PartitionRequestQueue queue = new PartitionRequestQueue();
-		final CreditBasedSequenceNumberingViewReader reader = new CreditBasedSequenceNumberingViewReader(receiverId, 0, queue);
+		final CreditBasedSequenceNumberingViewReader reader = new CreditBasedSequenceNumberingViewReader(receiverId, 2, queue);
 		final EmbeddedChannel channel = new EmbeddedChannel(queue);
 
 		reader.requestSubpartitionView(partitionProvider, new ResultPartitionID(), 0);
 		queue.notifyReaderCreated(reader);
+		// consume all available credit
+		reader.addCredit(-2);
 
 		// block the channel so that we see an intermediate state in the test
 		ByteBuf channelBlockingBuffer = blockChannel(channel);
@@ -388,7 +399,7 @@ public class PartitionRequestQueueTest {
 	}
 
 	/**
-	 * Tests {@link PartitionRequestQueue#enqueueAvailableReader(NetworkSequenceViewReader)},
+	 * Tests {@link PartitionRequestQueue#enqueueAvailableReader(NetworkSequenceViewReader, BooleanSupplier)},
 	 * verifying the reader would be enqueued in the pipeline after resuming data consumption if there
 	 * are credit and data available.
 	 */
@@ -413,14 +424,13 @@ public class PartitionRequestQueueTest {
 		queue.notifyReaderCreated(reader);
 		// we have adequate credits
 		reader.addCredit(Integer.MAX_VALUE);
-		assertTrue(reader.isAvailable());
 
 		reader.notifyDataAvailable();
 		channel.runPendingTasks();
 		assertFalse(reader.isAvailable());
 		assertEquals(1, subpartition.unsynchronizedGetNumberOfQueuedBuffers());
 
-		queue.addCreditOrResumeConsumption(receiverId, NetworkSequenceViewReader::resumeConsumption);
+		queue.addCreditOrResumeConsumption(receiverId, viewReader -> viewReader.resumeConsumption(2, false));
 		assertFalse(reader.isAvailable());
 		assertEquals(0, subpartition.unsynchronizedGetNumberOfQueuedBuffers());
 
