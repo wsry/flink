@@ -314,7 +314,6 @@ public class RemoteInputChannel extends InputChannel {
 		return partitionRequestClient;
 	}
 
-
 	/**
 	 * The unannounced credit is increased by the given amount and might notify
 	 * increased credit to the producer.
