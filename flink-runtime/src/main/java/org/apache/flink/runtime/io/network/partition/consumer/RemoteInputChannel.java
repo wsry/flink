@@ -374,7 +374,7 @@ public class RemoteInputChannel extends InputChannel {
 	}
 
 	public int unsynchronizedGetExclusiveBuffersUsed() {
-		return Math.max(0, initialCredit - bufferManager.unsynchronizedGetExclusiveBuffersUsed());
+		return Math.max(0, initialCredit - bufferManager.unsynchronizedGetAvailableExclusiveBuffers());
 	}
 
 	public int unsynchronizedGetFloatingBuffersAvailable() {
