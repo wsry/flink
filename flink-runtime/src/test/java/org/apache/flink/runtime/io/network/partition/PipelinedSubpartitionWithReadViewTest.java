@@ -424,8 +424,8 @@ public class PipelinedSubpartitionWithReadViewTest {
 		// no data available notification after adding a buffer and flushing the subpartition
 		checkNumNotificationsAndAvailability(2);
 
-		resumeConsumptionAndCheckAvailability(Integer.MAX_VALUE, false);
-		assertNextBuffer(readView, BUFFER_SIZE, false, 0, false, true);
+		resumeConsumptionAndCheckAvailability(Integer.MAX_VALUE, true);
+		assertNextBuffer(readView, BUFFER_SIZE, false, 1, false, true);
 
 		blockSubpartitionByCheckpoint(3);
 

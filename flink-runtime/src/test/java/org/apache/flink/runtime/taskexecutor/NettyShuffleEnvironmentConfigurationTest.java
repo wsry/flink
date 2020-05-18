@@ -67,7 +67,8 @@ public class NettyShuffleEnvironmentConfigurationTest extends TestLogger {
 		final Configuration config = new Configuration();
 		config.setInteger(NettyShuffleEnvironmentOptions.NETWORK_REQUEST_BACKOFF_INITIAL, 100);
 		config.setInteger(NettyShuffleEnvironmentOptions.NETWORK_REQUEST_BACKOFF_MAX, 200);
-		config.setInteger(NettyShuffleEnvironmentOptions.NETWORK_BUFFERS_PER_SUBPARTITION, 10);
+		config.setInteger(NettyShuffleEnvironmentOptions.NETWORK_BUFFERS_PER_SUBPARTITION, 20);
+		config.setInteger(NettyShuffleEnvironmentOptions.NETWORK_BUFFERS_PER_CHANNEL, 10);
 		config.setInteger(NettyShuffleEnvironmentOptions.NETWORK_EXTRA_BUFFERS_PER_GATE, 100);
 
 		final  NettyShuffleEnvironmentConfiguration networkConfig =  NettyShuffleEnvironmentConfiguration.fromConfiguration(
@@ -78,6 +79,7 @@ public class NettyShuffleEnvironmentConfigurationTest extends TestLogger {
 
 		assertEquals(networkConfig.partitionRequestInitialBackoff(), 100);
 		assertEquals(networkConfig.partitionRequestMaxBackoff(), 200);
+		assertEquals(networkConfig.networkBuffersPerSubpartition(), 20);
 		assertEquals(networkConfig.networkBuffersPerChannel(), 10);
 		assertEquals(networkConfig.floatingNetworkBuffersPerGate(), 100);
 	}
