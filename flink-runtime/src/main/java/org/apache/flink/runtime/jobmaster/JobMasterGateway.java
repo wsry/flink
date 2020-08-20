@@ -29,7 +29,7 @@ import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
 import org.apache.flink.runtime.executiongraph.ExecutionVertex;
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
+import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
@@ -110,7 +110,7 @@ public interface JobMasterGateway extends
 	 * Notifies the JobManager about available data for a produced partition.
 	 *
 	 * <p>There is a call to this method for each {@link ExecutionVertex} instance once per produced
-	 * {@link ResultPartition} instance, either when first producing data (for pipelined executions)
+	 * {@link AbstractResultPartition} instance, either when first producing data (for pipelined executions)
 	 * or when all data has been produced (for staged executions).
 	 *
 	 * <p>The JobManager then can decide when to schedule the partition consumers of the given session.

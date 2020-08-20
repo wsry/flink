@@ -31,7 +31,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 /**
  * ResultPartition that releases itself once all subpartitions have been consumed.
  */
-public class ReleaseOnConsumptionResultPartition extends ResultPartition {
+public class ReleaseOnConsumptionResultPartition extends AbstractResultPartition {
 
 	private static final Object lock = new Object();
 

@@ -71,7 +71,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 /**
- * Tests for {@link ResultPartition}.
+ * Tests for {@link AbstractResultPartition}.
  */
 public class ResultPartitionTest {
 
@@ -95,7 +95,7 @@ public class ResultPartitionTest {
 		final int numSubpartitions = 3;
 
 		for (int i = 0; i < numPartitions; i++) {
-			final ResultPartition partition = new ResultPartitionBuilder()
+			final AbstractResultPartition partition = new ResultPartitionBuilder()
 				.setResultPartitionIndex(i)
 				.setNumberOfSubpartitions(numSubpartitions)
 				.build();
@@ -158,7 +158,7 @@ public class ResultPartitionTest {
 	public void testBlockingPartitionIsConsumableMultipleTimesIfNotReleasedOnConsumption() throws IOException {
 		ResultPartitionManager manager = new ResultPartitionManager();
 
-		final ResultPartition partition = new ResultPartitionBuilder()
+		final AbstractResultPartition partition = new ResultPartitionBuilder()
 			.isReleasedOnConsumption(false)
 			.setResultPartitionManager(manager)
 			.setResultPartitionType(ResultPartitionType.BLOCKING)
@@ -182,7 +182,7 @@ public class ResultPartitionTest {
 	}
 
 	/**
-	 * Tests {@link ResultPartition#addBufferConsumer} on a partition which has already finished.
+	 * Tests {@link AbstractResultPartition#addBufferConsumer} on a partition which has already finished.
 	 *
 	 * @param partitionType the result partition type to set up
 	 */
@@ -228,7 +228,7 @@ public class ResultPartitionTest {
 	}
 
 	/**
-	 * Tests {@link ResultPartition#addBufferConsumer} on a partition which has already been released.
+	 * Tests {@link AbstractResultPartition#addBufferConsumer} on a partition which has already been released.
 	 *
 	 * @param partitionType the result partition type to set up
 	 */
@@ -237,7 +237,7 @@ public class ResultPartitionTest {
 		ResultPartitionConsumableNotifier notifier = mock(ResultPartitionConsumableNotifier.class);
 		JobID jobId = new JobID();
 		TaskActions taskActions = new NoOpTaskActions();
-		ResultPartition partition = partitionType == ResultPartitionType.BLOCKING ?
+		AbstractResultPartition partition = partitionType == ResultPartitionType.BLOCKING ?
 			createPartition(partitionType, fileChannelManager) : createPartition(partitionType);
 		ResultPartitionWriter consumableNotifyingPartitionWriter = ConsumableNotifyingResultPartitionWriterDecorator.decorate(
 			Collections.singleton(PartitionTestUtils.createPartitionDeploymentDescriptor(partitionType)),
@@ -273,12 +273,12 @@ public class ResultPartitionTest {
 	/**
 	 * Tests {@link ResultPartitionManager#createSubpartitionView(ResultPartitionID, int, BufferAvailabilityListener)}
 	 * would throw a {@link PartitionNotFoundException} if the registered partition was released from manager
-	 * via {@link ResultPartition#fail(Throwable)} before.
+	 * via {@link AbstractResultPartition#fail(Throwable)} before.
 	 */
 	@Test
 	public void testCreateSubpartitionOnFailingPartition() throws Exception {
 		final ResultPartitionManager manager = new ResultPartitionManager();
-		final ResultPartition partition = new ResultPartitionBuilder()
+		final AbstractResultPartition partition = new ResultPartitionBuilder()
 			.setResultPartitionManager(manager)
 			.build();
 
@@ -290,7 +290,7 @@ public class ResultPartitionTest {
 	}
 
 	/**
-	 * Tests {@link ResultPartition#addBufferConsumer(BufferConsumer, int)} on a working partition.
+	 * Tests {@link AbstractResultPartition#addBufferConsumer(BufferConsumer, int)} on a working partition.
 	 *
 	 * @param partitionType the result partition type to set up
 	 */
@@ -326,7 +326,7 @@ public class ResultPartitionTest {
 	}
 
 	/**
-	 * Tests {@link ResultPartition#releaseMemory(int)} on a working partition.
+	 * Tests {@link AbstractResultPartition#releaseMemory(int)} on a working partition.
 	 *
 	 * @param resultPartitionType the result partition type to set up
 	 */
@@ -334,7 +334,7 @@ public class ResultPartitionTest {
 		final int numAllBuffers = 10;
 		final NettyShuffleEnvironment network = new NettyShuffleEnvironmentBuilder()
 			.setNumNetworkBuffers(numAllBuffers).build();
-		final ResultPartition resultPartition = createPartition(network, resultPartitionType, 1);
+		final AbstractResultPartition resultPartition = createPartition(network, resultPartitionType, 1);
 		try {
 			resultPartition.setup();
 
@@ -364,14 +364,14 @@ public class ResultPartitionTest {
 	}
 
 	/**
-	 * Tests {@link ResultPartition#getAvailableFuture()}.
+	 * Tests {@link AbstractResultPartition#getAvailableFuture()}.
 	 */
 	@Test
 	public void testIsAvailableOrNot() throws IOException, InterruptedException {
 		final int numAllBuffers = 10;
 		final NettyShuffleEnvironment network = new NettyShuffleEnvironmentBuilder()
 				.setNumNetworkBuffers(numAllBuffers).build();
-		final ResultPartition resultPartition = createPartition(network, ResultPartitionType.PIPELINED, 1);
+		final AbstractResultPartition resultPartition = createPartition(network, ResultPartitionType.PIPELINED, 1);
 
 		try {
 			resultPartition.setup();
@@ -404,7 +404,7 @@ public class ResultPartitionTest {
 		final int networkBuffersPerChannel = 2;
 		final int floatingNetworkBuffersPerGate = 8;
 		final NetworkBufferPool globalPool = new NetworkBufferPool(20, 1);
-		final ResultPartition partition = new ResultPartitionBuilder()
+		final AbstractResultPartition partition = new ResultPartitionBuilder()
 			.setResultPartitionType(type)
 			.setFileChannelManager(fileChannelManager)
 			.setNetworkBuffersPerChannel(networkBuffersPerChannel)
@@ -436,7 +436,7 @@ public class ResultPartitionTest {
 			TaskActions taskActions,
 			JobID jobId,
 			ResultPartitionConsumableNotifier notifier) {
-		ResultPartition partition = partitionType == ResultPartitionType.BLOCKING ?
+		AbstractResultPartition partition = partitionType == ResultPartitionType.BLOCKING ?
 			createPartition(partitionType, fileChannelManager) : createPartition(partitionType);
 		return ConsumableNotifyingResultPartitionWriterDecorator.decorate(
 			Collections.singleton(PartitionTestUtils.createPartitionDeploymentDescriptor(partitionType)),
@@ -450,7 +450,7 @@ public class ResultPartitionTest {
 	public void testInitializeEmptyState() throws Exception {
 		final int totalBuffers = 2;
 		final NetworkBufferPool globalPool = new NetworkBufferPool(totalBuffers, 1);
-		final ResultPartition partition = new ResultPartitionBuilder()
+		final AbstractResultPartition partition = new ResultPartitionBuilder()
 			.setNetworkBufferPool(globalPool)
 			.build();
 		final ChannelStateReader stateReader = ChannelStateReader.NO_OP;
@@ -482,7 +482,7 @@ public class ResultPartitionTest {
 
 		final NetworkBufferPool globalPool = new NetworkBufferPool(totalBuffers, bufferSize);
 		final ChannelStateReader stateReader = new FiniteChannelStateReader(totalStates, states);
-		final ResultPartition partition = new ResultPartitionBuilder()
+		final AbstractResultPartition partition = new ResultPartitionBuilder()
 			.setNetworkBufferPool(globalPool)
 			.build();
 		final ExecutorService executor = Executors.newFixedThreadPool(1);
@@ -541,7 +541,7 @@ public class ResultPartitionTest {
 	public void testReadRecoveredStateWithException() throws Exception {
 		final int totalBuffers = 2;
 		final NetworkBufferPool globalPool = new NetworkBufferPool(totalBuffers, 1);
-		final ResultPartition partition = new ResultPartitionBuilder()
+		final AbstractResultPartition partition = new ResultPartitionBuilder()
 			.setNetworkBufferPool(globalPool)
 			.build();
 		final ChannelStateReader stateReader = new ChannelStateReaderWithException();

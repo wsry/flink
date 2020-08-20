@@ -30,7 +30,7 @@ import java.io.IOException;
 import java.util.Optional;
 
 /**
- * Utility class to encapsulate the logic of building a {@link ResultPartition} instance.
+ * Utility class to encapsulate the logic of building a {@link AbstractResultPartition} instance.
  */
 public class ResultPartitionBuilder {
 
@@ -158,7 +158,7 @@ public class ResultPartitionBuilder {
 		return this;
 	}
 
-	public ResultPartition build() {
+	public AbstractResultPartition build() {
 		ResultPartitionFactory resultPartitionFactory = new ResultPartitionFactory(
 			partitionManager,
 			channelManager,

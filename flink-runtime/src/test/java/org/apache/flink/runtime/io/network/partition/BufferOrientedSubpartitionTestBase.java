@@ -33,17 +33,17 @@ import static org.junit.Assert.fail;
 /**
  * Basic subpartition behaviour tests.
  */
-public abstract class SubpartitionTestBase extends TestLogger {
+public abstract class BufferOrientedSubpartitionTestBase extends TestLogger {
 
 	/**
 	 * Return the subpartition to be tested.
 	 */
-	abstract ResultSubpartition createSubpartition() throws Exception;
+	abstract BufferOrientedSubpartition createSubpartition() throws Exception;
 
 	/**
 	 * Return the subpartition to be used for tests where write calls should fail.
 	 */
-	abstract ResultSubpartition createFailingWritesSubpartition() throws Exception;
+	abstract BufferOrientedSubpartition createFailingWritesSubpartition() throws Exception;
 
 	// ------------------------------------------------------------------------
 
@@ -63,7 +63,7 @@ public abstract class SubpartitionTestBase extends TestLogger {
 
 	@Test
 	public void testAddAfterFinish() throws Exception {
-		final ResultSubpartition subpartition = createSubpartition();
+		final BufferOrientedSubpartition subpartition = createSubpartition();
 
 		try {
 			subpartition.finish();
@@ -86,7 +86,7 @@ public abstract class SubpartitionTestBase extends TestLogger {
 
 	@Test
 	public void testAddAfterRelease() throws Exception {
-		final ResultSubpartition subpartition = createSubpartition();
+		final BufferOrientedSubpartition subpartition = createSubpartition();
 
 		try {
 			subpartition.release();
@@ -105,7 +105,7 @@ public abstract class SubpartitionTestBase extends TestLogger {
 
 	@Test
 	public void testReleasingReaderDoesNotReleasePartition() throws Exception {
-		final ResultSubpartition partition = createSubpartition();
+		final BufferOrientedSubpartition partition = createSubpartition();
 		partition.add(createFilledFinishedBufferConsumer(BufferBuilderTestUtils.BUFFER_SIZE));
 		partition.finish();
 
@@ -124,7 +124,7 @@ public abstract class SubpartitionTestBase extends TestLogger {
 
 	@Test
 	public void testReleaseIsIdempotent() throws Exception {
-		final ResultSubpartition partition = createSubpartition();
+		final BufferOrientedSubpartition partition = createSubpartition();
 		partition.add(createFilledFinishedBufferConsumer(BufferBuilderTestUtils.BUFFER_SIZE));
 		partition.finish();
 
@@ -135,7 +135,7 @@ public abstract class SubpartitionTestBase extends TestLogger {
 
 	@Test
 	public void testReadAfterDispose() throws Exception {
-		final ResultSubpartition partition = createSubpartition();
+		final BufferOrientedSubpartition partition = createSubpartition();
 		partition.add(createFilledFinishedBufferConsumer(BufferBuilderTestUtils.BUFFER_SIZE));
 		partition.finish();
 
@@ -152,7 +152,7 @@ public abstract class SubpartitionTestBase extends TestLogger {
 
 	@Test
 	public void testRecycleBufferAndConsumerOnFailure() throws Exception {
-		final ResultSubpartition subpartition = createFailingWritesSubpartition();
+		final BufferOrientedSubpartition subpartition = createFailingWritesSubpartition();
 		try {
 			final BufferConsumer consumer = BufferBuilderTestUtils.createFilledFinishedBufferConsumer(100);
 

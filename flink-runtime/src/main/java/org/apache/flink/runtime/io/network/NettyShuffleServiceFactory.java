@@ -27,7 +27,7 @@ import org.apache.flink.runtime.io.disk.FileChannelManagerImpl;
 import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
 import org.apache.flink.runtime.io.network.netty.NettyConfig;
 import org.apache.flink.runtime.io.network.netty.NettyConnectionManager;
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
+import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionFactory;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionManager;
 import org.apache.flink.runtime.io.network.partition.consumer.SingleInputGate;
@@ -46,7 +46,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /**
  * Netty based shuffle service implementation.
  */
-public class NettyShuffleServiceFactory implements ShuffleServiceFactory<NettyShuffleDescriptor, ResultPartition, SingleInputGate> {
+public class NettyShuffleServiceFactory implements ShuffleServiceFactory<NettyShuffleDescriptor, AbstractResultPartition, SingleInputGate> {
 
 	private static final String DIR_NAME_PREFIX = "netty-shuffle";
 

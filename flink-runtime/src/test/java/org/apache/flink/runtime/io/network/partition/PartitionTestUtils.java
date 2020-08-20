@@ -43,22 +43,22 @@ import static org.junit.Assert.fail;
 public enum PartitionTestUtils {
 	;
 
-	public static ResultPartition createPartition() {
+	public static AbstractResultPartition createPartition() {
 		return createPartition(ResultPartitionType.PIPELINED_BOUNDED);
 	}
 
-	public static ResultPartition createPartition(ResultPartitionType type) {
+	public static AbstractResultPartition createPartition(ResultPartitionType type) {
 		return new ResultPartitionBuilder().setResultPartitionType(type).build();
 	}
 
-	public static ResultPartition createPartition(ResultPartitionType type, FileChannelManager channelManager) {
+	public static AbstractResultPartition createPartition(ResultPartitionType type, FileChannelManager channelManager) {
 		return new ResultPartitionBuilder()
 			.setResultPartitionType(type)
 			.setFileChannelManager(channelManager)
 			.build();
 	}
 
-	public static ResultPartition createPartition(
+	public static AbstractResultPartition createPartition(
 			ResultPartitionType type,
 			FileChannelManager channelManager,
 			boolean compressionEnabled,
@@ -71,7 +71,7 @@ public enum PartitionTestUtils {
 			.build();
 	}
 
-	public static ResultPartition createPartition(
+	public static AbstractResultPartition createPartition(
 			NettyShuffleEnvironment environment,
 			ResultPartitionType partitionType,
 			int numChannels) {
@@ -83,7 +83,7 @@ public enum PartitionTestUtils {
 			.build();
 	}
 
-	public static ResultPartition createPartition(
+	public static AbstractResultPartition createPartition(
 			NettyShuffleEnvironment environment,
 			FileChannelManager channelManager,
 			ResultPartitionType partitionType,

@@ -23,7 +23,7 @@ import org.apache.flink.core.testutils.BlockerSync;
 import org.apache.flink.runtime.io.disk.FileChannelManager;
 import org.apache.flink.runtime.io.disk.FileChannelManagerImpl;
 import org.apache.flink.runtime.io.network.api.writer.ResultPartitionWriter;
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
+import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionManager;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
@@ -142,12 +142,12 @@ public class NettyShuffleEnvironmentTest extends TestLogger {
 		int expectedRp4Buffers = rp4Channels * exclusiveBuffers + floatingBuffers;
 
 		// result partitions
-		ResultPartition rp1 = createPartition(network, ResultPartitionType.PIPELINED, channels);
-		ResultPartition rp2 = createPartition(network, fileChannelManager, ResultPartitionType.BLOCKING, channels);
-		ResultPartition rp3 = createPartition(network, ResultPartitionType.PIPELINED_BOUNDED, channels);
-		ResultPartition rp4 = createPartition(network, ResultPartitionType.PIPELINED_BOUNDED, rp4Channels);
+		AbstractResultPartition rp1 = createPartition(network, ResultPartitionType.PIPELINED, channels);
+		AbstractResultPartition rp2 = createPartition(network, fileChannelManager, ResultPartitionType.BLOCKING, channels);
+		AbstractResultPartition rp3 = createPartition(network, ResultPartitionType.PIPELINED_BOUNDED, channels);
+		AbstractResultPartition rp4 = createPartition(network, ResultPartitionType.PIPELINED_BOUNDED, rp4Channels);
 
-		final ResultPartition[] resultPartitions = new ResultPartition[] {rp1, rp2, rp3, rp4};
+		final AbstractResultPartition[] resultPartitions = new AbstractResultPartition[] {rp1, rp2, rp3, rp4};
 
 		// input gates
 		SingleInputGate ig1 = createSingleInputGate(network, ResultPartitionType.PIPELINED, channels);
@@ -186,7 +186,7 @@ public class NettyShuffleEnvironmentTest extends TestLogger {
 		assertEquals(expectedBuffers, rp3.getBufferPool().getMaxNumberOfMemorySegments());
 		assertEquals(expectedRp4Buffers, rp4.getBufferPool().getMaxNumberOfMemorySegments());
 
-		for (ResultPartition rp : resultPartitions) {
+		for (AbstractResultPartition rp : resultPartitions) {
 			assertEquals(rp.getNumberOfSubpartitions() + 1, rp.getBufferPool().getNumberOfRequiredMemorySegments());
 			assertEquals(rp.getNumberOfSubpartitions() + 1, rp.getBufferPool().getNumBuffers());
 		}
@@ -208,7 +208,7 @@ public class NettyShuffleEnvironmentTest extends TestLogger {
 		verify(ig3, times(1)).assignExclusiveSegments();
 		verify(ig4, times(1)).assignExclusiveSegments();
 
-		for (ResultPartition rp : resultPartitions) {
+		for (AbstractResultPartition rp : resultPartitions) {
 			rp.release();
 		}
 		for (SingleInputGate ig : inputGates) {
@@ -243,7 +243,7 @@ public class NettyShuffleEnvironmentTest extends TestLogger {
 	private static RemoteInputChannel createRemoteInputChannel(
 			SingleInputGate inputGate,
 			int channelIndex,
-			ResultPartition resultPartition,
+			AbstractResultPartition resultPartition,
 			ConnectionManager connManager) {
 		return InputChannelBuilder.newBuilder()
 			.setChannelIndex(channelIndex)

@@ -38,7 +38,7 @@ import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
 import org.apache.flink.runtime.io.network.partition.BufferAvailabilityListener;
 import org.apache.flink.runtime.io.network.partition.PartitionNotFoundException;
 import org.apache.flink.runtime.io.network.partition.PartitionTestUtils;
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
+import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionBuilder;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionManager;
@@ -134,7 +134,7 @@ public class LocalInputChannelTest {
 		for (int i = 0; i < parallelism; i++) {
 			partitionIds[i] = new ResultPartitionID();
 
-			final ResultPartition partition = new ResultPartitionBuilder()
+			final AbstractResultPartition partition = new ResultPartitionBuilder()
 				.setResultPartitionId(partitionIds[i])
 				.setNumberOfSubpartitions(parallelism)
 				.setNumTargetKeyGroups(parallelism)
@@ -488,7 +488,7 @@ public class LocalInputChannelTest {
 			public void notifyBarrierReceived(CheckpointBarrier barrier, InputChannelInfo channelInfo) {}
 		});
 
-		ResultPartition parent = PartitionTestUtils.createPartition(
+		AbstractResultPartition parent = PartitionTestUtils.createPartition(
 			ResultPartitionType.PIPELINED,
 			NoOpFileChannelManager.INSTANCE);
 		ResultSubpartition subpartition = parent.getAllPartitions()[0];
@@ -514,7 +514,7 @@ public class LocalInputChannelTest {
 
 	private static ResultSubpartitionView createResultSubpartitionView(boolean addBuffer) throws IOException {
 		int bufferSize = 4096;
-		ResultPartition parent = PartitionTestUtils.createPartition(
+		AbstractResultPartition parent = PartitionTestUtils.createPartition(
 			ResultPartitionType.PIPELINED,
 			NoOpFileChannelManager.INSTANCE,
 			true,

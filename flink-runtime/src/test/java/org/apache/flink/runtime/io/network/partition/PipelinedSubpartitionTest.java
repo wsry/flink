@@ -63,7 +63,7 @@ import static org.mockito.Mockito.when;
  *
  * @see PipelinedSubpartitionWithReadViewTest
  */
-public class PipelinedSubpartitionTest extends SubpartitionTestBase {
+public class PipelinedSubpartitionTest extends BufferOrientedSubpartitionTestBase {
 
 	/** Executor service for concurrent produce/consume tests. */
 	private static final ExecutorService executorService = Executors.newCachedThreadPool();
@@ -79,7 +79,7 @@ public class PipelinedSubpartitionTest extends SubpartitionTestBase {
 	}
 
 	@Override
-	ResultSubpartition createFailingWritesSubpartition() throws Exception {
+	PipelinedSubpartition createFailingWritesSubpartition() throws Exception {
 		// the tests relating to this are currently not supported by the PipelinedSubpartition
 		Assume.assumeTrue(false);
 		return null;
@@ -326,7 +326,7 @@ public class PipelinedSubpartitionTest extends SubpartitionTestBase {
 	}
 
 	public static PipelinedSubpartition createPipelinedSubpartition() {
-		final ResultPartition parent = PartitionTestUtils.createPartition();
+		final AbstractResultPartition parent = PartitionTestUtils.createPartition();
 
 		return new PipelinedSubpartition(0, parent);
 	}

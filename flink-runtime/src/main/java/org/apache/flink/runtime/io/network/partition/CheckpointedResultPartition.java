@@ -16,30 +16,22 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.io.network.metrics;
+package org.apache.flink.runtime.io.network.partition;
 
-import org.apache.flink.metrics.Gauge;
-import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
+import org.apache.flink.runtime.checkpoint.channel.ChannelStateReader;
+
+import java.io.IOException;
 
 /**
- * Gauge metric measuring the number of queued output buffers for {@link AbstractResultPartition}s.
+ * Interface for partitions that are checkpointed, meaning they store data as part of unaligned checkpoints.
  */
-public class OutputBuffersGauge implements Gauge<Integer> {
+public interface CheckpointedResultPartition {
 
-	private final AbstractResultPartition[] resultPartitions;
+	CheckpointedResultSubpartition getSubpartition(int subpartitionIndex);
 
-	public OutputBuffersGauge(AbstractResultPartition[] resultPartitions) {
-		this.resultPartitions = resultPartitions;
-	}
-
-	@Override
-	public Integer getValue() {
-		int totalBuffers = 0;
-
-		for (AbstractResultPartition producedPartition : resultPartitions) {
-			totalBuffers += producedPartition.getNumberOfQueuedBuffers();
-		}
-
-		return totalBuffers;
-	}
+	/**
+	 * Reads the previous output states with the given reader for unaligned checkpoint.
+	 * It should be done before task processing the inputs.
+	 */
+	void readRecoveredState(ChannelStateReader stateReader) throws IOException, InterruptedException;
 }

@@ -16,30 +16,19 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.io.network.metrics;
+package org.apache.flink.runtime.io.network.partition;
 
-import org.apache.flink.metrics.Gauge;
-import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
+import org.apache.flink.runtime.checkpoint.channel.ResultSubpartitionInfo;
+import org.apache.flink.runtime.io.network.buffer.Buffer;
+
+import java.util.List;
 
 /**
- * Gauge metric measuring the number of queued output buffers for {@link AbstractResultPartition}s.
+ * Interface for subpartitions that are checkpointed, meaning they store data as part of unaligned checkpoints.
  */
-public class OutputBuffersGauge implements Gauge<Integer> {
+public interface CheckpointedResultSubpartition {
 
-	private final AbstractResultPartition[] resultPartitions;
+	ResultSubpartitionInfo getSubpartitionInfo();
 
-	public OutputBuffersGauge(AbstractResultPartition[] resultPartitions) {
-		this.resultPartitions = resultPartitions;
-	}
-
-	@Override
-	public Integer getValue() {
-		int totalBuffers = 0;
-
-		for (AbstractResultPartition producedPartition : resultPartitions) {
-			totalBuffers += producedPartition.getNumberOfQueuedBuffers();
-		}
-
-		return totalBuffers;
-	}
+	List<Buffer> requestInflightBufferSnapshot();
 }

@@ -32,7 +32,7 @@ public class ReleaseOnConsumptionResultPartitionTest extends TestLogger {
 	@Test
 	public void testConsumptionBasedPartitionRelease() {
 		final ResultPartitionManager manager = new ResultPartitionManager();
-		final ResultPartition partition = new ResultPartitionBuilder()
+		final AbstractResultPartition partition = new ResultPartitionBuilder()
 			.setNumberOfSubpartitions(2)
 			.isReleasedOnConsumption(true)
 			.setResultPartitionManager(manager)
@@ -50,7 +50,7 @@ public class ReleaseOnConsumptionResultPartitionTest extends TestLogger {
 	@Test
 	public void testMultipleReleaseCallsAreIdempotent() {
 		final ResultPartitionManager manager = new ResultPartitionManager();
-		final ResultPartition partition = new ResultPartitionBuilder()
+		final AbstractResultPartition partition = new ResultPartitionBuilder()
 			.setNumberOfSubpartitions(2)
 			.isReleasedOnConsumption(true)
 			.setResultPartitionManager(manager)
@@ -66,7 +66,7 @@ public class ReleaseOnConsumptionResultPartitionTest extends TestLogger {
 	@Test
 	public void testReleaseAfterIdempotentCalls() {
 		final ResultPartitionManager manager = new ResultPartitionManager();
-		final ResultPartition partition = new ResultPartitionBuilder()
+		final AbstractResultPartition partition = new ResultPartitionBuilder()
 			.setNumberOfSubpartitions(2)
 			.isReleasedOnConsumption(true)
 			.setResultPartitionManager(manager)

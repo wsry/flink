@@ -28,7 +28,7 @@ import org.apache.flink.runtime.io.network.metrics.CreditBasedInputBuffersUsageG
 import org.apache.flink.runtime.io.network.metrics.ExclusiveBuffersUsageGauge;
 import org.apache.flink.runtime.io.network.metrics.FloatingBuffersUsageGauge;
 import org.apache.flink.runtime.io.network.partition.PartitionTestUtils;
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
+import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
 import org.apache.flink.util.TestLogger;
 
@@ -270,7 +270,7 @@ public class InputBuffersMetricsTest extends TestLogger {
 
 		int channelIdx = 0;
 		for (int i = 0; i < numberOfRemoteChannels; i++) {
-			ResultPartition partition = PartitionTestUtils.createPartition(network, ResultPartitionType.PIPELINED_BOUNDED, 1);
+			AbstractResultPartition partition = PartitionTestUtils.createPartition(network, ResultPartitionType.PIPELINED_BOUNDED, 1);
 			closeableRegistry.registerCloseable(partition::close);
 			partition.setup();
 
@@ -281,7 +281,7 @@ public class InputBuffersMetricsTest extends TestLogger {
 		}
 
 		for (int i = 0; i < numberOfLocalChannels; i++) {
-			ResultPartition partition = PartitionTestUtils.createPartition(network, ResultPartitionType.PIPELINED_BOUNDED, 1);
+			AbstractResultPartition partition = PartitionTestUtils.createPartition(network, ResultPartitionType.PIPELINED_BOUNDED, 1);
 			closeableRegistry.registerCloseable(partition::close);
 			partition.setup();
 
@@ -295,7 +295,7 @@ public class InputBuffersMetricsTest extends TestLogger {
 		int channelIndex,
 		SingleInputGate inputGate,
 		NettyShuffleEnvironment network,
-		ResultPartition partition) {
+		AbstractResultPartition partition) {
 		return new InputChannelBuilder()
 			.setPartitionId(partition.getPartitionId())
 			.setChannelIndex(channelIndex)
@@ -308,7 +308,7 @@ public class InputBuffersMetricsTest extends TestLogger {
 		int channelIndex,
 		SingleInputGate inputGate,
 		NettyShuffleEnvironment network,
-		ResultPartition partition) {
+		AbstractResultPartition partition) {
 		return new InputChannelBuilder()
 			.setPartitionId(partition.getPartitionId())
 			.setChannelIndex(channelIndex)

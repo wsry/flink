@@ -20,7 +20,7 @@ package org.apache.flink.runtime.io.network.metrics;
 
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
+import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
 import org.apache.flink.runtime.io.network.partition.ResultSubpartition;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -30,11 +30,11 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 public class ResultPartitionMetrics {
 
-	private final ResultPartition partition;
+	private final AbstractResultPartition partition;
 
 	// ------------------------------------------------------------------------
 
-	private ResultPartitionMetrics(ResultPartition partition) {
+	private ResultPartitionMetrics(AbstractResultPartition partition) {
 		this.partition = checkNotNull(partition);
 	}
 
@@ -160,7 +160,7 @@ public class ResultPartitionMetrics {
 	//  Static access
 	// ------------------------------------------------------------------------
 
-	public static void registerQueueLengthMetrics(MetricGroup parent, ResultPartition[] partitions) {
+	public static void registerQueueLengthMetrics(MetricGroup parent, AbstractResultPartition[] partitions) {
 		for (int i = 0; i < partitions.length; i++) {
 			ResultPartitionMetrics metrics = new ResultPartitionMetrics(partitions[i]);
 

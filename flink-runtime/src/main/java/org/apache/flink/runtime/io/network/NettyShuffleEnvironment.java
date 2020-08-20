@@ -31,7 +31,7 @@ import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
 import org.apache.flink.runtime.io.network.metrics.InputChannelMetrics;
 import org.apache.flink.runtime.io.network.metrics.NettyShuffleMetricFactory;
 import org.apache.flink.runtime.io.network.partition.PartitionProducerStateProvider;
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
+import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionFactory;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionManager;
@@ -72,7 +72,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * The network environment contains the data structures that keep track of all intermediate results
  * and shuffle data exchanges.
  */
-public class NettyShuffleEnvironment implements ShuffleEnvironment<ResultPartition, SingleInputGate> {
+public class NettyShuffleEnvironment implements ShuffleEnvironment<AbstractResultPartition, SingleInputGate> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(NettyShuffleEnvironment.class);
 
@@ -191,13 +191,13 @@ public class NettyShuffleEnvironment implements ShuffleEnvironment<ResultPartiti
 	}
 
 	@Override
-	public List<ResultPartition> createResultPartitionWriters(
+	public List<AbstractResultPartition> createResultPartitionWriters(
 			ShuffleIOOwnerContext ownerContext,
 			List<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors) {
 		synchronized (lock) {
 			Preconditions.checkState(!isClosed, "The NettyShuffleEnvironment has already been shut down.");
 
-			ResultPartition[] resultPartitions = new ResultPartition[resultPartitionDeploymentDescriptors.size()];
+			AbstractResultPartition[] resultPartitions = new AbstractResultPartition[resultPartitionDeploymentDescriptors.size()];
 			for (int partitionIndex = 0; partitionIndex < resultPartitions.length; partitionIndex++) {
 				resultPartitions[partitionIndex] = resultPartitionFactory.create(
 					ownerContext.getOwnerName(),

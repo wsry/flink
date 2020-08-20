@@ -66,16 +66,6 @@ public class ConsumableNotifyingResultPartitionWriterDecorator implements Result
 	}
 
 	@Override
-	public BufferBuilder getBufferBuilder(int targetChannel) throws IOException, InterruptedException {
-		return partitionWriter.getBufferBuilder(targetChannel);
-	}
-
-	@Override
-	public BufferBuilder tryGetBufferBuilder(int targetChannel) throws IOException {
-		return partitionWriter.tryGetBufferBuilder(targetChannel);
-	}
-
-	@Override
 	public ResultPartitionID getPartitionId() {
 		return partitionWriter.getPartitionId();
 	}
@@ -98,24 +88,6 @@ public class ConsumableNotifyingResultPartitionWriterDecorator implements Result
 	@Override
 	public ResultSubpartition getSubpartition(int subpartitionIndex) {
 		return partitionWriter.getSubpartition(subpartitionIndex);
-	}
-
-	@Override
-	public void readRecoveredState(ChannelStateReader stateReader) throws IOException, InterruptedException {
-		partitionWriter.readRecoveredState(stateReader);
-	}
-
-	@Override
-	public boolean addBufferConsumer(
-			BufferConsumer bufferConsumer,
-			int subpartitionIndex,
-			boolean isPriorityEvent) throws IOException {
-		boolean success = partitionWriter.addBufferConsumer(bufferConsumer, subpartitionIndex, isPriorityEvent);
-		if (success) {
-			notifyPipelinedConsumers();
-		}
-
-		return success;
 	}
 
 	@Override

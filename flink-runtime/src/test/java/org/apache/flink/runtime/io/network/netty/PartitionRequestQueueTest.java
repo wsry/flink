@@ -30,7 +30,7 @@ import org.apache.flink.runtime.io.network.partition.PartitionTestUtils;
 import org.apache.flink.runtime.io.network.partition.PipelinedSubpartition;
 import org.apache.flink.runtime.io.network.partition.PipelinedSubpartitionTest;
 import org.apache.flink.runtime.io.network.partition.PipelinedSubpartitionView;
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
+import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionBuilder;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionManager;
@@ -443,7 +443,7 @@ public class PartitionRequestQueueTest {
 	private void testCancelPartitionRequest(boolean isAvailableView) throws Exception {
 		// setup
 		final ResultPartitionManager partitionManager = new ResultPartitionManager();
-		final ResultPartition partition = createFinishedPartitionWithFilledData(partitionManager);
+		final AbstractResultPartition partition = createFinishedPartitionWithFilledData(partitionManager);
 		final InputChannelID receiverId = new InputChannelID();
 		final PartitionRequestQueue queue = new PartitionRequestQueue();
 		final CreditBasedSequenceNumberingViewReader reader = new CreditBasedSequenceNumberingViewReader(receiverId, 0, queue);
@@ -478,8 +478,8 @@ public class PartitionRequestQueueTest {
 		channel.close();
 	}
 
-	private static ResultPartition createFinishedPartitionWithFilledData(ResultPartitionManager partitionManager) throws Exception {
-		final ResultPartition partition = new ResultPartitionBuilder()
+	private static AbstractResultPartition createFinishedPartitionWithFilledData(ResultPartitionManager partitionManager) throws Exception {
+		final AbstractResultPartition partition = new ResultPartitionBuilder()
 			.setResultPartitionType(ResultPartitionType.BLOCKING)
 			.setFileChannelManager(fileChannelManager)
 			.setResultPartitionManager(partitionManager)

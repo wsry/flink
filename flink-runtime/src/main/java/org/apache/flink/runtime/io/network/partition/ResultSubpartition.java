@@ -19,18 +19,15 @@
 package org.apache.flink.runtime.io.network.partition;
 
 import org.apache.flink.annotation.VisibleForTesting;
-import org.apache.flink.runtime.checkpoint.channel.ChannelStateReader;
 import org.apache.flink.runtime.checkpoint.channel.ResultSubpartitionInfo;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
-import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
 
 import java.io.IOException;
-import java.util.List;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * A single subpartition of a {@link ResultPartition} instance.
+ * A single subpartition of a {@link AbstractResultPartition} instance.
  */
 public abstract class ResultSubpartition {
 
@@ -38,31 +35,18 @@ public abstract class ResultSubpartition {
 	protected final ResultSubpartitionInfo subpartitionInfo;
 
 	/** The parent partition this subpartition belongs to. */
-	protected final ResultPartition parent;
+	protected final AbstractResultPartition parent;
 
 	// - Statistics ----------------------------------------------------------
 
-	public ResultSubpartition(int index, ResultPartition parent) {
+	public ResultSubpartition(int index, AbstractResultPartition parent) {
 		this.parent = parent;
 		this.subpartitionInfo = new ResultSubpartitionInfo(parent.getPartitionIndex(), index);
-	}
-
-	/**
-	 * Whether the buffer can be compressed or not. Note that event is not compressed because it
-	 * is usually small and the size can become even larger after compression.
-	 */
-	protected boolean canBeCompressed(Buffer buffer) {
-		return parent.bufferCompressor != null && buffer.isBuffer() && buffer.readableBytes() > 0;
 	}
 
 	public ResultSubpartitionInfo getSubpartitionInfo() {
 		return subpartitionInfo;
 	}
-
-	/**
-	 * Gets the total numbers of buffers (data buffers plus events).
-	 */
-	protected abstract long getTotalNumberOfBuffers();
 
 	protected abstract long getTotalNumberOfBytes();
 
@@ -76,48 +60,6 @@ public abstract class ResultSubpartition {
 	protected void onConsumedSubpartition() {
 		parent.onConsumedSubpartition(getSubPartitionIndex());
 	}
-
-	public void readRecoveredState(ChannelStateReader stateReader) throws IOException, InterruptedException {
-	}
-
-	/**
-	 * Adds the given buffer.
-	 *
-	 * <p>The request may be executed synchronously, or asynchronously, depending on the
-	 * implementation.
-	 *
-	 * <p><strong>IMPORTANT:</strong> Before adding new {@link BufferConsumer} previously added must be in finished
-	 * state. Because of the performance reasons, this is only enforced during the data reading.
-	 *
-	 * @param bufferConsumer
-	 * 		the buffer to add (transferring ownership to this writer)
-	 * @param isPriorityEvent
-	 * @return true if operation succeeded and bufferConsumer was enqueued for consumption.
-	 * @throws IOException
-	 * 		thrown in case of errors while adding the buffer
-	 */
-	public abstract boolean add(BufferConsumer bufferConsumer, boolean isPriorityEvent) throws IOException;
-
-	/**
-	 * Adds the given buffer.
-	 *
-	 * <p>The request may be executed synchronously, or asynchronously, depending on the
-	 * implementation.
-	 *
-	 * <p><strong>IMPORTANT:</strong> Before adding new {@link BufferConsumer} previously added must be in finished
-	 * state. Because of the performance reasons, this is only enforced during the data reading.
-	 *
-	 * @param bufferConsumer
-	 * 		the buffer to add (transferring ownership to this writer)
-	 * @return true if operation succeeded and bufferConsumer was enqueued for consumption.
-	 * @throws IOException
-	 * 		thrown in case of errors while adding the buffer
-	 */
-	public boolean add(BufferConsumer bufferConsumer) throws IOException {
-		return add(bufferConsumer, false);
-	}
-
-	public abstract List<Buffer> requestInflightBufferSnapshot();
 
 	public abstract void flush();
 

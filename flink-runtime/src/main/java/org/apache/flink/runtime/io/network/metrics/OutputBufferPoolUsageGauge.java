@@ -20,16 +20,16 @@ package org.apache.flink.runtime.io.network.metrics;
 
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.runtime.io.network.buffer.BufferPool;
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
+import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
 
 /**
- * Gauge metric measuring the output buffer pool usage gauge for {@link ResultPartition}s.
+ * Gauge metric measuring the output buffer pool usage gauge for {@link AbstractResultPartition}s.
  */
 public class OutputBufferPoolUsageGauge implements Gauge<Float> {
 
-	private final ResultPartition[] resultPartitions;
+	private final AbstractResultPartition[] resultPartitions;
 
-	public OutputBufferPoolUsageGauge(ResultPartition[] resultPartitions) {
+	public OutputBufferPoolUsageGauge(AbstractResultPartition[] resultPartitions) {
 		this.resultPartitions = resultPartitions;
 	}
 
@@ -38,7 +38,7 @@ public class OutputBufferPoolUsageGauge implements Gauge<Float> {
 		int usedBuffers = 0;
 		int bufferPoolSize = 0;
 
-		for (ResultPartition resultPartition : resultPartitions) {
+		for (AbstractResultPartition resultPartition : resultPartitions) {
 			BufferPool bufferPool = resultPartition.getBufferPool();
 
 			if (bufferPool != null) {

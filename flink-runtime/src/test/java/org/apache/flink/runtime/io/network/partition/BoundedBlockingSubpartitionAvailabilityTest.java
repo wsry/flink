@@ -121,7 +121,7 @@ public class BoundedBlockingSubpartitionAvailabilityTest {
 	// ------------------------------------------------------------------------
 
 	private static BoundedBlockingSubpartition createPartitionWithData(int numberOfBuffers) throws IOException {
-		ResultPartition parent = PartitionTestUtils.createPartition();
+		AbstractResultPartition parent = PartitionTestUtils.createPartition();
 
 		BoundedBlockingSubpartition partition = BoundedBlockingSubpartition.createWithFileChannel(
 			0, parent, new File(TMP_FOLDER.newFolder(), "data"), BUFFER_SIZE);

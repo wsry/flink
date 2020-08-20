@@ -36,15 +36,15 @@ public class ResultPartitionManager implements ResultPartitionProvider {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ResultPartitionManager.class);
 
-	private final Map<ResultPartitionID, ResultPartition> registeredPartitions = new HashMap<>(16);
+	private final Map<ResultPartitionID, AbstractResultPartition> registeredPartitions = new HashMap<>(16);
 
 	private boolean isShutdown;
 
-	public void registerResultPartition(ResultPartition partition) {
+	public void registerResultPartition(AbstractResultPartition partition) {
 		synchronized (registeredPartitions) {
 			checkState(!isShutdown, "Result partition manager already shut down.");
 
-			ResultPartition previous = registeredPartitions.put(partition.getPartitionId(), partition);
+			AbstractResultPartition previous = registeredPartitions.put(partition.getPartitionId(), partition);
 
 			if (previous != null) {
 				throw new IllegalStateException("Result partition already registered.");
@@ -61,7 +61,7 @@ public class ResultPartitionManager implements ResultPartitionProvider {
 			BufferAvailabilityListener availabilityListener) throws IOException {
 
 		synchronized (registeredPartitions) {
-			final ResultPartition partition = registeredPartitions.get(partitionId);
+			final AbstractResultPartition partition = registeredPartitions.get(partitionId);
 
 			if (partition == null) {
 				throw new PartitionNotFoundException(partitionId);
@@ -75,7 +75,7 @@ public class ResultPartitionManager implements ResultPartitionProvider {
 
 	public void releasePartition(ResultPartitionID partitionId, Throwable cause) {
 		synchronized (registeredPartitions) {
-			ResultPartition resultPartition = registeredPartitions.remove(partitionId);
+			AbstractResultPartition resultPartition = registeredPartitions.remove(partitionId);
 			if (resultPartition != null) {
 				resultPartition.release(cause);
 				LOG.debug("Released partition {} produced by {}.",
@@ -90,7 +90,7 @@ public class ResultPartitionManager implements ResultPartitionProvider {
 			LOG.debug("Releasing {} partitions because of shutdown.",
 					registeredPartitions.values().size());
 
-			for (ResultPartition partition : registeredPartitions.values()) {
+			for (AbstractResultPartition partition : registeredPartitions.values()) {
 				partition.release();
 			}
 
@@ -106,11 +106,11 @@ public class ResultPartitionManager implements ResultPartitionProvider {
 	// Notifications
 	// ------------------------------------------------------------------------
 
-	void onConsumedPartition(ResultPartition partition) {
+	void onConsumedPartition(AbstractResultPartition partition) {
 		LOG.debug("Received consume notification from {}.", partition);
 
 		synchronized (registeredPartitions) {
-			final ResultPartition previous = registeredPartitions.remove(partition.getPartitionId());
+			final AbstractResultPartition previous = registeredPartitions.remove(partition.getPartitionId());
 			// Release the partition if it was successfully removed
 			if (partition == previous) {
 				partition.release();

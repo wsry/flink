@@ -83,7 +83,7 @@ public class PipelinedSubpartitionWithReadViewTest {
 
 	@Before
 	public void setup() throws IOException {
-		final ResultPartition parent = PartitionTestUtils.createPartition(
+		final AbstractResultPartition parent = PartitionTestUtils.createPartition(
 			ResultPartitionType.PIPELINED,
 			NoOpFileChannelManager.INSTANCE,
 			compressionEnabled,

@@ -46,7 +46,7 @@ import static org.junit.Assert.fail;
  * <p>Full read / write tests for the partition and the reader are in
  * {@link BoundedBlockingSubpartitionWriteReadTest}.
  */
-public class BoundedBlockingSubpartitionTest extends SubpartitionTestBase {
+public class BoundedBlockingSubpartitionTest extends BufferOrientedSubpartitionTestBase {
 
 	private static final String tempDir = EnvironmentInformation.getTemporaryFileDirectory();
 
@@ -95,15 +95,15 @@ public class BoundedBlockingSubpartitionTest extends SubpartitionTestBase {
 	// ------------------------------------------------------------------------
 
 	@Override
-	ResultSubpartition createSubpartition() throws Exception {
-		final ResultPartition resultPartition = createPartition(ResultPartitionType.BLOCKING, fileChannelManager);
+	BoundedBlockingSubpartition createSubpartition() throws Exception {
+		final AbstractResultPartition resultPartition = createPartition(ResultPartitionType.BLOCKING, fileChannelManager);
 		return BoundedBlockingSubpartition.createWithMemoryMappedFile(
 				0, resultPartition, new File(TMP_DIR.newFolder(), "subpartition"));
 	}
 
 	@Override
-	ResultSubpartition createFailingWritesSubpartition() throws Exception {
-		final ResultPartition resultPartition = createPartition(ResultPartitionType.BLOCKING, fileChannelManager);
+	BoundedBlockingSubpartition createFailingWritesSubpartition() throws Exception {
+		final AbstractResultPartition resultPartition = createPartition(ResultPartitionType.BLOCKING, fileChannelManager);
 
 		return new BoundedBlockingSubpartition(
 				0,

@@ -155,7 +155,7 @@ public class FileChannelBoundedDataTest extends BoundedDataTestBase {
 	}
 
 	private static ResultSubpartition createFileBoundedBlockingSubpartition() {
-		final ResultPartition resultPartition = new ResultPartitionBuilder()
+		final AbstractResultPartition resultPartition = new ResultPartitionBuilder()
 			.setNetworkBufferSize(BUFFER_SIZE)
 			.setResultPartitionType(ResultPartitionType.BLOCKING)
 			.setBoundedBlockingSubpartitionType(BoundedBlockingSubpartitionType.FILE)

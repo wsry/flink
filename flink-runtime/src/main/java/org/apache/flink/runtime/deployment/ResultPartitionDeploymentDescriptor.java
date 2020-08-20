@@ -18,7 +18,7 @@
 
 package org.apache.flink.runtime.deployment;
 
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
+import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID;
@@ -33,7 +33,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /**
  * Deployment descriptor for a result partition.
  *
- * @see ResultPartition
+ * @see AbstractResultPartition
  */
 public class ResultPartitionDeploymentDescriptor implements Serializable {
 

@@ -38,7 +38,7 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * Factory for {@link ResultPartition} to use in {@link NettyShuffleEnvironment}.
+ * Factory for {@link AbstractResultPartition} to use in {@link NettyShuffleEnvironment}.
  */
 public class ResultPartitionFactory {
 
@@ -92,7 +92,7 @@ public class ResultPartitionFactory {
 		this.maxBuffersPerChannel = maxBuffersPerChannel;
 	}
 
-	public ResultPartition create(
+	public AbstractResultPartition create(
 			String taskNameWithSubtaskAndId,
 			int partitionIndex,
 			ResultPartitionDeploymentDescriptor desc) {
@@ -107,7 +107,7 @@ public class ResultPartitionFactory {
 	}
 
 	@VisibleForTesting
-	public ResultPartition create(
+	public AbstractResultPartition create(
 			String taskNameWithSubtaskAndId,
 			int partitionIndex,
 			ResultPartitionID id,
@@ -121,7 +121,7 @@ public class ResultPartitionFactory {
 		}
 
 		ResultSubpartition[] subpartitions = new ResultSubpartition[numberOfSubpartitions];
-		ResultPartition partition = forcePartitionReleaseOnConsumption || !type.isBlocking()
+		AbstractResultPartition partition = forcePartitionReleaseOnConsumption || !type.isBlocking()
 			? new ReleaseOnConsumptionResultPartition(
 				taskNameWithSubtaskAndId,
 				partitionIndex,
@@ -132,7 +132,7 @@ public class ResultPartitionFactory {
 				partitionManager,
 				bufferCompressor,
 				bufferPoolFactory)
-			: new ResultPartition(
+			: new AbstractResultPartition(
 				taskNameWithSubtaskAndId,
 				partitionIndex,
 				id,
@@ -151,7 +151,7 @@ public class ResultPartitionFactory {
 	}
 
 	private void createSubpartitions(
-			ResultPartition partition,
+			AbstractResultPartition partition,
 			ResultPartitionType type,
 			BoundedBlockingSubpartitionType blockingSubpartitionType,
 			ResultSubpartition[] subpartitions) {
@@ -172,7 +172,7 @@ public class ResultPartitionFactory {
 
 	private static void initializeBoundedBlockingPartitions(
 			ResultSubpartition[] subpartitions,
-			ResultPartition parent,
+			AbstractResultPartition parent,
 			BoundedBlockingSubpartitionType blockingSubpartitionType,
 			int networkBufferSize,
 			FileChannelManager channelManager) {

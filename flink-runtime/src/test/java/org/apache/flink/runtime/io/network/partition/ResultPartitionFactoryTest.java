@@ -59,35 +59,35 @@ public class ResultPartitionFactoryTest extends TestLogger {
 
 	@Test
 	public void testBoundedBlockingSubpartitionsCreated() {
-		final ResultPartition resultPartition = createResultPartition(false, ResultPartitionType.BLOCKING);
+		final AbstractResultPartition resultPartition = createResultPartition(false, ResultPartitionType.BLOCKING);
 		Arrays.stream(resultPartition.subpartitions).forEach(sp -> assertThat(sp, instanceOf(BoundedBlockingSubpartition.class)));
 	}
 
 	@Test
 	public void testPipelinedSubpartitionsCreated() {
-		final ResultPartition resultPartition = createResultPartition(false, ResultPartitionType.PIPELINED);
+		final AbstractResultPartition resultPartition = createResultPartition(false, ResultPartitionType.PIPELINED);
 		Arrays.stream(resultPartition.subpartitions).forEach(sp -> assertThat(sp, instanceOf(PipelinedSubpartition.class)));
 	}
 
 	@Test
 	public void testConsumptionOnReleaseForced() {
-		final ResultPartition resultPartition = createResultPartition(true, ResultPartitionType.BLOCKING);
+		final AbstractResultPartition resultPartition = createResultPartition(true, ResultPartitionType.BLOCKING);
 		assertThat(resultPartition, instanceOf(ReleaseOnConsumptionResultPartition.class));
 	}
 
 	@Test
 	public void testConsumptionOnReleaseEnabledForNonBlocking() {
-		final ResultPartition resultPartition = createResultPartition(false, ResultPartitionType.PIPELINED);
+		final AbstractResultPartition resultPartition = createResultPartition(false, ResultPartitionType.PIPELINED);
 		assertThat(resultPartition, instanceOf(ReleaseOnConsumptionResultPartition.class));
 	}
 
 	@Test
 	public void testConsumptionOnReleaseDisabled() {
-		final ResultPartition resultPartition = createResultPartition(false, ResultPartitionType.BLOCKING);
+		final AbstractResultPartition resultPartition = createResultPartition(false, ResultPartitionType.BLOCKING);
 		assertThat(resultPartition, not(instanceOf(ReleaseOnConsumptionResultPartition.class)));
 	}
 
-	private static ResultPartition createResultPartition(
+	private static AbstractResultPartition createResultPartition(
 			boolean releasePartitionOnConsumption,
 			ResultPartitionType partitionType) {
 		ResultPartitionFactory factory = new ResultPartitionFactory(

@@ -22,7 +22,7 @@ import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.io.network.api.writer.ResultPartitionWriter;
 import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
-import org.apache.flink.runtime.io.network.partition.ResultPartition;
+import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
 import org.apache.flink.runtime.io.network.partition.consumer.InputGate;
 import org.apache.flink.runtime.io.network.partition.consumer.SingleInputGate;
 
@@ -124,7 +124,7 @@ public class NettyShuffleMetricFactory {
 		final MetricGroup outputGroup = networkGroup.addGroup(METRIC_GROUP_OUTPUT);
 		final MetricGroup inputGroup = networkGroup.addGroup(METRIC_GROUP_INPUT);
 
-		ResultPartition[] resultPartitions = Arrays.copyOf(producedPartitions, producedPartitions.length, ResultPartition[].class);
+		AbstractResultPartition[] resultPartitions = Arrays.copyOf(producedPartitions, producedPartitions.length, AbstractResultPartition[].class);
 		registerOutputMetrics(isDetailedMetrics, outputGroup, buffersGroup, resultPartitions);
 
 		SingleInputGate[] singleInputGates = Arrays.copyOf(inputGates, inputGates.length, SingleInputGate[].class);
@@ -134,7 +134,7 @@ public class NettyShuffleMetricFactory {
 	public static void registerOutputMetrics(
 			boolean isDetailedMetrics,
 			MetricGroup outputGroup,
-			ResultPartition[] resultPartitions) {
+			AbstractResultPartition[] resultPartitions) {
 		registerOutputMetrics(
 			isDetailedMetrics,
 			outputGroup,
@@ -146,7 +146,7 @@ public class NettyShuffleMetricFactory {
 			boolean isDetailedMetrics,
 			MetricGroup outputGroup,
 			MetricGroup buffersGroup,
-			ResultPartition[] resultPartitions) {
+			AbstractResultPartition[] resultPartitions) {
 		if (isDetailedMetrics) {
 			ResultPartitionMetrics.registerQueueLengthMetrics(outputGroup, resultPartitions);
 		}

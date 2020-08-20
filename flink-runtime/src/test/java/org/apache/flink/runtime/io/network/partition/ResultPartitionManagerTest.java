@@ -37,7 +37,7 @@ public class ResultPartitionManagerTest extends TestLogger {
 	@Test
 	public void testThrowPartitionNotFoundException() throws Exception {
 		final ResultPartitionManager partitionManager = new ResultPartitionManager();
-		final ResultPartition partition = createPartition();
+		final AbstractResultPartition partition = createPartition();
 
 		verifyCreateSubpartitionViewThrowsException(partitionManager, partition.getPartitionId());
 	}
@@ -49,7 +49,7 @@ public class ResultPartitionManagerTest extends TestLogger {
 	@Test
 	public void testCreateViewForRegisteredPartition() throws Exception {
 		final ResultPartitionManager partitionManager = new ResultPartitionManager();
-		final ResultPartition partition = createPartition();
+		final AbstractResultPartition partition = createPartition();
 
 		partitionManager.registerResultPartition(partition);
 		partitionManager.createSubpartitionView(partition.getPartitionId(), 0, new NoOpBufferAvailablityListener());
@@ -62,7 +62,7 @@ public class ResultPartitionManagerTest extends TestLogger {
 	@Test
 	public void testCreateViewForReleasedPartition() throws Exception {
 		final ResultPartitionManager partitionManager = new ResultPartitionManager();
-		final ResultPartition partition = createPartition();
+		final AbstractResultPartition partition = createPartition();
 
 		partitionManager.registerResultPartition(partition);
 		partitionManager.releasePartition(partition.getPartitionId(), null);

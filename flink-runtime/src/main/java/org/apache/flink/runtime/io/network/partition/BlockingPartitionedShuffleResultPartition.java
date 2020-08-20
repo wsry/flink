@@ -16,30 +16,13 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.io.network.metrics;
+package org.apache.flink.runtime.io.network.partition;
 
-import org.apache.flink.metrics.Gauge;
-import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
+import java.io.IOException;
 
 /**
- * Gauge metric measuring the number of queued output buffers for {@link AbstractResultPartition}s.
+ * Partition of a blocking (batch) result. The data in this result is stored in one file per target partition.
  */
-public class OutputBuffersGauge implements Gauge<Integer> {
+public class BlockingPartitionedShuffleResultPartition extends BufferOrientedResultPartition {
 
-	private final AbstractResultPartition[] resultPartitions;
-
-	public OutputBuffersGauge(AbstractResultPartition[] resultPartitions) {
-		this.resultPartitions = resultPartitions;
-	}
-
-	@Override
-	public Integer getValue() {
-		int totalBuffers = 0;
-
-		for (AbstractResultPartition producedPartition : resultPartitions) {
-			totalBuffers += producedPartition.getNumberOfQueuedBuffers();
-		}
-
-		return totalBuffers;
-	}
 }

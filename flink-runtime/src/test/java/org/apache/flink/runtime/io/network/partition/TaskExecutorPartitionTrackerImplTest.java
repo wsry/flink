@@ -172,9 +172,9 @@ public class TaskExecutorPartitionTrackerImplTest extends TestLogger {
 		assertThat(shuffleReleaseFuture.get(), hasItem(resultPartitionId1));
 	}
 
-	private static class TestingShuffleEnvironment implements ShuffleEnvironment<ResultPartition, SingleInputGate> {
+	private static class TestingShuffleEnvironment implements ShuffleEnvironment<AbstractResultPartition, SingleInputGate> {
 
-		private final ShuffleEnvironment<ResultPartition, SingleInputGate> backingShuffleEnvironment =
+		private final ShuffleEnvironment<AbstractResultPartition, SingleInputGate> backingShuffleEnvironment =
 			new NettyShuffleEnvironmentBuilder().build();
 
 		CompletableFuture<Collection<ResultPartitionID>> releasePartitionsLocallyFuture = null;
@@ -190,7 +190,7 @@ public class TaskExecutorPartitionTrackerImplTest extends TestLogger {
 		}
 
 		@Override
-		public List<ResultPartition> createResultPartitionWriters(ShuffleIOOwnerContext ownerContext, List<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors) {
+		public List<AbstractResultPartition> createResultPartitionWriters(ShuffleIOOwnerContext ownerContext, List<ResultPartitionDeploymentDescriptor> resultPartitionDeploymentDescriptors) {
 			return backingShuffleEnvironment.createResultPartitionWriters(ownerContext, resultPartitionDeploymentDescriptors);
 		}
 

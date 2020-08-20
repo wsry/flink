@@ -18,6 +18,7 @@
 package org.apache.flink.runtime.checkpoint.channel;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.runtime.io.network.partition.AbstractResultPartition;
 
 import java.io.Serializable;
 import java.util.Objects;
@@ -26,7 +27,7 @@ import java.util.Objects;
  * Identifies {@link org.apache.flink.runtime.io.network.partition.ResultSubpartition ResultSubpartition} in a given subtask.
  * Note that {@link org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID IntermediateResultPartitionID}
  * can not be used because it: a) identifies the whole
- * {@link org.apache.flink.runtime.io.network.partition.ResultPartition ResultPartition} b) is generated randomly.
+ * {@link AbstractResultPartition ResultPartition} b) is generated randomly.
  */
 @Internal
 public class ResultSubpartitionInfo implements Serializable {

@@ -44,7 +44,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 /**
  * A pipelined in-memory only subpartition, which can be consumed once.
  *
- * <p>Whenever {@link ResultSubpartition#add(BufferConsumer, boolean)} adds a finished {@link BufferConsumer} or a second
+ * <p>Whenever {@link BufferOrientedSubpartition#add(BufferConsumer, boolean)} adds a finished {@link BufferConsumer} or a second
  * {@link BufferConsumer} (in which case we will assume the first one finished), we will
  * {@link PipelinedSubpartitionView#notifyDataAvailable() notify} a read view created via
  * {@link ResultSubpartition#createReadView(BufferAvailabilityListener)} of new data availability. Except by calling
@@ -57,7 +57,7 @@ import static org.apache.flink.util.Preconditions.checkState;
  * {@link PipelinedSubpartitionView#notifyDataAvailable() notification} for any
  * {@link BufferConsumer} present in the queue.
  */
-public class PipelinedSubpartition extends ResultSubpartition {
+public class PipelinedSubpartition extends BufferOrientedSubpartition implements CheckpointedResultSubpartition {
 
 	private static final Logger LOG = LoggerFactory.getLogger(PipelinedSubpartition.class);
 
@@ -97,11 +97,10 @@ public class PipelinedSubpartition extends ResultSubpartition {
 
 	// ------------------------------------------------------------------------
 
-	PipelinedSubpartition(int index, ResultPartition parent) {
+	PipelinedSubpartition(int index, PipelinedResultPartition parent) {
 		super(index, parent);
 	}
 
-	@Override
 	public void readRecoveredState(ChannelStateReader stateReader) throws IOException, InterruptedException {
 		boolean recycleBuffer = true;
 		for (ReadResult readResult = ReadResult.HAS_MORE_DATA; readResult == ReadResult.HAS_MORE_DATA;) {
@@ -400,7 +399,6 @@ public class PipelinedSubpartition extends ResultSubpartition {
 		}
 	}
 
-	@Override
 	protected long getTotalNumberOfBuffers() {
 		return totalNumberOfBuffers;
 	}

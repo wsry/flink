@@ -30,7 +30,6 @@ import javax.annotation.concurrent.GuardedBy;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -61,7 +60,7 @@ import static org.apache.flink.util.Preconditions.checkState;
  * <p>The method calls to create readers, dispose readers, and dispose the partition are
  * thread-safe vis-a-vis each other.
  */
-final class BoundedBlockingSubpartition extends ResultSubpartition {
+final class BoundedBlockingSubpartition extends BufferOrientedSubpartition {
 
 	/** This lock guards the creation of readers and disposal of the memory mapped file. */
 	private final Object lock = new Object();
@@ -91,7 +90,7 @@ final class BoundedBlockingSubpartition extends ResultSubpartition {
 
 	public BoundedBlockingSubpartition(
 			int index,
-			ResultPartition parent,
+			BlockingPartitionedShuffleResultPartition parent,
 			BoundedData data) {
 
 		super(index, parent);
@@ -144,11 +143,6 @@ final class BoundedBlockingSubpartition extends ResultSubpartition {
 			writeAndCloseBufferConsumer(currentBuffer);
 			currentBuffer = null;
 		}
-	}
-
-	@Override
-	public List<Buffer> requestInflightBufferSnapshot() {
-		throw new UnsupportedOperationException("The batch job does not support unaligned checkpoint.");
 	}
 
 	private void writeAndCloseBufferConsumer(BufferConsumer bufferConsumer) throws IOException {
@@ -277,7 +271,7 @@ final class BoundedBlockingSubpartition extends ResultSubpartition {
 	 * Data is eagerly spilled (written to disk) and readers directly read from the file.
 	 */
 	public static BoundedBlockingSubpartition createWithFileChannel(
-			int index, ResultPartition parent, File tempFile, int readBufferSize) throws IOException {
+		int index, BlockingPartitionedShuffleResultPartition parent, File tempFile, int readBufferSize) throws IOException {
 
 		final FileChannelBoundedData bd = FileChannelBoundedData.create(tempFile.toPath(), readBufferSize);
 		return new BoundedBlockingSubpartition(index, parent, bd);
@@ -289,7 +283,7 @@ final class BoundedBlockingSubpartition extends ResultSubpartition {
 	 * OS swaps out the pages from the memory mapped file.
 	 */
 	public static BoundedBlockingSubpartition createWithMemoryMappedFile(
-			int index, ResultPartition parent, File tempFile) throws IOException {
+		int index, BlockingPartitionedShuffleResultPartition parent, File tempFile) throws IOException {
 
 		final MemoryMappedBoundedData bd = MemoryMappedBoundedData.create(tempFile.toPath());
 		return new BoundedBlockingSubpartition(index, parent, bd);
@@ -300,11 +294,11 @@ final class BoundedBlockingSubpartition extends ResultSubpartition {
 	 * Creates a BoundedBlockingSubpartition that stores the partition data in a file and
 	 * memory maps that file for reading.
 	 * Data is eagerly spilled (written to disk) and then mapped into memory. The main
-	 * difference to the {@link #createWithMemoryMappedFile(int, ResultPartition, File)} variant
+	 * difference to the {@link #createWithMemoryMappedFile(int, BlockingPartitionedShuffleResultPartition, File)} variant
 	 * is that no I/O is necessary when pages from the memory mapped file are evicted.
 	 */
 	public static BoundedBlockingSubpartition createWithFileAndMemoryMappedReader(
-			int index, ResultPartition parent, File tempFile) throws IOException {
+		int index, BlockingPartitionedShuffleResultPartition parent, File tempFile) throws IOException {
 
 		final FileChannelMemoryMappedBoundedData bd = FileChannelMemoryMappedBoundedData.create(tempFile.toPath());
 		return new BoundedBlockingSubpartition(index, parent, bd);
