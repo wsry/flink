@@ -43,6 +43,9 @@ public abstract class BufferOrientedResultPartition extends AbstractResultPartit
 
 	private final BufferBuilder currentPartitionBuffers[];
 
+	@Nullable
+	private BufferBuilder broadcastBuffer;
+
 	private final BufferOrientedSubpartition[] subpartitions;
 
 	private Counter numBuffersOut = new SimpleCounter();
@@ -95,31 +98,34 @@ public abstract class BufferOrientedResultPartition extends AbstractResultPartit
 
 	@Override
 	public void writeRecord(ByteBuffer recordBytes, int targetPartition) throws IOException {
-		BufferBuilder bufferBuilder = getCurrentOrNewBufferBuilder(targetPartition);
-		bufferBuilder.appendAndCommit(recordBytes);
-
-		while (recordBytes.hasRemaining() || bufferBuilder.isFull()) {
-			numBuffersOut.inc();
-
-			// If this was a full record, we are done. Not breaking out of the loop at this point
-			// will lead to another buffer request before breaking out (that would not be a
-			// problem per se, but it can lead to stalls in the pipeline).
-			if (!recordBytes.hasRemaining()) {
-				currentPartitionBuffers[targetPartition] = null;
-				break;
-			}
-
-			bufferBuilder = getNewBufferBuilder(targetPartition);
+		do {
+			final BufferBuilder bufferBuilder = getBufferBuilderForSinglePartitionEmit(targetPartition);
 			bufferBuilder.appendAndCommit(recordBytes);
+
+			if (bufferBuilder.isFull()) {
+				finishPartitionBuffer(targetPartition);
+			}
 		}
+		while (recordBytes.hasRemaining());
+	}
+
+	public void broadcastRecord(ByteBuffer recordBytes) throws IOException {
+		do {
+			final BufferBuilder bufferBuilder = getBufferBuilderForBroadcast();
+			bufferBuilder.appendAndCommit(recordBytes);
+
+			if (bufferBuilder.isFull()) {
+				finishBroadcastBuffer();
+			}
+		}
+		while (recordBytes.hasRemaining());
 	}
 
 	@Override
 	public void broadcastEvent(AbstractEvent event, boolean isPriorityEvent) throws IOException {
 		try (BufferConsumer eventBufferConsumer = EventSerializer.toBufferConsumer(event)) {
 			for (int targetChannel = 0; targetChannel < currentPartitionBuffers.length; targetChannel++) {
-				numBuffersOut.inc(currentPartitionBuffers[targetChannel] == null ? 0 : 1L);
-				currentPartitionBuffers[targetChannel] = null;
+				finishPartitionBuffer(targetChannel);
 
 				// Retain the buffer so that it can be recycled by each channel of targetPartition
 				subpartitions[targetChannel].add(eventBufferConsumer.copy(), isPriorityEvent);
@@ -131,25 +137,53 @@ public abstract class BufferOrientedResultPartition extends AbstractResultPartit
 
 	// ------------------------------------------------------------------------
 
-	private BufferBuilder getCurrentOrNewBufferBuilder(int targetChannel) throws IOException {
-		final BufferBuilder current = currentPartitionBuffers[targetChannel];
+	private BufferBuilder getBufferBuilderForSinglePartitionEmit(int targetpartition) throws IOException {
+		final BufferBuilder current = currentPartitionBuffers[targetpartition];
 		if (current != null) {
 			return current;
 		}
 
-		return getNewBufferBuilder(targetChannel);
+		return getNewBufferBuilderForSinglePartitionEmit(targetpartition);
 	}
 
-	private BufferBuilder getNewBufferBuilder(int targetChannel) throws IOException {
+	private BufferBuilder getNewBufferBuilderForSinglePartitionEmit(int targetpartition) throws IOException {
 		checkInProduceState();
-		final BufferBuilder bufferBuilder = requestNewBufferBuilderFromPool(targetChannel);
+		ensureUnicastMode();
 
-		subpartitions[targetChannel].add(bufferBuilder.createBufferConsumer(), false);
-		currentPartitionBuffers[targetChannel] = bufferBuilder;
+		final BufferBuilder bufferBuilder = requestNewBufferBuilderFromPool(targetpartition);
+		currentPartitionBuffers[targetpartition] = bufferBuilder;
+		subpartitions[targetpartition].add(bufferBuilder.createBufferConsumer(), false);
+		return bufferBuilder;
+	}
+
+	private BufferBuilder getBufferBuilderForBroadcast() throws IOException {
+		final BufferBuilder buffer = broadcastBuffer;
+		if (buffer != null) {
+			return buffer;
+		}
+
+		return getNewBufferBuilderForBroadcast();
+	}
+
+	private BufferBuilder getNewBufferBuilderForBroadcast() throws IOException {
+		checkInProduceState();
+		ensureBroadcastMode();
+
+		final BufferBuilder bufferBuilder = requestNewBufferBuilderFromPool(0);
+		broadcastBuffer = bufferBuilder;
+
+		try (BufferConsumer consumer = bufferBuilder.createBufferConsumer()) {
+			for (BufferOrientedSubpartition subpartition : subpartitions) {
+				subpartition.add(consumer.copy(), false);
+			}
+		}
+
 		return bufferBuilder;
 	}
 
 	private BufferBuilder requestNewBufferBuilderFromPool(int targetChannel) throws IOException {
+		numBuffersOut.inc();
+
 		final BufferBuilder builder = bufferPool.requestBufferBuilder(targetChannel);
 		if (builder != null) {
 			return builder;
@@ -165,7 +199,21 @@ public abstract class BufferOrientedResultPartition extends AbstractResultPartit
 		}
 	}
 
-	private void finishAllCurrentBuffers() {
+	private void finishPartitionBuffer(int targetPartition) {
+		currentPartitionBuffers[targetPartition] = null;
+	}
 
+	private void finishBroadcastBuffer() {
+		broadcastBuffer = null;
+	}
+
+	private void ensureUnicastMode() {
+		finishBroadcastBuffer();
+	}
+
+	private void ensureBroadcastMode() throws IOException {
+		for (int i = 0; i < currentPartitionBuffers.length; i++) {
+			finishPartitionBuffer(i);
+		}
 	}
 }
