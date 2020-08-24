@@ -38,12 +38,14 @@ import java.io.IOException;
  */
 public class BufferWritingResultPartition extends ResultPartition {
 
+	private final BufferWritingSubpartition[] bufferWritingSubpartitions;
+
 	public BufferWritingResultPartition(
 			String owningTaskName,
 			int partitionIndex,
 			ResultPartitionID partitionId,
 			ResultPartitionType partitionType,
-			ResultSubpartition[] subpartitions,
+			BufferWritingSubpartition[] subpartitions,
 			int numTargetKeyGroups,
 			ResultPartitionManager partitionManager,
 			@Nullable BufferCompressor bufferCompressor,
@@ -60,5 +62,7 @@ public class BufferWritingResultPartition extends ResultPartition {
 			partitionManager,
 			bufferCompressor,
 			bufferPoolFactory);
+
+		this.bufferWritingSubpartitions = subpartitions;
 	}
 }

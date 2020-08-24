@@ -116,10 +116,9 @@ public class ResultPartitionFactory {
 			bufferCompressor = new BufferCompressor(networkBufferSize, compressionCodec);
 		}
 
-		ResultSubpartition[] subpartitions = new ResultSubpartition[numberOfSubpartitions];
-
 		final ResultPartition partition;
 		if (type == ResultPartitionType.PIPELINED || type == ResultPartitionType.PIPELINED_BOUNDED) {
+			final PipelinedSubpartition[] subpartitions = new PipelinedSubpartition[numberOfSubpartitions];
 			final PipelinedResultPartition pipelinedPartition = new PipelinedResultPartition(
 				taskNameWithSubtaskAndId,
 				partitionIndex,
@@ -138,6 +137,7 @@ public class ResultPartitionFactory {
 			partition = pipelinedPartition;
 		}
 		else if (type == ResultPartitionType.BLOCKING || type == ResultPartitionType.BLOCKING_PERSISTENT) {
+			final BoundedBlockingSubpartition[] subpartitions = new BoundedBlockingSubpartition[numberOfSubpartitions];
 			final BoundedBlockingResultPartition blockingPartition = new BoundedBlockingResultPartition(
 				taskNameWithSubtaskAndId,
 				partitionIndex,
@@ -168,7 +168,7 @@ public class ResultPartitionFactory {
 	}
 
 	private static void initializeBoundedBlockingPartitions(
-			ResultSubpartition[] subpartitions,
+			BoundedBlockingSubpartition[] subpartitions,
 			BoundedBlockingResultPartition parent,
 			BoundedBlockingSubpartitionType blockingSubpartitionType,
 			int networkBufferSize,

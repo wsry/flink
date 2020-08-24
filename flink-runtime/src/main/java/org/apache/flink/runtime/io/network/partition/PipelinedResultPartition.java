@@ -67,7 +67,7 @@ public class PipelinedResultPartition extends BufferWritingResultPartition imple
 			int partitionIndex,
 			ResultPartitionID partitionId,
 			ResultPartitionType partitionType,
-			ResultSubpartition[] subpartitions,
+			PipelinedSubpartition[] subpartitions,
 			int numTargetKeyGroups,
 			ResultPartitionManager partitionManager,
 			@Nullable BufferCompressor bufferCompressor,

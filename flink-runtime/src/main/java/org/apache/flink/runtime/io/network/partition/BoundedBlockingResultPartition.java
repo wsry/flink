@@ -45,7 +45,7 @@ public class BoundedBlockingResultPartition extends BufferWritingResultPartition
 			int partitionIndex,
 			ResultPartitionID partitionId,
 			ResultPartitionType partitionType,
-			ResultSubpartition[] subpartitions,
+			BoundedBlockingSubpartition[] subpartitions,
 			int numTargetKeyGroups,
 			ResultPartitionManager partitionManager,
 			@Nullable BufferCompressor bufferCompressor,
