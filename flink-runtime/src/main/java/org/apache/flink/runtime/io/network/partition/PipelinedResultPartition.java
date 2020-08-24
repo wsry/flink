@@ -46,7 +46,7 @@ import static org.apache.flink.util.Preconditions.checkArgument;
  * {@link #onConsumedSubpartition(int)}) then the partition as a whole is disposed and all buffers are
  * freed.
  */
-public class PipelinedResultPartition extends ResultPartition implements CheckpointedResultPartition {
+public class PipelinedResultPartition extends BufferWritingResultPartition implements CheckpointedResultPartition {
 
 	/** The lock that guard release operations (which can be asynchronously propagated from the
 	 * networks threads. */

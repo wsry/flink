@@ -27,20 +27,18 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 
-import static org.apache.flink.util.Preconditions.checkArgument;
-
 /**
- * A output data result of an individual task (one partition of an intermediate result),
- * produced and communicated in a batch manner: The result must be produced completely before
- * it can be consumed.
+ * A {@link ResultPartition} that turns records into buffers and write directly to partitions.
+ * This is in contrast to implementations where records are written to a joint
+ * structure, from which the subpartitions draw the data after the write phase is finished,
+ * for example sort-based partitioning.
  *
- * <p>In this particular implementation, the batch result is written to (and read from) one file
- * per sub-partition. This implementation hence requires at least as many files (file handles) and
- * memory buffers as the parallelism of the target task that the data is shuffled to.
+ * <p>To avoid confusion: On the read side, all partitions return buffers (and backlog) to be
+ * transported through the network ch
  */
-public class BoundedBlockingResultPartition extends BufferWritingResultPartition {
+public class BufferWritingResultPartition extends ResultPartition {
 
-	public BoundedBlockingResultPartition(
+	public BufferWritingResultPartition(
 			String owningTaskName,
 			int partitionIndex,
 			ResultPartitionID partitionId,
@@ -49,22 +47,18 @@ public class BoundedBlockingResultPartition extends BufferWritingResultPartition
 			int numTargetKeyGroups,
 			ResultPartitionManager partitionManager,
 			@Nullable BufferCompressor bufferCompressor,
-			FunctionWithException<BufferPoolOwner, BufferPool, IOException> bufferPoolFactory) {
+			FunctionWithException<BufferPoolOwner,
+			BufferPool, IOException> bufferPoolFactory) {
 
 		super(
 			owningTaskName,
 			partitionIndex,
 			partitionId,
-			checkResultPartitionType(partitionType),
+			partitionType,
 			subpartitions,
 			numTargetKeyGroups,
 			partitionManager,
 			bufferCompressor,
 			bufferPoolFactory);
-	}
-
-	private static ResultPartitionType checkResultPartitionType(ResultPartitionType type) {
-		checkArgument(type == ResultPartitionType.BLOCKING || type == ResultPartitionType.BLOCKING_PERSISTENT);
-		return type;
 	}
 }

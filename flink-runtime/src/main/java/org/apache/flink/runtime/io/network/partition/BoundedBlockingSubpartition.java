@@ -30,7 +30,6 @@ import javax.annotation.concurrent.GuardedBy;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -61,7 +60,7 @@ import static org.apache.flink.util.Preconditions.checkState;
  * <p>The method calls to create readers, dispose readers, and dispose the partition are
  * thread-safe vis-a-vis each other.
  */
-final class BoundedBlockingSubpartition extends ResultSubpartition {
+final class BoundedBlockingSubpartition extends BufferWritingSubpartition {
 
 	/** This lock guards the creation of readers and disposal of the memory mapped file. */
 	private final Object lock = new Object();
