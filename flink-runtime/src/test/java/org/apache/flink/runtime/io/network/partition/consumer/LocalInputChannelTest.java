@@ -36,6 +36,7 @@ import org.apache.flink.runtime.io.network.buffer.BufferReceivedListener;
 import org.apache.flink.runtime.io.network.buffer.FreeingBufferRecycler;
 import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
 import org.apache.flink.runtime.io.network.partition.BufferAvailabilityListener;
+import org.apache.flink.runtime.io.network.partition.BufferWritingResultPartition;
 import org.apache.flink.runtime.io.network.partition.PartitionNotFoundException;
 import org.apache.flink.runtime.io.network.partition.PartitionTestUtils;
 import org.apache.flink.runtime.io.network.partition.PipelinedResultPartition;
@@ -149,7 +150,7 @@ public class LocalInputChannelTest {
 
 			// Create the producer
 			partitionProducers[i] = new TestPartitionProducer(
-				partition,
+				(BufferWritingResultPartition) partition,
 				false,
 				new TestPartitionProducerBufferSource(
 					parallelism,
