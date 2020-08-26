@@ -24,7 +24,6 @@ import org.apache.flink.runtime.io.network.buffer.BufferBuilder;
 import java.io.IOException;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * A regular record-oriented runtime result writer.
@@ -39,9 +38,6 @@ public final class ChannelSelectorRecordWriter<T extends IOReadableWritable> ext
 
 	private final ChannelSelector<T> channelSelector;
 
-	/** Every subpartition maintains a separate buffer builder which might be null. */
-	private final BufferBuilder[] bufferBuilders;
-
 	ChannelSelectorRecordWriter(
 			ResultPartitionWriter writer,
 			ChannelSelector<T> channelSelector,
@@ -51,82 +47,21 @@ public final class ChannelSelectorRecordWriter<T extends IOReadableWritable> ext
 
 		this.channelSelector = checkNotNull(channelSelector);
 		this.channelSelector.setup(numberOfChannels);
-
-		this.bufferBuilders = new BufferBuilder[numberOfChannels];
 	}
 
 	@Override
-	public void emit(T record) throws IOException, InterruptedException {
+	public void emit(T record) throws IOException {
 		emit(record, channelSelector.selectChannel(record));
 	}
 
 	@Override
-	public void randomEmit(T record) throws IOException, InterruptedException {
-		emit(record, rng.nextInt(numberOfChannels));
-	}
-
-	/**
-	 * The record is serialized into intermediate serialization buffer which is then copied
-	 * into the target buffer for every channel.
-	 */
-	@Override
-	public void broadcastEmit(T record) throws IOException, InterruptedException {
+	public void broadcastEmit(T record) throws IOException {
 		checkErroneous();
 
-		serializer.serializeRecord(record);
+		targetPartition.emitRecordToAllSubpartitions(serializeRecord(record));
 
-		for (int targetChannel = 0; targetChannel < numberOfChannels; targetChannel++) {
-			copyFromSerializerToTargetChannel(targetChannel);
-		}
-	}
-
-	@Override
-	public BufferBuilder getBufferBuilder(int targetChannel) throws IOException, InterruptedException {
-		if (bufferBuilders[targetChannel] != null) {
-			return bufferBuilders[targetChannel];
-		} else {
-			return requestNewBufferBuilder(targetChannel);
-		}
-	}
-
-	@Override
-	public BufferBuilder requestNewBufferBuilder(int targetChannel) throws IOException, InterruptedException {
-		checkState(bufferBuilders[targetChannel] == null || bufferBuilders[targetChannel].isFinished());
-
-		BufferBuilder bufferBuilder = super.requestNewBufferBuilder(targetChannel);
-		addBufferConsumer(bufferBuilder.createBufferConsumer(), targetChannel);
-		bufferBuilders[targetChannel] = bufferBuilder;
-		return bufferBuilder;
-	}
-
-	@Override
-	public void tryFinishCurrentBufferBuilder(int targetChannel) {
-		if (bufferBuilders[targetChannel] == null) {
-			return;
-		}
-		BufferBuilder bufferBuilder = bufferBuilders[targetChannel];
-		bufferBuilders[targetChannel] = null;
-
-		finishBufferBuilder(bufferBuilder);
-	}
-
-	@Override
-	public void emptyCurrentBufferBuilder(int targetChannel) {
-		bufferBuilders[targetChannel] = null;
-	}
-
-	@Override
-	public void closeBufferBuilder(int targetChannel) {
-		if (bufferBuilders[targetChannel] != null) {
-			bufferBuilders[targetChannel].finish();
-			bufferBuilders[targetChannel] = null;
-		}
-	}
-
-	@Override
-	public void clearBuffers() {
-		for (int index = 0; index < numberOfChannels; index++) {
-			closeBufferBuilder(index);
+		if (flushAlways) {
+			flushAll();
 		}
 	}
 }

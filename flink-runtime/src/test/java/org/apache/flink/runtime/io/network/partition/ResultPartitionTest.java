@@ -45,6 +45,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -126,7 +127,7 @@ public class ResultPartitionTest {
 				taskActions,
 				jobId,
 				notifier);
-			consumableNotifyingPartitionWriter.addBufferConsumer(createFilledFinishedBufferConsumer(BufferBuilderTestUtils.BUFFER_SIZE), 0);
+			consumableNotifyingPartitionWriter.emitRecord(ByteBuffer.allocate(BufferBuilderTestUtils.BUFFER_SIZE), 0);
 			verify(notifier, times(1))
 				.notifyPartitionConsumable(eq(jobId), eq(consumableNotifyingPartitionWriter.getPartitionId()), eq(taskActions));
 		}
@@ -139,7 +140,7 @@ public class ResultPartitionTest {
 				taskActions,
 				jobId,
 				notifier);
-			partition.addBufferConsumer(createFilledFinishedBufferConsumer(BufferBuilderTestUtils.BUFFER_SIZE), 0);
+			partition.emitRecord(ByteBuffer.allocate(BufferBuilderTestUtils.BUFFER_SIZE), 0);
 			verify(notifier, never()).notifyPartitionConsumable(eq(jobId), eq(partition.getPartitionId()), eq(taskActions));
 		}
 	}
@@ -181,7 +182,7 @@ public class ResultPartitionTest {
 	}
 
 	/**
-	 * Tests {@link ResultPartition#addBufferConsumer} on a partition which has already finished.
+	 * Tests {@link ResultPartition#emitRecord(ByteBuffer, int)} on a partition which has already finished.
 	 *
 	 * @param partitionType the result partition type to set up
 	 */
@@ -199,7 +200,7 @@ public class ResultPartitionTest {
 			consumableNotifyingPartitionWriter.finish();
 			reset(notifier);
 			// partition.add() should fail
-			consumableNotifyingPartitionWriter.addBufferConsumer(bufferConsumer, 0);
+			consumableNotifyingPartitionWriter.emitRecord(ByteBuffer.allocate(BufferBuilderTestUtils.BUFFER_SIZE), 0);
 			Assert.fail("exception expected");
 		} catch (IllegalStateException e) {
 			// expected => ignored
@@ -227,7 +228,7 @@ public class ResultPartitionTest {
 	}
 
 	/**
-	 * Tests {@link ResultPartition#addBufferConsumer} on a partition which has already been released.
+	 * Tests {@link ResultPartition#emitRecord(ByteBuffer, int)} on a partition which has already been released.
 	 *
 	 * @param partitionType the result partition type to set up
 	 */
@@ -247,7 +248,7 @@ public class ResultPartitionTest {
 		try {
 			partition.release();
 			// partition.add() silently drops the bufferConsumer but recycles it
-			consumableNotifyingPartitionWriter.addBufferConsumer(bufferConsumer, 0);
+			consumableNotifyingPartitionWriter.emitRecord(ByteBuffer.allocate(BufferBuilderTestUtils.BUFFER_SIZE), 0);
 			assertTrue(partition.isReleased());
 		} finally {
 			if (!bufferConsumer.isRecycled()) {
@@ -289,7 +290,7 @@ public class ResultPartitionTest {
 	}
 
 	/**
-	 * Tests {@link ResultPartition#addBufferConsumer(BufferConsumer, int)} on a working partition.
+	 * Tests {@link ResultPartition#emitRecord(ByteBuffer, int)} on a working partition.
 	 *
 	 * @param partitionType the result partition type to set up
 	 */
@@ -305,7 +306,7 @@ public class ResultPartitionTest {
 		BufferConsumer bufferConsumer = createFilledFinishedBufferConsumer(BufferBuilderTestUtils.BUFFER_SIZE);
 		try {
 			// partition.add() adds the bufferConsumer without recycling it (if not spilling)
-			consumableNotifyingPartitionWriter.addBufferConsumer(bufferConsumer, 0);
+			consumableNotifyingPartitionWriter.emitRecord(ByteBuffer.allocate(BufferBuilderTestUtils.BUFFER_SIZE), 0);
 			assertFalse("bufferConsumer should not be recycled (still in the queue)", bufferConsumer.isRecycled());
 		} finally {
 			if (!bufferConsumer.isRecycled()) {
@@ -340,7 +341,7 @@ public class ResultPartitionTest {
 			// take all buffers (more than the minimum required)
 			for (int i = 0; i < numAllBuffers; ++i) {
 				BufferBuilder bufferBuilder = resultPartition.getBufferPool().requestBufferBuilderBlocking();
-				resultPartition.addBufferConsumer(bufferBuilder.createBufferConsumer(), 0);
+				resultPartition.emitRecord(ByteBuffer.allocate(BufferBuilderTestUtils.BUFFER_SIZE), 0);
 			}
 			resultPartition.finish();
 
@@ -379,8 +380,6 @@ public class ResultPartitionTest {
 
 			assertTrue(resultPartition.getAvailableFuture().isDone());
 
-			resultPartition.getBufferBuilder(0);
-			resultPartition.getBufferBuilder(0);
 			assertFalse(resultPartition.getAvailableFuture().isDone());
 		} finally {
 			resultPartition.release();

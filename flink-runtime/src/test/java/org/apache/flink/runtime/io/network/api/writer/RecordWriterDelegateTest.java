@@ -20,8 +20,6 @@ package org.apache.flink.runtime.io.network.api.writer;
 
 import org.apache.flink.runtime.io.network.api.CancelCheckpointMarker;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
-import org.apache.flink.runtime.io.network.buffer.BufferBuilder;
-import org.apache.flink.runtime.io.network.buffer.BufferBuilderTestUtils;
 import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
 import org.apache.flink.runtime.io.network.buffer.BufferPool;
 import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
@@ -29,19 +27,18 @@ import org.apache.flink.runtime.io.network.partition.NoOpBufferAvailablityListen
 import org.apache.flink.runtime.io.network.partition.ResultPartitionBuilder;
 import org.apache.flink.runtime.io.network.partition.ResultSubpartitionView;
 import org.apache.flink.runtime.io.network.partition.consumer.BufferOrEvent;
-import org.apache.flink.runtime.io.network.util.TestPooledBufferProvider;
 import org.apache.flink.util.TestLogger;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -136,10 +133,13 @@ public class RecordWriterDelegateTest extends TestLogger {
 		return new RecordWriterBuilder().build(partition);
 	}
 
-	private RecordWriter createRecordWriter(ArrayDeque<BufferConsumer>[] queues) {
-		final ResultPartitionWriter partition = new RecordWriterTest.CollectingPartitionWriter(
-			queues,
-			new TestPooledBufferProvider(1));
+	private RecordWriter createRecordWriter(ArrayDeque<BufferConsumer>[] queues) throws IOException {
+		int bufferSize = 32 * 1024;
+		int numBuffers = 1;
+
+		final NetworkBufferPool networkBufferPool = new NetworkBufferPool(numBuffers, bufferSize);
+		final BufferPool bufferProvider = networkBufferPool.createBufferPool(numBuffers, numBuffers);
+		final ResultPartitionWriter partition = new RecordWriterTest.CollectingPartitionWriter(queues, bufferProvider);
 
 		return new RecordWriterBuilder().build(partition);
 	}
@@ -151,13 +151,11 @@ public class RecordWriterDelegateTest extends TestLogger {
 
 		// request one buffer from the local pool to make it unavailable
 		RecordWriter recordWriter = writerDelegate.getRecordWriter(0);
-		final BufferBuilder bufferBuilder = checkNotNull(recordWriter.getBufferBuilder(0));
 		assertFalse(writerDelegate.isAvailable());
 		CompletableFuture future = writerDelegate.getAvailableFuture();
 		assertFalse(future.isDone());
 
 		// recycle the buffer to make the local pool available again
-		BufferBuilderTestUtils.fillBufferBuilder(bufferBuilder, 1).finish();
 		ResultSubpartitionView readView = recordWriter.getTargetPartition().getSubpartition(0).createReadView(new NoOpBufferAvailablityListener());
 		Buffer buffer = readView.getNextBuffer().buffer();
 

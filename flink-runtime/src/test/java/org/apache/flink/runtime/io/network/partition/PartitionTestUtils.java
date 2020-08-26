@@ -21,7 +21,6 @@ package org.apache.flink.runtime.io.network.partition;
 import org.apache.flink.runtime.deployment.ResultPartitionDeploymentDescriptor;
 import org.apache.flink.runtime.io.disk.FileChannelManager;
 import org.apache.flink.runtime.io.network.NettyShuffleEnvironment;
-import org.apache.flink.runtime.io.network.api.writer.ResultPartitionWriter;
 import org.apache.flink.runtime.shuffle.PartitionDescriptor;
 import org.apache.flink.runtime.shuffle.PartitionDescriptorBuilder;
 import org.apache.flink.runtime.shuffle.ShuffleDescriptor;
@@ -125,11 +124,11 @@ public enum PartitionTestUtils {
 	}
 
 	public static void writeBuffers(
-			ResultPartitionWriter partition,
+			BufferWritingResultPartition partition,
 			int numberOfBuffers,
 			int bufferSize) throws IOException {
 		for (int i = 0; i < numberOfBuffers; i++) {
-			partition.addBufferConsumer(createFilledFinishedBufferConsumer(bufferSize), 0);
+			partition.addBufferConsumer(createFilledFinishedBufferConsumer(bufferSize), 0, false);
 		}
 		partition.finish();
 	}

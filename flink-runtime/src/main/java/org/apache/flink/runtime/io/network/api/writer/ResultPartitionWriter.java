@@ -18,18 +18,19 @@
 
 package org.apache.flink.runtime.io.network.api.writer;
 
+import org.apache.flink.runtime.event.AbstractEvent;
 import org.apache.flink.runtime.io.AvailabilityProvider;
-import org.apache.flink.runtime.io.network.buffer.BufferBuilder;
-import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.io.network.partition.ResultSubpartition;
+import org.apache.flink.runtime.metrics.groups.TaskIOMetricGroup;
 
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
- * A buffer-oriented runtime result writer API for producing results.
+ * A record-oriented runtime result writer API for producing results.
  *
  * <p>If {@link ResultPartitionWriter#close()} is called before {@link ResultPartitionWriter#fail(Throwable)} or
  * {@link ResultPartitionWriter#finish()}, it abruptly triggers failure and cancellation of production.
@@ -50,45 +51,34 @@ public interface ResultPartitionWriter extends AutoCloseable, AvailabilityProvid
 	int getNumTargetKeyGroups();
 
 	/**
-	 * Requests a {@link BufferBuilder} from this partition for writing data.
+	 * Writes the given serialized record to the target subpartition.
 	 */
-	BufferBuilder getBufferBuilder(int targetChannel) throws IOException, InterruptedException;
-
-
-	/**
-	 * Try to request a {@link BufferBuilder} from this partition for writing data.
-	 *
-	 * <p>Returns <code>null</code> if no buffer is available or the buffer provider has been destroyed.
-	 */
-	BufferBuilder tryGetBufferBuilder(int targetChannel) throws IOException;
+	void emitRecord(ByteBuffer record, int targetSubpartition) throws IOException;
 
 	/**
-	 * Adds the bufferConsumer to the subpartition with the given index.
-	 *
-	 * <p>This method takes the ownership of the passed {@code bufferConsumer} and thus is responsible for releasing
-	 * it's resources.
-	 *
-	 * <p>To avoid problems with data re-ordering, before adding new {@link BufferConsumer} the previously added one
-	 * the given {@code subpartitionIndex} must be marked as {@link BufferConsumer#isFinished()}.
-	 *
-	 * @return true if operation succeeded and bufferConsumer was enqueued for consumption.
+	 * Writes the given serialized record to all subpartitions.
 	 */
-	boolean addBufferConsumer(BufferConsumer bufferConsumer, int subpartitionIndex, boolean isPriorityEvent) throws IOException;
+	void emitRecordToAllSubpartitions(ByteBuffer record) throws IOException;
 
 	/**
-	 * Adds the bufferConsumer to the subpartition with the given index.
+	 * Writes the given serialized record to a shared channel which can be consumed by all subpartitions.
 	 *
-	 * <p>This method takes the ownership of the passed {@code bufferConsumer} and thus is responsible for releasing
-	 * it's resources.
-	 *
-	 * <p>To avoid problems with data re-ordering, before adding new {@link BufferConsumer} the previously added one
-	 * the given {@code subpartitionIndex} must be marked as {@link BufferConsumer#isFinished()}.
-	 *
-	 * @return true if operation succeeded and bufferConsumer was enqueued for consumption.
+	 * <p>Note: Different from {@link #emitRecordToAllSubpartitions(ByteBuffer)}, this method copies the
+	 * given serialized record only once so can have better performance for continuous record broadcast.
+	 * However, for non-frequent random broadcast, {@link #emitRecordToAllSubpartitions(ByteBuffer)} is
+	 * better because this method can incur extra overhead.
 	 */
-	default boolean addBufferConsumer(BufferConsumer bufferConsumer, int subpartitionIndex) throws IOException {
-		return addBufferConsumer(bufferConsumer, subpartitionIndex, false);
-	}
+	void broadcastRecord(ByteBuffer record) throws IOException;
+
+	/**
+	 * Writes the given {@link AbstractEvent} to all channels.
+	 */
+	void broadcastEvent(AbstractEvent event, boolean isPriorityEvent) throws IOException;
+
+	/**
+	 * Sets the metric group for the {@link ResultPartitionWriter}.
+	 */
+	void setMetricGroup(TaskIOMetricGroup metrics);
 
 	/**
 	 * Returns the subpartition with the given index.
@@ -96,12 +86,12 @@ public interface ResultPartitionWriter extends AutoCloseable, AvailabilityProvid
 	ResultSubpartition getSubpartition(int subpartitionIndex);
 
 	/**
-	 * Manually trigger consumption from enqueued {@link BufferConsumer BufferConsumers} in all subpartitions.
+	 * Manually trigger the consumption of data from all subpartitions.
 	 */
 	void flushAll();
 
 	/**
-	 * Manually trigger consumption from enqueued {@link BufferConsumer BufferConsumers} in one specified subpartition.
+	 * Manually trigger the consumption of data from the given subpartitions.
 	 */
 	void flush(int subpartitionIndex);
 

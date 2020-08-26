@@ -18,17 +18,18 @@
 
 package org.apache.flink.runtime.io.network.partition;
 
+import org.apache.flink.metrics.Counter;
+import org.apache.flink.metrics.SimpleCounter;
 import org.apache.flink.runtime.executiongraph.IntermediateResultPartition;
 import org.apache.flink.runtime.io.network.api.writer.ResultPartitionWriter;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
-import org.apache.flink.runtime.io.network.buffer.BufferBuilder;
 import org.apache.flink.runtime.io.network.buffer.BufferCompressor;
-import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
 import org.apache.flink.runtime.io.network.buffer.BufferPool;
 import org.apache.flink.runtime.io.network.buffer.BufferPoolOwner;
 import org.apache.flink.runtime.io.network.partition.consumer.LocalInputChannel;
 import org.apache.flink.runtime.io.network.partition.consumer.RemoteInputChannel;
 import org.apache.flink.runtime.jobgraph.DistributionPattern;
+import org.apache.flink.runtime.metrics.groups.TaskIOMetricGroup;
 import org.apache.flink.runtime.taskexecutor.TaskExecutor;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.FunctionWithException;
@@ -106,6 +107,10 @@ public abstract class ResultPartition implements ResultPartitionWriter, BufferPo
 	/** Used to compress buffer to reduce IO. */
 	@Nullable
 	protected final BufferCompressor bufferCompressor;
+
+	protected Counter numBytesOut = new SimpleCounter();
+
+	protected Counter numBuffersOut = new SimpleCounter();
 
 	public ResultPartition(
 		String owningTaskName,
@@ -196,39 +201,6 @@ public abstract class ResultPartition implements ResultPartitionWriter, BufferPo
 	}
 
 	// ------------------------------------------------------------------------
-
-	@Override
-	public BufferBuilder getBufferBuilder(int targetChannel) throws IOException, InterruptedException {
-		checkInProduceState();
-
-		return bufferPool.requestBufferBuilderBlocking(targetChannel);
-	}
-
-	@Override
-	public BufferBuilder tryGetBufferBuilder(int targetChannel) throws IOException {
-		BufferBuilder bufferBuilder = bufferPool.requestBufferBuilder(targetChannel);
-		return bufferBuilder;
-	}
-
-	@Override
-	public boolean addBufferConsumer(
-			BufferConsumer bufferConsumer,
-			int subpartitionIndex,
-			boolean isPriorityEvent) throws IOException {
-		checkNotNull(bufferConsumer);
-
-		ResultSubpartition subpartition;
-		try {
-			checkInProduceState();
-			subpartition = subpartitions[subpartitionIndex];
-		}
-		catch (Exception ex) {
-			bufferConsumer.close();
-			throw ex;
-		}
-
-		return subpartition.add(bufferConsumer, isPriorityEvent);
-	}
 
 	@Override
 	public void flushAll() {
@@ -322,6 +294,12 @@ public abstract class ResultPartition implements ResultPartitionWriter, BufferPo
 	@Override
 	public int getNumTargetKeyGroups() {
 		return numTargetKeyGroups;
+	}
+
+	@Override
+	public void setMetricGroup(TaskIOMetricGroup metrics) {
+		numBytesOut = metrics.getNumBytesOutCounter();
+		numBuffersOut = metrics.getNumBuffersOutCounter();
 	}
 
 	/**
