@@ -23,7 +23,7 @@ import org.apache.flink.runtime.io.network.api.serialization.RecordDeserializer;
 import org.apache.flink.runtime.io.network.api.serialization.SpillingAdaptiveSpanningRecordDeserializer;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
-import org.apache.flink.runtime.io.network.util.TestPooledBufferProvider;
+import org.apache.flink.runtime.io.network.buffer.BufferPool;
 import org.apache.flink.testutils.serialization.types.IntType;
 import org.apache.flink.testutils.serialization.types.SerializationTestType;
 import org.apache.flink.testutils.serialization.types.SerializationTestTypeFactory;
@@ -56,9 +56,10 @@ public class BroadcastRecordWriterTest extends RecordWriterTest {
 	 */
 	@Test
 	public void testBroadcastMixedRandomEmitRecord() throws Exception {
-		final int numberOfChannels = 4;
+		final int numberOfChannels = 8;
 		final int numberOfRecords = 8;
 		final int bufferSize = 32;
+		final int numBuffers = 100;
 
 		@SuppressWarnings("unchecked")
 		final Queue<BufferConsumer>[] queues = new Queue[numberOfChannels];
@@ -66,9 +67,10 @@ public class BroadcastRecordWriterTest extends RecordWriterTest {
 			queues[i] = new ArrayDeque<>();
 		}
 
-		final TestPooledBufferProvider bufferProvider = new TestPooledBufferProvider(Integer.MAX_VALUE, bufferSize);
+		final BufferPool bufferProvider = createBufferProvider(numBuffers, bufferSize, numberOfChannels);
 		final ResultPartitionWriter partitionWriter = new CollectingPartitionWriter(queues, bufferProvider);
-		final BroadcastRecordWriter<SerializationTestType> writer = new BroadcastRecordWriter<>(partitionWriter, 0, "test");
+		partitionWriter.setup();
+		final BroadcastRecordWriter<SerializationTestType> writer = new BroadcastRecordWriter<>(partitionWriter, -1, "test");
 		final RecordDeserializer<SerializationTestType> deserializer = new SpillingAdaptiveSpanningRecordDeserializer<>(
 			new String[]{ tempFolder.getRoot().getAbsolutePath() });
 
@@ -84,7 +86,7 @@ public class BroadcastRecordWriterTest extends RecordWriterTest {
 		int index = 0;
 		for (SerializationTestType record : records) {
 			int randomChannel = index++ % numberOfChannels;
-			writer.randomEmit(record, randomChannel);
+			writer.emit(record, randomChannel);
 			serializedRecords.get(randomChannel).add(record);
 
 			writer.broadcastEmit(record);
@@ -93,13 +95,13 @@ public class BroadcastRecordWriterTest extends RecordWriterTest {
 			}
 		}
 
-		final int numberOfCreatedBuffers = bufferProvider.getNumberOfCreatedBuffers();
+		final int numberOfCreatedBuffers = bufferProvider.bestEffortGetNumOfUsedBuffers();
 		// verify the expected number of requested buffers, and it would always request a new buffer while random emitting
-		assertEquals(numberOfRecords, numberOfCreatedBuffers);
+		assertEquals(2 * numberOfRecords, numberOfCreatedBuffers);
 
 		for (int i = 0; i < numberOfChannels; i++) {
 			// every channel would queue the number of above crated buffers
-			assertEquals(numberOfRecords, queues[i].size());
+			assertEquals(numberOfRecords + 1, queues[i].size());
 
 			final int excessRandomRecords = i < numberOfRecords % numberOfChannels ? 1 : 0;
 			final int numberOfRandomRecords = numberOfRecords / numberOfChannels + excessRandomRecords;
@@ -109,7 +111,7 @@ public class BroadcastRecordWriterTest extends RecordWriterTest {
 				queues[i],
 				deserializer,
 				serializedRecords.get(i),
-				numberOfCreatedBuffers,
+				numberOfRecords + 1,
 				numberOfTotalRecords);
 		}
 	}
@@ -121,39 +123,37 @@ public class BroadcastRecordWriterTest extends RecordWriterTest {
 	@Test
 	public void testRandomEmitAndBufferRecycling() throws Exception {
 		int recordSize = 8;
+		int numBuffers = 100;
+		int numberOfChannels = 2;
 
-		final TestPooledBufferProvider bufferProvider = new TestPooledBufferProvider(2, 2 * recordSize);
-		final KeepingPartitionWriter partitionWriter = new KeepingPartitionWriter(bufferProvider) {
-			@Override
-			public int getNumberOfSubpartitions() {
-				return 2;
-			}
-		};
-		final BroadcastRecordWriter<SerializationTestType> writer = new BroadcastRecordWriter<>(partitionWriter, 0, "test");
+		final BufferPool bufferProvider = createBufferProvider(numBuffers, 2 * recordSize, numberOfChannels);
+		final KeepingPartitionWriter partitionWriter = new KeepingPartitionWriter(bufferProvider, numberOfChannels);
+		partitionWriter.setup();
+		final BroadcastRecordWriter<SerializationTestType> writer = new BroadcastRecordWriter<>(partitionWriter, -1, "test");
 
 		// force materialization of both buffers for easier availability tests
 		List<Buffer> buffers = Arrays.asList(bufferProvider.requestBuffer(), bufferProvider.requestBuffer());
 		buffers.forEach(Buffer::recycleBuffer);
-		assertEquals(2, bufferProvider.getNumberOfAvailableBuffers());
+		assertEquals(2, bufferProvider.getNumberOfAvailableMemorySegments());
 
 		// fill first buffer
-		writer.randomEmit(new IntType(1), 0);
+		writer.broadcastEmit(new IntType(1));
 		writer.broadcastEmit(new IntType(2));
-		assertEquals(1, bufferProvider.getNumberOfAvailableBuffers());
+		assertEquals(1, bufferProvider.getNumberOfAvailableMemorySegments());
 
 		// simulate consumption of first buffer consumer; this should not free buffers
 		assertEquals(1, partitionWriter.getAddedBufferConsumers(0).size());
 		closeConsumer(partitionWriter, 0, 2 * recordSize);
-		assertEquals(1, bufferProvider.getNumberOfAvailableBuffers());
+		assertEquals(1, bufferProvider.getNumberOfAvailableMemorySegments());
 
 		// use second buffer
-		writer.broadcastEmit(new IntType(3));
-		assertEquals(0, bufferProvider.getNumberOfAvailableBuffers());
+		writer.emit(new IntType(3), 0);
+		assertEquals(0, bufferProvider.getNumberOfAvailableMemorySegments());
 
 		// fully free first buffer
-		assertEquals(2, partitionWriter.getAddedBufferConsumers(1).size());
-		closeConsumer(partitionWriter, 1, recordSize);
-		assertEquals(1, bufferProvider.getNumberOfAvailableBuffers());
+		assertEquals(1, partitionWriter.getAddedBufferConsumers(1).size());
+		closeConsumer(partitionWriter, 1, 2 * recordSize);
+		assertEquals(1, bufferProvider.getNumberOfAvailableMemorySegments());
 	}
 
 	public void closeConsumer(KeepingPartitionWriter partitionWriter, int subpartitionIndex, int expectedSize) {
