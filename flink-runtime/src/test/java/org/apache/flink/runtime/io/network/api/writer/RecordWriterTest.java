@@ -30,7 +30,6 @@ import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.api.serialization.EventSerializer;
 import org.apache.flink.runtime.io.network.api.serialization.RecordDeserializer;
-import org.apache.flink.runtime.io.network.api.serialization.RecordSerializer.SerializationResult;
 import org.apache.flink.runtime.io.network.api.serialization.SpillingAdaptiveSpanningRecordDeserializer;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferBuilder;
@@ -142,8 +141,7 @@ public class RecordWriterTest {
 	}
 
 	/**
-	 * Tests broadcasting events when records have been emitted. The emitted
-	 * records cover all three {@link SerializationResult} types.
+	 * Tests broadcasting events when records have been emitted.
 	 */
 	@Test
 	public void testBroadcastEventMixedRecords() throws Exception {
