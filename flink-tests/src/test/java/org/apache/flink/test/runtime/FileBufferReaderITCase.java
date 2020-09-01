@@ -157,7 +157,7 @@ public class FileBufferReaderITCase extends TestLogger {
 					writer.emit(bytes);
 					writer.flushAll();
 				} finally {
-					writer.clearBuffers();
+					writer.close();
 				}
 			}
 		}

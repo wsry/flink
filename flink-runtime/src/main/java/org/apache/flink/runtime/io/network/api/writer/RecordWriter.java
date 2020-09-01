@@ -243,7 +243,7 @@ public abstract class RecordWriter<T extends IOReadableWritable> implements Avai
 	/**
 	 * Closes the {@link BufferBuilder}s for all the channels.
 	 */
-	public abstract void clearBuffers();
+	protected abstract void clearBuffers();
 
 	/**
 	 * Closes the writer. This stops the flushing thread (if there is one).
