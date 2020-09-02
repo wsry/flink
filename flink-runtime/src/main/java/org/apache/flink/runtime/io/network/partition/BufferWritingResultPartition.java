@@ -118,7 +118,10 @@ public class BufferWritingResultPartition extends ResultPartition {
 			throw ex;
 		}
 
-		return subpartition.add(bufferConsumer, isPriorityEvent);
+		if (!subpartition.add(bufferConsumer, isPriorityEvent)) {
+			throw new IOException("Failed to add buffer, partition released or finished.");
+		}
+		return true;
 	}
 
 	@Override

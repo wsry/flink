@@ -249,6 +249,8 @@ public class ResultPartitionTest {
 			// partition.add() silently drops the bufferConsumer but recycles it
 			consumableNotifyingPartitionWriter.addBufferConsumer(bufferConsumer, 0);
 			assertTrue(partition.isReleased());
+		} catch (IOException e) {
+			// expected => ignored
 		} finally {
 			if (!bufferConsumer.isRecycled()) {
 				bufferConsumer.close();
