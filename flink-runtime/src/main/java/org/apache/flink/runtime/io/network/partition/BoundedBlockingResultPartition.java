@@ -63,6 +63,22 @@ public class BoundedBlockingResultPartition extends BufferWritingResultPartition
 			bufferPoolFactory);
 	}
 
+	@Override
+	public void flush(int targetSubpartition) {
+		finishBroadcastBufferBuilder();
+		finishSubpartitionBufferBuilder(targetSubpartition);
+
+		super.flush(targetSubpartition);
+	}
+
+	@Override
+	public void flushAll() {
+		finishBroadcastBufferBuilder();
+		finishSubpartitionBufferBuilders();
+
+		super.flushAll();
+	}
+
 	private static ResultPartitionType checkResultPartitionType(ResultPartitionType type) {
 		checkArgument(type == ResultPartitionType.BLOCKING || type == ResultPartitionType.BLOCKING_PERSISTENT);
 		return type;
