@@ -277,7 +277,7 @@ public class BufferWritingResultPartition extends ResultPartition {
 		}
 	}
 
-	private void finishSubpartitionBufferBuilder(int targetSubpartition) {
+	protected void finishSubpartitionBufferBuilder(int targetSubpartition) {
 		final BufferBuilder bufferBuilder = subpartitionBufferBuilders[targetSubpartition];
 		if (bufferBuilder != null) {
 			numBytesOut.inc(bufferBuilder.finish());
@@ -286,13 +286,13 @@ public class BufferWritingResultPartition extends ResultPartition {
 		}
 	}
 
-	private void finishSubpartitionBufferBuilders() {
+	protected void finishSubpartitionBufferBuilders() {
 		for (int channelIndex = 0; channelIndex < numSubpartitions; channelIndex++) {
 			finishSubpartitionBufferBuilder(channelIndex);
 		}
 	}
 
-	private void finishBroadcastBufferBuilder() {
+	protected void finishBroadcastBufferBuilder() {
 		if (broadcastBufferBuilder != null) {
 			numBytesOut.inc(broadcastBufferBuilder.finish() * numSubpartitions);
 			numBuffersOut.inc(numSubpartitions);
