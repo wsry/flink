@@ -174,6 +174,37 @@ public class NettyShuffleEnvironmentOptions {
 				" increased in case of higher round trip times between nodes and/or larger number of machines in the cluster.");
 
 	/**
+	 * Boolean flag to enable/disable sort-merge based blocking shuffle.
+	 */
+	@Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
+	public static final ConfigOption<Boolean> NETWORK_SORT_MERGE_SHUFFLE_ENABLED =
+		key("taskmanager.network.sort-merge-blocking-shuffle.enabled")
+			.defaultValue(false)
+			.withDescription("Boolean flag to enable/disable sort-merge based blocking shuffle. The sort-merge based" +
+				" blocking shuffle can use less network memory and bring better performance for large scale batch jobs.");
+
+	/**
+	 * Number of network buffers required for each sort-merge blocking result partition.
+	 */
+	@Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
+	public static final ConfigOption<Integer> NETWORK_BUFFERS_PER_SORT_MERGE_PARTITION =
+		key("taskmanager.network.sort-merge-blocking-shuffle.buffers-per-partition")
+			.defaultValue(2048)
+			.withDescription("Number of network buffers required for each sort-merge blocking result partition. Larger " +
+				"value can reduce the number of shuffle files and bring better performance.");
+
+	/**
+	 * Parallelism threshold to switch between sort-merge based blocking shuffle and the default hash-based blocking shuffle.
+	 */
+	@Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
+	public static final ConfigOption<Integer> NETWORK_SORT_MERGE_SHUFFLE_MIN_PARALLELISM =
+		key("taskmanager.network.sort-merge-blocking-shuffle.min-parallelism")
+			.defaultValue(200)
+			.withDescription("Parallelism threshold to switch between sort-merge based blocking shuffle and the default" +
+				" hash-based blocking shuffle, which means for small parallelism, hash-based blocking shuffle will be " +
+				"used and for large parallelism, sort-merge based blocking shuffle will be used.");
+
+	/**
 	 * Number of max buffers can be used for each output subparition.
 	 */
 	@Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
