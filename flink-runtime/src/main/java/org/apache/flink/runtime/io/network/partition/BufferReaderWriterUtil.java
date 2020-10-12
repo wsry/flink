@@ -201,7 +201,7 @@ final class BufferReaderWriterUtil {
 		}
 	}
 
-	private static void readByteBufferFully(FileChannel channel, ByteBuffer b) throws IOException {
+	static void readByteBufferFully(FileChannel channel, ByteBuffer b) throws IOException {
 		// the post-checked loop here gets away with one less check in the normal case
 		do {
 			if (channel.read(b) == -1) {
@@ -211,7 +211,7 @@ final class BufferReaderWriterUtil {
 		while (b.hasRemaining());
 	}
 
-	private static void writeBuffer(FileChannel channel, ByteBuffer buffer) throws IOException {
+	static void writeBuffer(FileChannel channel, ByteBuffer buffer) throws IOException {
 		while (buffer.hasRemaining()) {
 			channel.write(buffer);
 		}
