@@ -95,7 +95,7 @@ public abstract class ResultPartition implements ResultPartitionWriter {
 
 	protected BufferPool bufferPool;
 
-	private boolean isFinished;
+	protected boolean isFinished;
 
 	private volatile Throwable cause;
 

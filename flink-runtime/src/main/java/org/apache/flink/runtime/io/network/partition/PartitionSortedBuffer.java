@@ -52,7 +52,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 @NotThreadSafe
 public class PartitionSortedBuffer implements SortBuffer {
 
-	private final Object lock = new Object();
+	private final Object lock;
 
 	/**
 	 * Size of an index entry: 4 bytes for record length, 4 bytes for data type and 8 bytes
@@ -119,11 +119,12 @@ public class PartitionSortedBuffer implements SortBuffer {
 	/** Current available channel to read data from. */
 	private int readChannelIndex = -1;
 
-	public PartitionSortedBuffer(BufferPool bufferPool, int numSubpartitions, int bufferSize) {
+	public PartitionSortedBuffer(BufferPool bufferPool, int numSubpartitions, int bufferSize, Object lock) {
 		checkArgument(bufferSize > INDEX_ENTRY_SIZE, "Buffer size is too small.");
 
 		this.bufferPool = checkNotNull(bufferPool);
 		this.bufferSize = bufferSize;
+		this.lock = checkNotNull(lock);
 		this.firstIndexEntryAddresses = new long[numSubpartitions];
 		this.lastIndexEntryAddresses = new long[numSubpartitions];
 
