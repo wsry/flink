@@ -63,6 +63,10 @@ public class ResultPartitionFactory {
 
 	private final int maxBuffersPerChannel;
 
+	private final int sortShuffleMinBuffers;
+
+	private final int sortShuffleMinParallelism;
+
 	public ResultPartitionFactory(
 		ResultPartitionManager partitionManager,
 		FileChannelManager channelManager,
@@ -73,7 +77,9 @@ public class ResultPartitionFactory {
 		int networkBufferSize,
 		boolean blockingShuffleCompressionEnabled,
 		String compressionCodec,
-		int maxBuffersPerChannel) {
+		int maxBuffersPerChannel,
+		int sortShuffleMinBuffers,
+		int sortShuffleMinParallelism) {
 
 		this.partitionManager = partitionManager;
 		this.channelManager = channelManager;
@@ -85,6 +91,8 @@ public class ResultPartitionFactory {
 		this.blockingShuffleCompressionEnabled = blockingShuffleCompressionEnabled;
 		this.compressionCodec = compressionCodec;
 		this.maxBuffersPerChannel = maxBuffersPerChannel;
+		this.sortShuffleMinBuffers = sortShuffleMinBuffers;
+		this.sortShuffleMinParallelism = sortShuffleMinParallelism;
 	}
 
 	public ResultPartition create(
@@ -137,25 +145,40 @@ public class ResultPartitionFactory {
 			partition = pipelinedPartition;
 		}
 		else if (type == ResultPartitionType.BLOCKING || type == ResultPartitionType.BLOCKING_PERSISTENT) {
-			final BoundedBlockingResultPartition blockingPartition = new BoundedBlockingResultPartition(
-				taskNameWithSubtaskAndId,
-				partitionIndex,
-				id,
-				type,
-				subpartitions,
-				maxParallelism,
-				partitionManager,
-				bufferCompressor,
-				bufferPoolFactory);
+			if (numberOfSubpartitions >= sortShuffleMinParallelism) {
+				partition = new SortMergeResultPartition(
+					taskNameWithSubtaskAndId,
+					partitionIndex,
+					id,
+					type,
+					subpartitions.length,
+					maxParallelism,
+					networkBufferSize,
+					partitionManager,
+					channelManager.createChannel().getPath(),
+					bufferCompressor,
+					bufferPoolFactory);
+			} else {
+				final BoundedBlockingResultPartition blockingPartition = new BoundedBlockingResultPartition(
+					taskNameWithSubtaskAndId,
+					partitionIndex,
+					id,
+					type,
+					subpartitions,
+					maxParallelism,
+					partitionManager,
+					bufferCompressor,
+					bufferPoolFactory);
 
-			initializeBoundedBlockingPartitions(
-				subpartitions,
-				blockingPartition,
-				blockingSubpartitionType,
-				networkBufferSize,
-				channelManager);
+				initializeBoundedBlockingPartitions(
+					subpartitions,
+					blockingPartition,
+					blockingSubpartitionType,
+					networkBufferSize,
+					channelManager);
 
-			partition = blockingPartition;
+				partition = blockingPartition;
+			}
 		}
 		else {
 			throw new IllegalArgumentException("Unrecognized ResultPartitionType: " + type);
@@ -215,10 +238,13 @@ public class ResultPartitionFactory {
 		return () -> {
 			int maxNumberOfMemorySegments = type.isBounded() ?
 				numberOfSubpartitions * networkBuffersPerChannel + floatingNetworkBuffersPerGate : Integer.MAX_VALUE;
+			int numRequiredBuffers = !type.isPipelined() && numberOfSubpartitions >= sortShuffleMinParallelism ?
+				sortShuffleMinBuffers : numberOfSubpartitions + 1;
+
 			// If the partition type is back pressure-free, we register with the buffer pool for
 			// callbacks to release memory.
 			return bufferPoolFactory.createBufferPool(
-				numberOfSubpartitions + 1,
+				numRequiredBuffers,
 				maxNumberOfMemorySegments,
 				numberOfSubpartitions,
 				maxBuffersPerChannel);

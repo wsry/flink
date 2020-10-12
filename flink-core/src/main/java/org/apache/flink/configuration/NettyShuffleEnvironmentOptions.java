@@ -174,6 +174,28 @@ public class NettyShuffleEnvironmentOptions {
 				" increased in case of higher round trip times between nodes and/or larger number of machines in the cluster.");
 
 	/**
+	 * Minimum number of network buffers required per sort-merge blocking result partition.
+	 */
+	@Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
+	public static final ConfigOption<Integer> NETWORK_SORT_SHUFFLE_MIN_BUFFERS =
+		key("taskmanager.network.sort-shuffle.min-buffers")
+			.intType()
+			.defaultValue(64)
+			.withDescription("Minimum number of network buffers required per sort-merge blocking result partition.");
+
+	/**
+	 * Parallelism threshold to switch between sort-merge blocking shuffle and the default hash-based blocking shuffle.
+	 */
+	@Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
+	public static final ConfigOption<Integer> NETWORK_SORT_SHUFFLE_MIN_PARALLELISM =
+		key("taskmanager.network.sort-shuffle.min-parallelism")
+			.intType()
+			.defaultValue(Integer.MAX_VALUE)
+			.withDescription("Parallelism threshold to switch between sort-merge blocking shuffle and the default " +
+				"hash-based blocking shuffle, which means for small parallelism, hash-based blocking shuffle will " +
+				"be used and for large parallelism, sort-merge blocking shuffle will be used.");
+
+	/**
 	 * Number of max buffers can be used for each output subparition.
 	 */
 	@Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
