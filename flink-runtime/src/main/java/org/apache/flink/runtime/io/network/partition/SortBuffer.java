@@ -27,8 +27,8 @@ import java.nio.ByteBuffer;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * Data of different channels can be appended to a {@link SortBuffer} and after the {@link SortBuffer} is
- * finished, the appended data can be copied from it in channel index order.
+ * Data of different channels can be appended to a {@link SortBuffer} and after the {@link SortBuffer}
+ * is finished, the appended data can be copied from it in the given channel order.
  */
 public interface SortBuffer {
 
@@ -40,9 +40,9 @@ public interface SortBuffer {
 	boolean append(ByteBuffer source, int targetChannel, Buffer.DataType dataType) throws IOException;
 
 	/**
-	 * Copies data in this {@link SortBuffer} to the target {@link MemorySegment} in channel index order
-	 * and returns {@link BufferWithChannel} which contains the copied data and the corresponding channel
-	 * index.
+	 * Copies data in this {@link SortBuffer} to the target {@link MemorySegment} in the given channel
+	 * order and returns {@link BufferWithChannel} which contains the copied data and the corresponding
+	 * channel index.
 	 */
 	BufferWithChannel copyIntoSegment(MemorySegment target);
 

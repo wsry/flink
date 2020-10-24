@@ -25,6 +25,7 @@ import org.apache.flink.runtime.io.network.buffer.BufferBuilder;
 import org.apache.flink.runtime.io.network.buffer.BufferPool;
 import org.apache.flink.runtime.io.network.buffer.NetworkBuffer;
 
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.NotThreadSafe;
 
@@ -110,16 +111,24 @@ public class PartitionSortedBuffer implements SortBuffer {
 	// For reading
 	// ----------------------------------------------------------------------------------------------
 
+	/** Data of different subpartitions in this sort buffer will be read in this order. */
+	private final int[] subpartitionReadOrder;
+
 	/** Index entry address of the current record or event to be read. */
 	private long readIndexEntryAddress;
 
 	/** Record bytes remaining after last copy, which must be read first in next copy. */
 	private int recordRemainingBytes;
 
-	/** Current available channel to read data from. */
-	private int readChannelIndex = -1;
+	/** Used to index current available channel to read data from. */
+	private int readOrderIndex = -1;
 
-	public PartitionSortedBuffer(BufferPool bufferPool, int numSubpartitions, int bufferSize, Object lock) {
+	public PartitionSortedBuffer(
+			BufferPool bufferPool,
+			int numSubpartitions,
+			int bufferSize,
+			Object lock,
+			@Nullable int[] subpartitionReadOrder) {
 		checkArgument(bufferSize > INDEX_ENTRY_SIZE, "Buffer size is too small.");
 
 		this.bufferPool = checkNotNull(bufferPool);
@@ -127,10 +136,20 @@ public class PartitionSortedBuffer implements SortBuffer {
 		this.lock = checkNotNull(lock);
 		this.firstIndexEntryAddresses = new long[numSubpartitions];
 		this.lastIndexEntryAddresses = new long[numSubpartitions];
+		this.subpartitionReadOrder = new int[numSubpartitions];
 
 		// initialized with -1 means the corresponding channel has no data
 		Arrays.fill(firstIndexEntryAddresses, -1L);
 		Arrays.fill(lastIndexEntryAddresses, -1L);
+
+		if (subpartitionReadOrder != null) {
+			checkArgument(subpartitionReadOrder.length == numSubpartitions, "Illegal data read order.");
+			System.arraycopy(subpartitionReadOrder, 0, this.subpartitionReadOrder, 0, numSubpartitions);
+		} else {
+			for (int channel = 0; channel < numSubpartitions; ++channel) {
+				this.subpartitionReadOrder[channel] = channel;
+			}
+		}
 	}
 
 	@Override
@@ -269,7 +288,7 @@ public class PartitionSortedBuffer implements SortBuffer {
 
 		int numBytesCopied = 0;
 		DataType bufferDataType = DataType.DATA_BUFFER;
-		int channelIndex = readChannelIndex;
+		int channelIndex = subpartitionReadOrder[readOrderIndex];
 
 		do {
 			int sourceSegmentIndex = getSegmentIndexFromPointer(readIndexEntryAddress);
@@ -352,8 +371,8 @@ public class PartitionSortedBuffer implements SortBuffer {
 
 	private void updateReadChannelAndIndexEntryAddress() {
 		// skip the channels without any data
-		while (++readChannelIndex < firstIndexEntryAddresses.length) {
-			if ((readIndexEntryAddress = firstIndexEntryAddresses[readChannelIndex]) >= 0) {
+		while (++readOrderIndex < firstIndexEntryAddresses.length) {
+			if ((readIndexEntryAddress = firstIndexEntryAddresses[subpartitionReadOrder[readOrderIndex]]) >= 0) {
 				break;
 			}
 		}

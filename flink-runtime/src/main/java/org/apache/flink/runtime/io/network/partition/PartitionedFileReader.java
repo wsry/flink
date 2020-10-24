@@ -22,17 +22,15 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferRecycler;
-import org.apache.flink.util.ExceptionUtils;
 
 import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.file.StandardOpenOption;
 
+import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * Reader which can read all data of the target subpartition from a {@link PartitionedFile}.
@@ -52,13 +50,16 @@ public class PartitionedFileReader implements AutoCloseable {
 	private final int targetSubpartition;
 
 	/** Data file channel of the target {@link PartitionedFile}. */
-	private FileChannel dataFileChannel;
+	private final FileChannel dataFileChannel;
 
 	/** Index file channel of the target {@link PartitionedFile}. */
-	private FileChannel indexFileChannel;
+	private final FileChannel indexFileChannel;
 
 	/** Next data region to be read. */
 	private int nextRegionToRead;
+
+	/** Next offset in the data file to read. */
+	private long nextReadOffset;
 
 	/** Number of remaining buffers in the current data region read. */
 	private int currentRegionRemainingBuffers;
@@ -66,36 +67,31 @@ public class PartitionedFileReader implements AutoCloseable {
 	/** Whether this partitioned file reader is closed. */
 	private boolean isClosed;
 
-	public PartitionedFileReader(PartitionedFile partitionedFile, int targetSubpartition) {
+	public PartitionedFileReader(
+			PartitionedFile partitionedFile,
+			int targetSubpartition,
+			FileChannel dataFileChannel,
+			FileChannel indexFileChannel) throws IOException {
+		checkArgument(dataFileChannel.isOpen() && indexFileChannel.isOpen(), "File channels must be opened.");
+
 		this.partitionedFile = checkNotNull(partitionedFile);
 		this.targetSubpartition = targetSubpartition;
+		this.dataFileChannel = checkNotNull(dataFileChannel);
+		this.indexFileChannel = checkNotNull(indexFileChannel);
 
 		this.indexEntryBuf = ByteBuffer.allocate(PartitionedFile.INDEX_ENTRY_SIZE);
 		indexEntryBuf.order(PartitionedFile.DEFAULT_BYTE_ORDER);
-	}
-
-	/**
-	 * Opens the given {@link PartitionedFile} and moves read position to the starting offset of the
-	 * target subpartition.
-	 */
-	public void open() throws IOException {
-		checkState(dataFileChannel == null && indexFileChannel == null, "File reader is already opened.");
-		checkState(!isClosed, "File reader is already closed.");
-
-		dataFileChannel = FileChannel.open(partitionedFile.getDataFilePath(), StandardOpenOption.READ);
-		indexFileChannel = FileChannel.open(partitionedFile.getIndexFilePath(), StandardOpenOption.READ);
 
 		moveToNextReadableRegion();
 	}
 
-	private boolean moveToNextReadableRegion() throws IOException {
+	public boolean moveToNextReadableRegion() throws IOException {
 		while (currentRegionRemainingBuffers == 0 && nextRegionToRead < partitionedFile.getNumRegions()) {
 			partitionedFile.getIndexEntry(indexFileChannel, indexEntryBuf, nextRegionToRead, targetSubpartition);
-			long dataOffset = indexEntryBuf.getLong();
+			nextReadOffset = indexEntryBuf.getLong();
 			currentRegionRemainingBuffers = indexEntryBuf.getInt();
 
 			++nextRegionToRead;
-			dataFileChannel.position(dataOffset);
 		}
 
 		return currentRegionRemainingBuffers > 0;
@@ -108,22 +104,32 @@ public class PartitionedFileReader implements AutoCloseable {
 	 */
 	@Nullable
 	public Buffer readBuffer(MemorySegment target, BufferRecycler recycler) throws IOException {
-		checkState(dataFileChannel != null && indexFileChannel != null, "Must open the partitioned file first.");
-		checkState(!isClosed, "File reader is already closed.");
-
+		Buffer buffer = null;
 		if (moveToNextReadableRegion()) {
+			dataFileChannel.position(nextReadOffset);
+			buffer = BufferReaderWriterUtil.readFromByteChannel(dataFileChannel, headerBuf, target, recycler);
+			nextReadOffset = dataFileChannel.position();
 			--currentRegionRemainingBuffers;
-			return BufferReaderWriterUtil.readFromByteChannel(dataFileChannel, headerBuf, target, recycler);
 		}
 
-		return null;
+		return buffer;
+	}
+
+	public long getNextReadOffset() {
+		return nextReadOffset;
+	}
+
+	public int getCurrentRegionRemainingBuffers() {
+		return currentRegionRemainingBuffers;
+	}
+
+	/** Gets read priority of this file reader. Smaller value indicates higher priority. */
+	public long getPriority() {
+		return nextReadOffset;
 	}
 
 	@VisibleForTesting
 	public boolean hasRemaining() throws IOException {
-		checkState(dataFileChannel != null && indexFileChannel != null, "Must open the partitioned file first.");
-		checkState(!isClosed, "File reader is already closed.");
-
 		return moveToNextReadableRegion();
 	}
 
@@ -133,26 +139,5 @@ public class PartitionedFileReader implements AutoCloseable {
 			return;
 		}
 		isClosed = true;
-
-		Throwable exception = null;
-		try {
-			if (dataFileChannel != null) {
-				dataFileChannel.close();
-			}
-		} catch (Throwable throwable) {
-			exception = throwable;
-		}
-
-		try {
-			if (indexFileChannel != null) {
-				indexFileChannel.close();
-			}
-		} catch (Throwable throwable) {
-			exception = ExceptionUtils.firstOrSuppressed(throwable, exception);
-		}
-
-		if (exception != null) {
-			ExceptionUtils.rethrow(exception);
-		}
 	}
 }

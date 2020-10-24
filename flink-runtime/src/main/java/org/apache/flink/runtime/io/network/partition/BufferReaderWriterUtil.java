@@ -96,6 +96,32 @@ final class BufferReaderWriterUtil {
 		return new NetworkBuffer(memorySegment, FreeingBufferRecycler.INSTANCE, dataType, isCompressed, size);
 	}
 
+	static Buffer sliceNextBuffer(ByteBuffer memory, MemorySegment target, BufferRecycler recycler) {
+		final int remaining = memory.remaining();
+
+		// we only check the correct case where data is exhausted
+		// all other cases can only occur if our write logic is wrong and will already throw
+		// buffer underflow exceptions which will cause the read to fail.
+		if (remaining == 0) {
+			return null;
+		}
+
+		final boolean isEvent = memory.getShort() == HEADER_VALUE_IS_EVENT;
+		final boolean isCompressed = memory.getShort() == BUFFER_IS_COMPRESSED;
+		final int size = memory.getInt();
+
+		int limit = memory.limit();
+		memory.limit(memory.position() + size);
+		ByteBuffer buf = memory.slice();
+		memory.position(memory.limit());
+		memory.limit(limit);
+
+		target.put(0, buf, size);
+
+		Buffer.DataType dataType = isEvent ? Buffer.DataType.EVENT_BUFFER : Buffer.DataType.DATA_BUFFER;
+		return new NetworkBuffer(target, recycler, dataType, isCompressed, size);
+	}
+
 	// ------------------------------------------------------------------------
 	//  ByteChannel read / write
 	// ------------------------------------------------------------------------
@@ -125,6 +151,26 @@ final class BufferReaderWriterUtil {
 			writeBuffers(channel, arrayWithHeaderBuffer);
 		}
 		return bytesExpected;
+	}
+
+	static long writeToByteChannel(
+			FileChannel channel,
+			Buffer buffer,
+			ByteBuffer cacheBuffer) throws IOException {
+
+		final long bytesToWrite = HEADER_LENGTH + buffer.readableBytes();
+		if (bytesToWrite > cacheBuffer.remaining()) {
+			cacheBuffer.flip();
+			writeBuffer(channel, cacheBuffer);
+			cacheBuffer.clear();
+		}
+
+		cacheBuffer.putShort(buffer.isBuffer() ? HEADER_VALUE_IS_BUFFER : HEADER_VALUE_IS_EVENT);
+		cacheBuffer.putShort(buffer.isCompressed() ? BUFFER_IS_COMPRESSED : BUFFER_IS_NOT_COMPRESSED);
+		cacheBuffer.putInt(buffer.getSize());
+		cacheBuffer.put(buffer.getNioBufferReadable());
+
+		return bytesToWrite;
 	}
 
 	static long writeToByteChannelIfBelowSize(

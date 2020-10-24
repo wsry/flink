@@ -44,9 +44,6 @@ import static org.apache.flink.util.Preconditions.checkState;
 @NotThreadSafe
 public class PartitionedFileWriter implements AutoCloseable {
 
-	/** Used when writing data buffers. */
-	private final ByteBuffer[] header = BufferReaderWriterUtil.allocatedWriteBufferArray();
-
 	/** Buffer for writing region index. */
 	private final ByteBuffer indexBuffer;
 
@@ -59,11 +56,14 @@ public class PartitionedFileWriter implements AutoCloseable {
 	/** Index file path of the target {@link PartitionedFile}. */
 	private final Path indexFilePath;
 
-	/** Number of bytes written for each subpartition in the current region. */
-	private final long[] subpartitionBytes;
+	/** Offset in the data file for each subpartition in the current region. */
+	private final long[] subpartitionOffsets;
 
 	/** Number of buffers written for each subpartition in the current region. */
 	private final int[] subpartitionBuffers;
+
+	/** Used to cache data before writing to disk for better read performance. */
+	private ByteBuffer writeDataCache;
 
 	/** Opened data file channel of the target {@link PartitionedFile}. */
 	private FileChannel dataFileChannel;
@@ -78,7 +78,7 @@ public class PartitionedFileWriter implements AutoCloseable {
 	private int numRegions;
 
 	/** Current subpartition to write. Buffer writing must be in subpartition order within each region. */
-	private int currentSubpartition;
+	private int currentSubpartition = -1;
 
 	/** Whether all index data is cached in memory or not. */
 	private boolean allIndexDataCached = true;
@@ -95,13 +95,19 @@ public class PartitionedFileWriter implements AutoCloseable {
 		checkArgument(indexBufferSize > 0, "Illegal index buffer size.");
 
 		this.numSubpartitions = numSubpartitions;
-		this.subpartitionBytes = new long[numSubpartitions];
+		this.subpartitionOffsets = new long[numSubpartitions];
 		this.subpartitionBuffers = new int[numSubpartitions];
 		this.dataFilePath = new File(basePath + PartitionedFile.DATA_FILE_SUFFIX).toPath();
 		this.indexFilePath = new File(basePath + PartitionedFile.INDEX_FILE_SUFFIX).toPath();
 
 		this.indexBuffer = ByteBuffer.allocate(indexBufferSize * PartitionedFile.INDEX_ENTRY_SIZE);
 		indexBuffer.order(PartitionedFile.DEFAULT_BYTE_ORDER);
+
+		Arrays.fill(subpartitionOffsets, -1L);
+
+		// allocate 4M unmanaged direct memory for caching of data
+		this.writeDataCache = ByteBuffer.allocateDirect(4 * 1024 * 1024);
+		BufferReaderWriterUtil.configureByteBuffer(writeDataCache);
 	}
 
 	/**
@@ -138,7 +144,7 @@ public class PartitionedFileWriter implements AutoCloseable {
 	}
 
 	private void writeRegionIndex() throws IOException {
-		if (Arrays.stream(subpartitionBytes).sum() > 0) {
+		if (Arrays.stream(subpartitionBuffers).sum() > 0) {
 			for (int subpartition = 0; subpartition < numSubpartitions; ++subpartition) {
 				if (!indexBuffer.hasRemaining()) {
 					flushIndexBuffer();
@@ -146,42 +152,44 @@ public class PartitionedFileWriter implements AutoCloseable {
 					allIndexDataCached = false;
 				}
 
-				indexBuffer.putLong(totalBytesWritten);
+				indexBuffer.putLong(subpartitionOffsets[subpartition]);
 				indexBuffer.putInt(subpartitionBuffers[subpartition]);
-				totalBytesWritten += subpartitionBytes[subpartition];
 			}
 
+			currentSubpartition = -1;
 			++numRegions;
-			currentSubpartition = 0;
-			Arrays.fill(subpartitionBytes, 0);
+			Arrays.fill(subpartitionOffsets, -1L);
 			Arrays.fill(subpartitionBuffers, 0);
 		}
 	}
 
 	private void flushIndexBuffer() throws IOException {
 		indexBuffer.flip();
-		if (indexBuffer.limit() > 0) {
+		if (indexBuffer.hasRemaining()) {
 			BufferReaderWriterUtil.writeBuffer(indexFileChannel, indexBuffer);
 		}
 	}
 
 	/**
-	 * Writes a {@link Buffer} of the given subpartition to the this {@link PartitionedFile}.
+	 * Writes a {@link Buffer} of the given subpartition to the this {@link PartitionedFile}. In a data region,
+	 * all data of the same subpartition must be written together.
 	 *
 	 * <p>Note: The caller is responsible for recycling the target buffer and releasing the failed
 	 * {@link PartitionedFile} if any exception occurs.
 	 */
 	public void writeBuffer(Buffer target, int targetSubpartition) throws IOException {
-		checkArgument(targetSubpartition >= currentSubpartition, "Must write in subpartition index order.");
 		checkState(!isFinished, "File writer is already finished.");
 		checkState(!isClosed, "File writer is already closed.");
 		checkState(dataFileChannel != null && indexFileChannel != null, "Must open the partitioned file first.");
 
-		currentSubpartition = Math.max(currentSubpartition, targetSubpartition);
-		long numBytes = BufferReaderWriterUtil.writeToByteChannel(dataFileChannel, target, header);
+		if (targetSubpartition != currentSubpartition) {
+			checkState(subpartitionOffsets[targetSubpartition] == -1, "Must write data of the same channel together.");
+			subpartitionOffsets[targetSubpartition] = totalBytesWritten;
+			currentSubpartition = targetSubpartition;
+		}
 
+		totalBytesWritten += BufferReaderWriterUtil.writeToByteChannel(dataFileChannel, target, writeDataCache);
 		++subpartitionBuffers[targetSubpartition];
-		subpartitionBytes[targetSubpartition] += numBytes;
 	}
 
 	/**
@@ -196,6 +204,12 @@ public class PartitionedFileWriter implements AutoCloseable {
 		checkState(dataFileChannel != null && indexFileChannel != null, "Must open the partitioned file first.");
 
 		isFinished = true;
+
+		writeDataCache.flip();
+		if (writeDataCache.hasRemaining()) {
+			BufferReaderWriterUtil.writeBuffer(dataFileChannel, writeDataCache);
+		}
+		writeDataCache = null;
 
 		writeRegionIndex();
 		flushIndexBuffer();

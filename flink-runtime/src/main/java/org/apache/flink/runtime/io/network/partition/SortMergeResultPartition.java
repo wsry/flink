@@ -37,6 +37,8 @@ import javax.annotation.concurrent.NotThreadSafe;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -48,9 +50,9 @@ import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * {@link SortMergeResultPartition} appends records and events to {@link SortBuffer} and after the {@link SortBuffer}
- * is full, all data in the {@link SortBuffer} will be copied and spilled to a {@link PartitionedFile} in subpartition
- * index order sequentially. Large records that can not be appended to an empty {@link SortBuffer} will be spilled to
- * the {@link PartitionedFile} separately.
+ * is full, all data in the {@link SortBuffer} will be copied and spilled to a {@link PartitionedFile} in the random
+ * subpartition index order sequentially. Large records that can not be appended to an empty {@link SortBuffer} will
+ * be spilled to the {@link PartitionedFile} separately.
  */
 @NotThreadSafe
 public class SortMergeResultPartition extends ResultPartition {
@@ -65,9 +67,6 @@ public class SortMergeResultPartition extends ResultPartition {
 	@GuardedBy("lock")
 	private PartitionedFile resultFile;
 
-	/** Number of data buffers (excluding events) written for each subpartition. */
-	private final int[] numDataBuffers;
-
 	/** A piece of unmanaged memory for data writing. */
 	private final MemorySegment writeBuffer;
 
@@ -76,6 +75,12 @@ public class SortMergeResultPartition extends ResultPartition {
 
 	/** File writer for this result partition. */
 	private final PartitionedFileWriter fileWriter;
+
+	/** Subpartition order of coping data from {@link SortBuffer}. */
+	private final int[] subpartitionReadOrder;
+
+	/** IO scheduler which controls shuffle data reading. */
+	private final BlockingShuffleIOScheduler shuffleIOScheduler;
 
 	/** Current {@link SortBuffer} to append records to. */
 	private SortBuffer currentSortBuffer;
@@ -105,11 +110,40 @@ public class SortMergeResultPartition extends ResultPartition {
 			bufferPoolFactory);
 
 		this.networkBufferSize = networkBufferSize;
-		this.numDataBuffers = new int[numSubpartitions];
 		this.writeBuffer = MemorySegmentFactory.allocateUnpooledOffHeapMemory(networkBufferSize);
+		this.subpartitionReadOrder = getRandomSubpartitionReadOrder(numSubpartitions);
+		this.fileWriter = createPartitionedFileWriter(resultFileBasePath, numSubpartitions);
+		this.shuffleIOScheduler = createShuffleIOScheduler(networkBufferSize);
+	}
 
+	private int[] getRandomSubpartitionReadOrder(int numSubpartitions) {
+		int[] subpartitionReadOrder = new int[numSubpartitions];
+		ArrayList<Integer> tmpOrder = new ArrayList<>(numSubpartitions);
+
+		for (int channel = 0; channel < numSubpartitions; ++channel) {
+			tmpOrder.add(channel);
+		}
+		Collections.shuffle(tmpOrder);
+
+		for (int channel = 0; channel < numSubpartitions; ++channel) {
+			subpartitionReadOrder[channel] = tmpOrder.get(channel);
+		}
+
+		return subpartitionReadOrder;
+	}
+
+	private BlockingShuffleIOScheduler createShuffleIOScheduler(int networkBufferSize) {
+		// the scheduler thread will be released when the result partition is released
+		BlockingShuffleIOScheduler shuffleIOScheduler = new BlockingShuffleIOScheduler(networkBufferSize, lock);
+		shuffleIOScheduler.start();
+
+		return shuffleIOScheduler;
+	}
+
+	private PartitionedFileWriter createPartitionedFileWriter(String resultFileBasePath, int numSubpartitions) {
 		// allocate about 4m heap memory for caching of index entries
-		this.fileWriter = new PartitionedFileWriter(resultFileBasePath, numSubpartitions, 400 * 1024);
+		PartitionedFileWriter fileWriter = new PartitionedFileWriter(resultFileBasePath, numSubpartitions, 400 * 1024);
+
 		try {
 			fileWriter.open();
 		} catch (Throwable throwable) {
@@ -117,11 +151,15 @@ public class SortMergeResultPartition extends ResultPartition {
 			fileWriter.releaseQuietly();
 			ExceptionUtils.rethrow(throwable);
 		}
+
+		return fileWriter;
 	}
 
 	@Override
 	protected void releaseInternal() {
 		synchronized (lock) {
+			shuffleIOScheduler.release(getFailureCause());
+
 			if (resultFile == null) {
 				fileWriter.releaseQuietly();
 			}
@@ -195,7 +233,8 @@ public class SortMergeResultPartition extends ResultPartition {
 			return currentSortBuffer;
 		}
 
-		currentSortBuffer = new PartitionSortedBuffer(bufferPool, numSubpartitions, networkBufferSize, lock);
+		currentSortBuffer = new PartitionSortedBuffer(
+			bufferPool, numSubpartitions, networkBufferSize, lock, subpartitionReadOrder);
 		return currentSortBuffer;
 	}
 
@@ -221,7 +260,7 @@ public class SortMergeResultPartition extends ResultPartition {
 	}
 
 	private void writeCompressedBufferIfPossible(Buffer buffer, int targetSubpartition) throws IOException {
-		updateStatistics(buffer, targetSubpartition);
+		updateStatistics(buffer);
 
 		try {
 			if (canBeCompressed(buffer)) {
@@ -233,12 +272,9 @@ public class SortMergeResultPartition extends ResultPartition {
 		}
 	}
 
-	private void updateStatistics(Buffer buffer, int subpartitionIndex) {
+	private void updateStatistics(Buffer buffer) {
 		numBuffersOut.inc();
 		numBytesOut.inc(buffer.readableBytes());
-		if (buffer.isBuffer()) {
-			++numDataBuffers[subpartitionIndex];
-		}
 	}
 
 	/**
@@ -258,11 +294,15 @@ public class SortMergeResultPartition extends ResultPartition {
 
 	void releaseReader(SortMergeSubpartitionReader reader) {
 		synchronized (lock) {
+			shuffleIOScheduler.releaseSubpartitionReader(reader);
 			readers.remove(reader);
 
 			// release the result partition if it has been marked as released
 			if (readers.isEmpty() && isReleased()) {
-				releaseInternal();
+				if (resultFile != null) {
+					resultFile.deleteQuietly();
+					resultFile = null;
+				}
 			}
 		}
 	}
@@ -302,15 +342,12 @@ public class SortMergeResultPartition extends ResultPartition {
 			checkState(!isReleased(), "Partition released.");
 			checkState(isFinished(), "Trying to read unfinished blocking partition.");
 
-			SortMergeSubpartitionReader reader = new SortMergeSubpartitionReader(
-				subpartitionIndex,
-				numDataBuffers[subpartitionIndex],
-				networkBufferSize,
+			SortMergeSubpartitionReader reader = shuffleIOScheduler.crateSubpartitionReader(
 				this,
+				resultFile,
 				availabilityListener,
-				resultFile);
+				subpartitionIndex);
 			readers.add(reader);
-			availabilityListener.notifyDataAvailable();
 
 			return reader;
 		}
