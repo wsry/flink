@@ -79,12 +79,16 @@ public class ShuffleCompressionITCase {
 
 	@Test
 	public void testDataCompressionForBoundedBlockingShuffle() throws Exception {
-		Configuration configuration = new Configuration();
-		configuration.setBoolean(NettyShuffleEnvironmentOptions.BLOCKING_SHUFFLE_COMPRESSION_ENABLED, true);
+		for (int i = 0; i < 1000; ++i) {
+			Configuration configuration = new Configuration();
+			configuration.setBoolean(NettyShuffleEnvironmentOptions.BLOCKING_SHUFFLE_COMPRESSION_ENABLED, true);
+			//configuration.setString(AkkaOptions.ASK_TIMEOUT, "60 s");
 
-		JobGraph jobGraph = createJobGraph(
-			ScheduleMode.LAZY_FROM_SOURCES, ResultPartitionType.BLOCKING, ExecutionMode.BATCH);
-		JobGraphRunningUtil.execute(jobGraph, configuration, NUM_TASKMANAGERS, NUM_SLOTS);
+			JobGraph jobGraph = createJobGraph(
+				ScheduleMode.LAZY_FROM_SOURCES, ResultPartitionType.BLOCKING, ExecutionMode.BATCH);
+			JobGraphRunningUtil.execute(jobGraph, configuration, NUM_TASKMANAGERS, NUM_SLOTS);
+			System.out.println("Finish #" + i);
+		}
 	}
 
 	@Test
@@ -92,6 +96,7 @@ public class ShuffleCompressionITCase {
 		Configuration configuration = new Configuration();
 		configuration.setBoolean(NettyShuffleEnvironmentOptions.BLOCKING_SHUFFLE_COMPRESSION_ENABLED, true);
 		configuration.setInteger(NettyShuffleEnvironmentOptions.NETWORK_SORT_SHUFFLE_MIN_PARALLELISM, 1);
+		//configuration.setString(AkkaOptions.ASK_TIMEOUT, "60 s");
 
 		JobGraph jobGraph = createJobGraph(
 			ScheduleMode.LAZY_FROM_SOURCES, ResultPartitionType.BLOCKING, ExecutionMode.BATCH);
