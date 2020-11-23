@@ -68,7 +68,7 @@ public class PartitionedFileWriteReadTest {
 
 		PartitionedFileWriter fileWriter = createPartitionedFileWriter(numSubpartitions);
 		for (int region = 0; region < numRegions; ++region) {
-			fileWriter.startNewRegion();
+			fileWriter.startNewRegion(false);
 
 			for (int i = 0; i < numBuffers; ++i) {
 				Buffer buffer = createBuffer(random, bufferSize);
@@ -120,7 +120,7 @@ public class PartitionedFileWriteReadTest {
 
 		PartitionedFileWriter fileWriter = createPartitionedFileWriter(numSubpartitions);
 		for (int region = 0; region < numRegions; ++region) {
-			fileWriter.startNewRegion();
+			fileWriter.startNewRegion(false);
 			for (int subpartition = 0; subpartition < numSubpartitions; ++subpartition) {
 				if (random.nextBoolean()) {
 					Buffer buffer = createBuffer(random, bufferSize);

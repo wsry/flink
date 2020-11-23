@@ -92,6 +92,13 @@ public class PartitionedFileWriter implements AutoCloseable {
 	/** Current subpartition to write buffers to. */
 	private int currentSubpartition = -1;
 
+	/**
+	 * Broadcast region is an optimization for the scenario where the same data is written to the
+	 * all subpartition. For a broadcast region, data is only written once and the indexes of all
+	 * subpartitions point to the same offset in the data file.
+	 */
+	private boolean isBroadCastRegion;
+
 	/** Whether this file writer is finished or not. */
 	private boolean isFinished;
 
@@ -146,10 +153,14 @@ public class PartitionedFileWriter implements AutoCloseable {
 	 *
 	 * <p>Note: The caller is responsible for releasing the failed {@link PartitionedFile} if any
 	 * exception occurs.
+	 *
+	 * @param isBroadcastRegion Whether it's a broadcast region. See {@link #isBroadCastRegion}.
 	 */
-	public void startNewRegion() throws IOException {
+	public void startNewRegion(boolean isBroadcastRegion) throws IOException {
 		checkState(!isFinished, "File writer is already finished.");
 		checkState(!isClosed, "File writer is already closed.");
+
+		this.isBroadCastRegion = isBroadcastRegion;
 
 		writeRegionIndex();
 	}
@@ -211,6 +222,7 @@ public class PartitionedFileWriter implements AutoCloseable {
 	public void writeBuffer(Buffer target, int targetSubpartition) throws IOException {
 		checkState(!isFinished, "File writer is already finished.");
 		checkState(!isClosed, "File writer is already closed.");
+		checkState(!isBroadCastRegion, "Trying to write unicast data to a broadcast region.");
 
 		if (targetSubpartition != currentSubpartition) {
 			checkState(subpartitionBuffers[targetSubpartition] == 0,
@@ -221,6 +233,29 @@ public class PartitionedFileWriter implements AutoCloseable {
 
 		totalBytesWritten += writeToByteChannel(dataFileChannel, target, writeDataCache, header);
 		++subpartitionBuffers[targetSubpartition];
+	}
+
+	/**
+	 * Writes the given {@link Buffer} to all subpartitions of this {@link PartitionedFile}.
+	 *
+	 * <p>Note: The caller is responsible for recycling the target buffer and releasing the failed
+	 * {@link PartitionedFile} if any exception occurs.
+	 */
+	public void broadcastBuffer(Buffer target) throws IOException {
+		checkState(!isFinished, "File writer is already finished.");
+		checkState(!isClosed, "File writer is already closed.");
+		checkState(isBroadCastRegion, "Trying to write broadcast data to a unicast region.");
+
+		if (subpartitionBuffers[0] == 0) {
+			for (int subpartition = 0; subpartition < numSubpartitions; ++subpartition) {
+				subpartitionOffsets[subpartition] = totalBytesWritten;
+			}
+		}
+
+		totalBytesWritten += writeToByteChannel(dataFileChannel, target, writeDataCache, header);
+		for (int subpartition = 0; subpartition < numSubpartitions; ++subpartition) {
+			++subpartitionBuffers[subpartition];
+		}
 	}
 
 	/**

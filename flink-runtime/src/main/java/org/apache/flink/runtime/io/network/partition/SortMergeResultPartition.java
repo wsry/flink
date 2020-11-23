@@ -81,8 +81,11 @@ public class SortMergeResultPartition extends ResultPartition {
 	/** File writer for this result partition. */
 	private final PartitionedFileWriter fileWriter;
 
-	/** Current {@link SortBuffer} to append records to. */
-	private SortBuffer currentSortBuffer;
+	/** {@link SortBuffer} for records to be sent to a single subpartition. */
+	private SortBuffer unicastSortBuffer;
+
+	/** {@link SortBuffer} for records to be sent to all subpartitions. */
+	private SortBuffer broadcastSortBuffer;
 
 	public SortMergeResultPartition(
 			String owningTaskName,
@@ -142,7 +145,7 @@ public class SortMergeResultPartition extends ResultPartition {
 
 	@Override
 	public void emitRecord(ByteBuffer record, int targetSubpartition) throws IOException {
-		emit(record, targetSubpartition, DataType.DATA_BUFFER);
+		emit(record, targetSubpartition, DataType.DATA_BUFFER, false);
 	}
 
 	@Override
@@ -162,93 +165,121 @@ public class SortMergeResultPartition extends ResultPartition {
 	}
 
 	private void broadcast(ByteBuffer record, DataType dataType) throws IOException {
-		for (int channelIndex = 0; channelIndex < numSubpartitions; ++channelIndex) {
-			record.rewind();
-			emit(record, channelIndex, dataType);
-		}
+		emit(record, 0, dataType, true);
 	}
 
 	private void emit(
 			ByteBuffer record,
 			int targetSubpartition,
-			DataType dataType) throws IOException {
+			DataType dataType,
+			boolean isBroadcast) throws IOException {
 		checkInProduceState();
 
-		SortBuffer sortBuffer = getSortBuffer();
+		SortBuffer sortBuffer = isBroadcast ? getBroadcastSortBuffer() : getUnicastSortBuffer();
 		if (sortBuffer.append(record, targetSubpartition, dataType)) {
 			return;
 		}
 
 		if (!sortBuffer.hasRemaining()) {
 			// the record can not be appended to the free sort buffer because it is too large
-			currentSortBuffer.finish();
-			currentSortBuffer.release();
-			writeLargeRecord(record, targetSubpartition, dataType);
+			sortBuffer.finish();
+			sortBuffer.release();
+			writeLargeRecord(record, targetSubpartition, dataType, isBroadcast);
 			return;
 		}
 
-		flushCurrentSortBuffer();
-		emit(record, targetSubpartition, dataType);
+		flushSortBuffer(sortBuffer, isBroadcast);
+		emit(record, targetSubpartition, dataType, isBroadcast);
 	}
 
-	private void releaseCurrentSortBuffer() {
-		if (currentSortBuffer != null) {
-			currentSortBuffer.release();
+	private void releaseSortBuffer(SortBuffer sortBuffer) {
+		if (sortBuffer != null) {
+			sortBuffer.release();
 		}
 	}
 
-	private SortBuffer getSortBuffer() {
-		if (currentSortBuffer != null && !currentSortBuffer.isFinished()) {
-			return currentSortBuffer;
+	private SortBuffer getUnicastSortBuffer() throws IOException {
+		flushSortBuffer(broadcastSortBuffer, true);
+
+		if (unicastSortBuffer != null && !unicastSortBuffer.isFinished()) {
+			return unicastSortBuffer;
 		}
 
-		currentSortBuffer = new PartitionSortedBuffer(
+		unicastSortBuffer = new PartitionSortedBuffer(
 			lock, bufferPool, numSubpartitions, networkBufferSize, null);
-		return currentSortBuffer;
+		return unicastSortBuffer;
 	}
 
-	private void flushCurrentSortBuffer() throws IOException {
-		if (currentSortBuffer == null) {
+	private SortBuffer getBroadcastSortBuffer() throws IOException {
+		flushSortBuffer(unicastSortBuffer, false);
+
+		if (broadcastSortBuffer != null && !broadcastSortBuffer.isFinished()) {
+			return broadcastSortBuffer;
+		}
+
+		broadcastSortBuffer = new PartitionSortedBuffer(
+			lock, bufferPool, numSubpartitions, networkBufferSize, null);
+		return broadcastSortBuffer;
+	}
+
+	private void flushSortBuffer(SortBuffer sortBuffer, boolean isBroadcast) throws IOException {
+		if (sortBuffer == null || sortBuffer.isReleased()) {
 			return;
 		}
-		currentSortBuffer.finish();
+		sortBuffer.finish();
 
-		if (currentSortBuffer.hasRemaining()) {
-			fileWriter.startNewRegion();
+		if (sortBuffer.hasRemaining()) {
+			fileWriter.startNewRegion(isBroadcast);
 
-			while (currentSortBuffer.hasRemaining()) {
-				BufferWithChannel bufferWithChannel = currentSortBuffer.copyIntoSegment(writeBuffer);
+			while (sortBuffer.hasRemaining()) {
+				BufferWithChannel bufferWithChannel = sortBuffer.copyIntoSegment(writeBuffer);
 				Buffer buffer = bufferWithChannel.getBuffer();
 				int subpartitionIndex = bufferWithChannel.getChannelIndex();
 
-				writeCompressedBufferIfPossible(buffer, subpartitionIndex);
+				writeCompressedBufferIfPossible(buffer, subpartitionIndex, isBroadcast);
 			}
 		}
 
-		currentSortBuffer.release();
+		releaseSortBuffer(sortBuffer);
 	}
 
 	private void writeCompressedBufferIfPossible(
 			Buffer buffer,
-			int targetSubpartition) throws IOException {
-		updateStatistics(buffer, targetSubpartition);
-
+			int targetSubpartition,
+			boolean isBroadcast) throws IOException {
+		updateStatistics(buffer, targetSubpartition, isBroadcast);
 		try {
 			if (canBeCompressed(buffer)) {
 				buffer = bufferCompressor.compressToIntermediateBuffer(buffer);
 			}
-			fileWriter.writeBuffer(buffer, targetSubpartition);
+
+			if (isBroadcast) {
+				fileWriter.broadcastBuffer(buffer);
+			} else {
+				fileWriter.writeBuffer(buffer, targetSubpartition);
+			}
 		} finally {
 			buffer.recycleBuffer();
 		}
 	}
 
-	private void updateStatistics(Buffer buffer, int subpartitionIndex) {
-		numBuffersOut.inc();
-		numBytesOut.inc(buffer.readableBytes());
-		++numDataAndEventBuffers[subpartitionIndex];
-		if (buffer.isBuffer()) {
-			++numDataBuffers[subpartitionIndex];
+	private void updateStatistics(Buffer buffer, int subpartitionIndex, boolean isBroadcast) {
+		numBuffersOut.inc(isBroadcast ? numSubpartitions : 1);
+		long readableBytes = buffer.readableBytes();
+		numBytesOut.inc(isBroadcast ? readableBytes * numSubpartitions : readableBytes);
+
+		if (!isBroadcast) {
+			++numDataAndEventBuffers[subpartitionIndex];
+			if (buffer.isBuffer()) {
+				++numDataBuffers[subpartitionIndex];
+			}
+		} else {
+			for (int subpartition = 0; subpartition < numSubpartitions; ++subpartition) {
+				++numDataAndEventBuffers[subpartition];
+				if (buffer.isBuffer()) {
+					++numDataBuffers[subpartition];
+				}
+			}
 		}
 	}
 
@@ -258,15 +289,16 @@ public class SortMergeResultPartition extends ResultPartition {
 	private void writeLargeRecord(
 			ByteBuffer record,
 			int targetSubpartition,
-			DataType dataType) throws IOException {
-		fileWriter.startNewRegion();
+			DataType dataType,
+			boolean isBroadcast) throws IOException {
+		fileWriter.startNewRegion(isBroadcast);
 
 		while (record.hasRemaining()) {
 			int toCopy = Math.min(record.remaining(), writeBuffer.size());
 			writeBuffer.put(0, record, toCopy);
 			NetworkBuffer buffer = new NetworkBuffer(writeBuffer, (buf) -> {}, dataType, toCopy);
 
-			writeCompressedBufferIfPossible(buffer, targetSubpartition);
+			writeCompressedBufferIfPossible(buffer, targetSubpartition, isBroadcast);
 		}
 	}
 
@@ -284,7 +316,9 @@ public class SortMergeResultPartition extends ResultPartition {
 	@Override
 	public void finish() throws IOException {
 		broadcastEvent(EndOfPartitionEvent.INSTANCE, false);
-		flushCurrentSortBuffer();
+		checkState(unicastSortBuffer == null || unicastSortBuffer.isReleased(),
+			"The unicast sort buffer should be either null or released.");
+		flushSortBuffer(broadcastSortBuffer, true);
 
 		synchronized (lock) {
 			checkState(!isReleased(), "Result partition is already released.");
@@ -298,7 +332,8 @@ public class SortMergeResultPartition extends ResultPartition {
 
 	@Override
 	public void close() {
-		releaseCurrentSortBuffer();
+		releaseSortBuffer(unicastSortBuffer);
+		releaseSortBuffer(broadcastSortBuffer);
 		super.close();
 
 		IOUtils.closeQuietly(fileWriter);
@@ -326,10 +361,24 @@ public class SortMergeResultPartition extends ResultPartition {
 		}
 	}
 
+	private void flushInternal() throws IOException {
+		if (unicastSortBuffer != null && !unicastSortBuffer.isReleased()) {
+			checkState(broadcastSortBuffer == null || broadcastSortBuffer.isReleased(),
+				"The broadcast sort buffer should be either null or released.");
+			flushSortBuffer(unicastSortBuffer, false);
+		}
+
+		if (broadcastSortBuffer != null && !broadcastSortBuffer.isReleased()) {
+			checkState(unicastSortBuffer == null || unicastSortBuffer.isReleased(),
+				"The unicast sort buffer should be either null or released.");
+			flushSortBuffer(broadcastSortBuffer, true);
+		}
+	}
+
 	@Override
 	public void flushAll() {
 		try {
-			flushCurrentSortBuffer();
+			flushInternal();
 		} catch (IOException e) {
 			LOG.error("Failed to flush the current sort buffer.", e);
 		}
@@ -338,7 +387,7 @@ public class SortMergeResultPartition extends ResultPartition {
 	@Override
 	public void flush(int subpartitionIndex) {
 		try {
-			flushCurrentSortBuffer();
+			flushInternal();
 		} catch (IOException e) {
 			LOG.error("Failed to flush the current sort buffer.", e);
 		}
