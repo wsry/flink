@@ -70,6 +70,8 @@ public class SortMergeResultPartition extends ResultPartition {
 	/** Number of data buffers (excluding events) written for each subpartition. */
 	private final int[] numDataBuffers;
 
+	private final int[] numDataAndEventBuffers;
+
 	/** A piece of unmanaged memory for data writing. */
 	private final MemorySegment writeBuffer;
 
@@ -108,6 +110,7 @@ public class SortMergeResultPartition extends ResultPartition {
 
 		this.networkBufferSize = networkBufferSize;
 		this.numDataBuffers = new int[numSubpartitions];
+		this.numDataAndEventBuffers = new int[numSubpartitions];
 		this.writeBuffer = MemorySegmentFactory.allocateUnpooledOffHeapMemory(networkBufferSize);
 
 		PartitionedFileWriter fileWriter = null;
@@ -243,6 +246,7 @@ public class SortMergeResultPartition extends ResultPartition {
 	private void updateStatistics(Buffer buffer, int subpartitionIndex) {
 		numBuffersOut.inc();
 		numBytesOut.inc(buffer.readableBytes());
+		++numDataAndEventBuffers[subpartitionIndex];
 		if (buffer.isBuffer()) {
 			++numDataBuffers[subpartitionIndex];
 		}
@@ -312,7 +316,7 @@ public class SortMergeResultPartition extends ResultPartition {
 			SortMergeSubpartitionReader reader = new SortMergeSubpartitionReader(
 				subpartitionIndex,
 				numDataBuffers[subpartitionIndex],
-				networkBufferSize,
+				numDataAndEventBuffers[subpartitionIndex],
 				this,
 				availabilityListener,
 				resultFile);

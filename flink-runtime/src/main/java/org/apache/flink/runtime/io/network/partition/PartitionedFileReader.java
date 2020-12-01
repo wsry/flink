@@ -129,6 +129,17 @@ public class PartitionedFileReader implements AutoCloseable {
 		return null;
 	}
 
+	public Buffer readBuffer() throws IOException {
+		checkState(!isClosed, "File reader is already closed.");
+
+		if (moveToNextReadableRegion()) {
+			--currentRegionRemainingBuffers;
+			return BufferReaderWriterUtil.readFileRegionFromByteChannel(dataFileChannel, headerBuf);
+		}
+
+		return null;
+	}
+
 	@VisibleForTesting
 	public boolean hasRemaining() throws IOException {
 		checkState(!isClosed, "File reader is already closed.");
