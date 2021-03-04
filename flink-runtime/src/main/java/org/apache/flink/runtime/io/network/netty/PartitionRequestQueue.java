@@ -97,6 +97,10 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
      * availability, so there is no race condition here.
      */
     private void enqueueAvailableReader(final NetworkSequenceViewReader reader) throws Exception {
+        if (reader.needAnnounceBacklog()) {
+            announceBacklog(reader);
+        }
+
         if (reader.isRegisteredAsAvailable() || !reader.isAvailable()) {
             return;
         }
@@ -161,6 +165,27 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
         } else {
             throw new IllegalStateException(
                     "No reader for receiverId = " + receiverId + " exists.");
+        }
+    }
+
+    /**
+     * Announces remaining backlog to the consumer after the available data notification or data
+     * consumption resumption.
+     */
+    private void announceBacklog(NetworkSequenceViewReader reader) {
+        int backlog = reader.getRemainingBacklog();
+        if (backlog > 0) {
+            NettyMessage.BacklogAnnouncement announcement =
+                    new NettyMessage.BacklogAnnouncement(backlog, reader.getReceiverId());
+            ctx.channel()
+                    .writeAndFlush(announcement)
+                    .addListener(
+                            (ChannelFutureListener)
+                                    future -> {
+                                        if (!future.isSuccess()) {
+                                            onChannelFutureFailure(future);
+                                        }
+                                    });
         }
     }
 
@@ -310,6 +335,15 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
         reader.releaseAllResources();
     }
 
+    private void onChannelFutureFailure(ChannelFuture future) throws Exception {
+        if (future.cause() != null) {
+            handleException(future.channel(), future.cause());
+        } else {
+            handleException(
+                    future.channel(), new IllegalStateException("Sending cancelled by user."));
+        }
+    }
+
     // This listener is called after an element of the current nonEmptyReader has been
     // flushed. If successful, the listener triggers further processing of the
     // queues.
@@ -320,12 +354,8 @@ class PartitionRequestQueue extends ChannelInboundHandlerAdapter {
             try {
                 if (future.isSuccess()) {
                     writeAndFlushNextMessageIfPossible(future.channel());
-                } else if (future.cause() != null) {
-                    handleException(future.channel(), future.cause());
                 } else {
-                    handleException(
-                            future.channel(),
-                            new IllegalStateException("Sending cancelled by user."));
+                    onChannelFutureFailure(future);
                 }
             } catch (Throwable t) {
                 handleException(future.channel(), t);

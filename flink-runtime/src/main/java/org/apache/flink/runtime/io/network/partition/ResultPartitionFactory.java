@@ -279,7 +279,7 @@ public class ResultPartitionFactory {
             // callbacks to release memory.
             return bufferPoolFactory.createBufferPool(
                     numRequiredBuffers,
-                    maxNumberOfMemorySegments,
+                    Math.max(numRequiredBuffers, maxNumberOfMemorySegments),
                     numberOfSubpartitions,
                     maxBuffersPerChannel);
         };

@@ -225,6 +225,11 @@ class SortMergeSubpartitionReader
     }
 
     @Override
+    public int getRemainingBacklog() {
+        return dataBufferBacklog;
+    }
+
+    @Override
     public int unsynchronizedGetNumberOfQueuedBuffers() {
         return Math.max(0, buffersRead.size());
     }
