@@ -204,7 +204,7 @@ public class NettyShuffleEnvironmentOptions {
     @Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
     public static final ConfigOption<Integer> NETWORK_EXTRA_BUFFERS_PER_GATE =
             key("taskmanager.network.memory.floating-buffers-per-gate")
-                    .defaultValue(1)
+                    .defaultValue(8)
                     .withDescription(
                             "Number of extra network buffers to use for each outgoing/incoming gate (result partition/input gate)."
                                     + " In credit-based flow control mode, this indicates how many floating credits are shared among all the input channels."

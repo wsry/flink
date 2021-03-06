@@ -347,12 +347,12 @@ class CreditBasedPartitionRequestClientHandler extends ChannelInboundHandlerAdap
             RemoteInputChannel inputChannel, NettyMessage.BufferResponse bufferOrEvent)
             throws Throwable {
         if (bufferOrEvent.isBuffer() && bufferOrEvent.bufferSize == 0) {
+            inputChannel.onEmptyBuffer(bufferOrEvent.sequenceNumber, bufferOrEvent.backlog);
             // recycle the empty buffer directly
             Buffer buffer = bufferOrEvent.getBuffer();
             if (buffer != null) {
                 buffer.recycleBuffer();
             }
-            inputChannel.onEmptyBuffer(bufferOrEvent.sequenceNumber, bufferOrEvent.backlog);
         } else if (bufferOrEvent.getBuffer() != null) {
             inputChannel.onBuffer(
                     bufferOrEvent.getBuffer(), bufferOrEvent.sequenceNumber, bufferOrEvent.backlog);

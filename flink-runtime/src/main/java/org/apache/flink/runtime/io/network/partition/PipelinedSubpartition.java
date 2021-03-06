@@ -505,11 +505,13 @@ public class PipelinedSubpartition extends ResultSubpartition
     /** Gets the number of non-event buffers in this subpartition. */
     public int getBuffersInBacklog() {
         synchronized (buffers) {
-            if (isBlocked) {
+            if (isBlocked || buffers.isEmpty()) {
                 return 0;
             }
 
-            if (flushRequested || isFinished) {
+            if (flushRequested
+                    || isFinished
+                    || !checkNotNull(buffers.peekLast()).getBufferConsumer().isBuffer()) {
                 return buffersInBacklog;
             } else {
                 return Math.max(buffersInBacklog - 1, 0);

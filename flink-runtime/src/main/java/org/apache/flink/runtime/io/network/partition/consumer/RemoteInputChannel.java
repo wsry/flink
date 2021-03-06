@@ -449,7 +449,7 @@ public class RemoteInputChannel extends InputChannel {
      */
     @Nullable
     public Buffer requestBuffer() {
-        return bufferManager.requestBuffer();
+        return bufferManager.requestBuffer(initialCredit);
     }
 
     /**

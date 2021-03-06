@@ -82,8 +82,16 @@ public class BufferManager implements BufferListener, BufferRecycler {
     // ------------------------------------------------------------------------
 
     @Nullable
-    Buffer requestBuffer() {
+    Buffer requestBuffer(int initialCredit) {
         synchronized (bufferQueue) {
+            // decrease the number of buffers require to avoid the possibility of
+            // allocating more than required buffers after the buffer is taken
+            if (initialCredit == 0) {
+                checkState(
+                        bufferQueue.getAvailableBufferSize() <= numRequiredBuffers,
+                        "Too many buffers allocated.");
+                --numRequiredBuffers;
+            }
             return bufferQueue.takeBuffer();
         }
     }
@@ -170,12 +178,6 @@ public class BufferManager implements BufferListener, BufferRecycler {
                     isWaitingForFloatingBuffers = true;
                     break;
                 }
-            }
-
-            if (numRequiredBuffers == 0) {
-                // both the initial credit and remaining backlog must be 0
-                checkState(
-                        bufferQueue.getAvailableBufferSize() == 0, "Too many buffers allocated.");
             }
         }
         return numRequestedBuffers;
