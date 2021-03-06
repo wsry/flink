@@ -50,7 +50,7 @@ public class ResultPartitionFactory {
 
     private final BoundedBlockingSubpartitionType blockingSubpartitionType;
 
-    private final int networkBuffersPerChannel;
+    private final int networkBuffersPerSubpartition;
 
     private final int floatingNetworkBuffersPerGate;
 
@@ -73,7 +73,7 @@ public class ResultPartitionFactory {
             FileChannelManager channelManager,
             BufferPoolFactory bufferPoolFactory,
             BoundedBlockingSubpartitionType blockingSubpartitionType,
-            int networkBuffersPerChannel,
+            int networkBuffersPerSubpartition,
             int floatingNetworkBuffersPerGate,
             int networkBufferSize,
             boolean blockingShuffleCompressionEnabled,
@@ -85,7 +85,7 @@ public class ResultPartitionFactory {
 
         this.partitionManager = partitionManager;
         this.channelManager = channelManager;
-        this.networkBuffersPerChannel = networkBuffersPerChannel;
+        this.networkBuffersPerSubpartition = networkBuffersPerSubpartition;
         this.floatingNetworkBuffersPerGate = floatingNetworkBuffersPerGate;
         this.bufferPoolFactory = bufferPoolFactory;
         this.blockingSubpartitionType = blockingSubpartitionType;
@@ -256,7 +256,7 @@ public class ResultPartitionFactory {
         return () -> {
             int maxNumberOfMemorySegments =
                     type.isBounded()
-                            ? numberOfSubpartitions * networkBuffersPerChannel
+                            ? numberOfSubpartitions * networkBuffersPerSubpartition
                                     + floatingNetworkBuffersPerGate
                             : Integer.MAX_VALUE;
             int numRequiredBuffers =

@@ -127,7 +127,7 @@ public class NettyShuffleServiceFactory
                         fileChannelManager,
                         networkBufferPool,
                         config.getBlockingSubpartitionType(),
-                        config.networkBuffersPerChannel(),
+                        config.networkBuffersPerSubpartition(),
                         config.floatingNetworkBuffersPerGate(),
                         config.networkBufferSize(),
                         config.isBlockingShuffleCompressionEnabled(),

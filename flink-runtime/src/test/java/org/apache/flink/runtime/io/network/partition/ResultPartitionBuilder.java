@@ -50,7 +50,7 @@ public class ResultPartitionBuilder {
 
     private NetworkBufferPool networkBufferPool = new NetworkBufferPool(2, 1);
 
-    private int networkBuffersPerChannel = 1;
+    private int networkBuffersPerSubpartition = 1;
 
     private int floatingNetworkBuffersPerGate = 1;
 
@@ -110,8 +110,8 @@ public class ResultPartitionBuilder {
 
     public ResultPartitionBuilder setupBufferPoolFactoryFromNettyShuffleEnvironment(
             NettyShuffleEnvironment environment) {
-        return setNetworkBuffersPerChannel(
-                        environment.getConfiguration().networkBuffersPerChannel())
+        return setNetworkBuffersPerSubpartition(
+                        environment.getConfiguration().networkBuffersPerSubpartition())
                 .setFloatingNetworkBuffersPerGate(
                         environment.getConfiguration().floatingNetworkBuffersPerGate())
                 .setNetworkBufferSize(environment.getConfiguration().networkBufferSize())
@@ -126,8 +126,9 @@ public class ResultPartitionBuilder {
         return this;
     }
 
-    public ResultPartitionBuilder setNetworkBuffersPerChannel(int networkBuffersPerChannel) {
-        this.networkBuffersPerChannel = networkBuffersPerChannel;
+    public ResultPartitionBuilder setNetworkBuffersPerSubpartition(
+            int networkBuffersPerSubpartition) {
+        this.networkBuffersPerSubpartition = networkBuffersPerSubpartition;
         return this;
     }
 
@@ -188,7 +189,7 @@ public class ResultPartitionBuilder {
                         channelManager,
                         networkBufferPool,
                         blockingSubpartitionType,
-                        networkBuffersPerChannel,
+                        networkBuffersPerSubpartition,
                         floatingNetworkBuffersPerGate,
                         networkBufferSize,
                         blockingShuffleCompressionEnabled,
