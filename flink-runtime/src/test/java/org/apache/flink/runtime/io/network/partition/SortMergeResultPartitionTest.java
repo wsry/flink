@@ -20,12 +20,14 @@ package org.apache.flink.runtime.io.network.partition;
 
 import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.core.memory.MemorySegmentFactory;
+import org.apache.flink.runtime.concurrent.Executors;
 import org.apache.flink.runtime.io.disk.FileChannelManager;
 import org.apache.flink.runtime.io.disk.FileChannelManagerImpl;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.api.serialization.EventSerializer;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferPool;
+import org.apache.flink.runtime.io.network.buffer.FileIOBufferPool;
 import org.apache.flink.runtime.io.network.buffer.NetworkBuffer;
 import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
 
@@ -324,7 +326,8 @@ public class SortMergeResultPartitionTest {
                         ResultPartitionType.BLOCKING,
                         numSubpartitions,
                         numSubpartitions,
-                        bufferSize,
+                        Executors.directExecutor(),
+                        new FileIOBufferPool(FileIOBufferPool.MIN_TOTAL_BYTES, bufferSize),
                         new ResultPartitionManager(),
                         fileChannelManager.createChannel().getPath(),
                         null,

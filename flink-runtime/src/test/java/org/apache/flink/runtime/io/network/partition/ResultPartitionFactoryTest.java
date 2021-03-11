@@ -17,9 +17,11 @@
 
 package org.apache.flink.runtime.io.network.partition;
 
+import org.apache.flink.runtime.concurrent.Executors;
 import org.apache.flink.runtime.deployment.ResultPartitionDeploymentDescriptor;
 import org.apache.flink.runtime.io.disk.FileChannelManager;
 import org.apache.flink.runtime.io.disk.FileChannelManagerImpl;
+import org.apache.flink.runtime.io.network.buffer.FileIOBufferPool;
 import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
 import org.apache.flink.runtime.shuffle.PartitionDescriptorBuilder;
 import org.apache.flink.runtime.util.EnvironmentInformation;
@@ -122,6 +124,8 @@ public class ResultPartitionFactoryTest extends TestLogger {
                         manager,
                         fileChannelManager,
                         new NetworkBufferPool(1, SEGMENT_SIZE),
+                        Executors.directExecutor(),
+                        new FileIOBufferPool(FileIOBufferPool.MIN_TOTAL_BYTES, SEGMENT_SIZE),
                         BoundedBlockingSubpartitionType.AUTO,
                         1,
                         1,

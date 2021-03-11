@@ -24,6 +24,7 @@ import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.io.disk.FileChannelManager;
 import org.apache.flink.runtime.io.disk.FileChannelManagerImpl;
+import org.apache.flink.runtime.io.network.buffer.FileIOBufferPool;
 import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
 import org.apache.flink.runtime.io.network.netty.NettyConfig;
 import org.apache.flink.runtime.io.network.netty.NettyConnectionManager;
@@ -37,8 +38,10 @@ import org.apache.flink.runtime.shuffle.NettyShuffleMaster;
 import org.apache.flink.runtime.shuffle.ShuffleEnvironmentContext;
 import org.apache.flink.runtime.shuffle.ShuffleServiceFactory;
 import org.apache.flink.runtime.taskmanager.NettyShuffleEnvironmentConfiguration;
+import org.apache.flink.runtime.util.Hardware;
 
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.apache.flink.runtime.io.network.metrics.NettyShuffleMetricFactory.registerShuffleMetrics;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -68,8 +71,7 @@ public class NettyShuffleServiceFactory
                 networkConfig,
                 shuffleEnvironmentContext.getTaskExecutorResourceId(),
                 shuffleEnvironmentContext.getEventPublisher(),
-                shuffleEnvironmentContext.getParentMetricGroup(),
-                shuffleEnvironmentContext.getIoExecutor());
+                shuffleEnvironmentContext.getParentMetricGroup());
     }
 
     @VisibleForTesting
@@ -77,15 +79,13 @@ public class NettyShuffleServiceFactory
             NettyShuffleEnvironmentConfiguration config,
             ResourceID taskExecutorResourceId,
             TaskEventPublisher taskEventPublisher,
-            MetricGroup metricGroup,
-            Executor ioExecutor) {
+            MetricGroup metricGroup) {
         return createNettyShuffleEnvironment(
                 config,
                 taskExecutorResourceId,
                 taskEventPublisher,
                 new ResultPartitionManager(),
-                metricGroup,
-                ioExecutor);
+                metricGroup);
     }
 
     @VisibleForTesting
@@ -94,8 +94,7 @@ public class NettyShuffleServiceFactory
             ResourceID taskExecutorResourceId,
             TaskEventPublisher taskEventPublisher,
             ResultPartitionManager resultPartitionManager,
-            MetricGroup metricGroup,
-            Executor ioExecutor) {
+            MetricGroup metricGroup) {
         checkNotNull(config);
         checkNotNull(taskExecutorResourceId);
         checkNotNull(taskEventPublisher);
@@ -119,6 +118,18 @@ public class NettyShuffleServiceFactory
                         config.networkBufferSize(),
                         config.getRequestSegmentsTimeout());
 
+        FileIOBufferPool ioBufferPool =
+                new FileIOBufferPool(
+                        config.fileIOMemorySize().getBytes(), config.networkBufferSize());
+
+        ExecutorService ioExecutor =
+                Executors.newFixedThreadPool(
+                        Math.min(
+                                ioBufferPool.getNumTotalBuffers()
+                                        / ioBufferPool.getNumBuffersToRequest(),
+                                4 * Hardware.getNumberCPUCores()),
+                        runnable -> new Thread(runnable, "blocking-shuffle-file-io-thread"));
+
         registerShuffleMetrics(metricGroup, networkBufferPool);
 
         ResultPartitionFactory resultPartitionFactory =
@@ -126,6 +137,8 @@ public class NettyShuffleServiceFactory
                         resultPartitionManager,
                         fileChannelManager,
                         networkBufferPool,
+                        ioExecutor,
+                        ioBufferPool,
                         config.getBlockingSubpartitionType(),
                         config.networkBuffersPerChannel(),
                         config.floatingNetworkBuffersPerGate(),
@@ -150,11 +163,12 @@ public class NettyShuffleServiceFactory
                 taskExecutorResourceId,
                 config,
                 networkBufferPool,
+                ioBufferPool,
+                ioExecutor,
                 connectionManager,
                 resultPartitionManager,
                 fileChannelManager,
                 resultPartitionFactory,
-                singleInputGateFactory,
-                ioExecutor);
+                singleInputGateFactory);
     }
 }

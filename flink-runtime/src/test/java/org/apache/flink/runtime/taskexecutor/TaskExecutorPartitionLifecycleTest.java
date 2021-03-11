@@ -67,7 +67,6 @@ import org.apache.flink.runtime.taskexecutor.slot.TaskSlotUtils;
 import org.apache.flink.runtime.taskmanager.NoOpTaskManagerActions;
 import org.apache.flink.runtime.taskmanager.Task;
 import org.apache.flink.runtime.util.TestingFatalErrorHandler;
-import org.apache.flink.testutils.executor.TestExecutorResource;
 import org.apache.flink.util.SerializedValue;
 import org.apache.flink.util.TestLogger;
 import org.apache.flink.util.function.TriConsumer;
@@ -76,7 +75,6 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -116,10 +114,6 @@ public class TaskExecutorPartitionLifecycleTest extends TestLogger {
     private final JobID jobId = new JobID();
 
     @Rule public final TemporaryFolder tmp = new TemporaryFolder();
-
-    @ClassRule
-    public static final TestExecutorResource TEST_EXECUTOR_SERVICE_RESOURCE =
-            new TestExecutorResource(() -> java.util.concurrent.Executors.newFixedThreadPool(1));
 
     @Before
     public void setup() {
@@ -341,7 +335,6 @@ public class TaskExecutorPartitionLifecycleTest extends TestLogger {
         NettyShuffleEnvironment shuffleEnvironment =
                 new NettyShuffleEnvironmentBuilder()
                         .setResultPartitionManager(blockingResultPartitionManager)
-                        .setIoExecutor(TEST_EXECUTOR_SERVICE_RESOURCE.getExecutor())
                         .build();
 
         final CompletableFuture<ResultPartitionID> startTrackingFuture = new CompletableFuture<>();

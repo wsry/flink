@@ -273,8 +273,7 @@ public class TaskManagerServices {
                 createShuffleEnvironment(
                         taskManagerServicesConfiguration,
                         taskEventDispatcher,
-                        taskManagerMetricGroup,
-                        ioExecutor);
+                        taskManagerMetricGroup);
         final int listeningDataPort = shuffleEnvironment.start();
 
         final KvStateService kvStateService =
@@ -380,8 +379,7 @@ public class TaskManagerServices {
     private static ShuffleEnvironment<?, ?> createShuffleEnvironment(
             TaskManagerServicesConfiguration taskManagerServicesConfiguration,
             TaskEventDispatcher taskEventDispatcher,
-            MetricGroup taskManagerMetricGroup,
-            Executor ioExecutor)
+            MetricGroup taskManagerMetricGroup)
             throws FlinkException {
 
         final ShuffleEnvironmentContext shuffleEnvironmentContext =
@@ -392,8 +390,7 @@ public class TaskManagerServices {
                         taskManagerServicesConfiguration.isLocalCommunicationOnly(),
                         taskManagerServicesConfiguration.getBindAddress(),
                         taskEventDispatcher,
-                        taskManagerMetricGroup,
-                        ioExecutor);
+                        taskManagerMetricGroup);
 
         return ShuffleServiceLoader.loadShuffleServiceFactory(
                         taskManagerServicesConfiguration.getConfiguration())

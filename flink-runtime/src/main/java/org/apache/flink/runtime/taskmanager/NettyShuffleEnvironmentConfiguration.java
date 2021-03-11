@@ -22,6 +22,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ConfigurationUtils;
 import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.configuration.NettyShuffleEnvironmentOptions;
+import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.runtime.io.network.netty.NettyConfig;
 import org.apache.flink.runtime.io.network.partition.BoundedBlockingSubpartitionType;
 import org.apache.flink.runtime.util.ConfigurationParserUtils;
@@ -67,6 +68,8 @@ public class NettyShuffleEnvironmentConfiguration {
 
     private final int sortShuffleMinParallelism;
 
+    private final MemorySize fileIOMemorySize;
+
     private final Duration requestSegmentsTimeout;
 
     private final boolean isNetworkDetailedMetrics;
@@ -99,7 +102,8 @@ public class NettyShuffleEnvironmentConfiguration {
             String compressionCodec,
             int maxBuffersPerChannel,
             int sortShuffleMinBuffers,
-            int sortShuffleMinParallelism) {
+            int sortShuffleMinParallelism,
+            MemorySize fileIOMemorySize) {
 
         this.numNetworkBuffers = numNetworkBuffers;
         this.networkBufferSize = networkBufferSize;
@@ -117,6 +121,7 @@ public class NettyShuffleEnvironmentConfiguration {
         this.maxBuffersPerChannel = maxBuffersPerChannel;
         this.sortShuffleMinBuffers = sortShuffleMinBuffers;
         this.sortShuffleMinParallelism = sortShuffleMinParallelism;
+        this.fileIOMemorySize = Preconditions.checkNotNull(fileIOMemorySize);
     }
 
     // ------------------------------------------------------------------------
@@ -151,6 +156,10 @@ public class NettyShuffleEnvironmentConfiguration {
 
     public int sortShuffleMinParallelism() {
         return sortShuffleMinParallelism;
+    }
+
+    public MemorySize fileIOMemorySize() {
+        return fileIOMemorySize;
     }
 
     public Duration getRequestSegmentsTimeout() {
@@ -247,6 +256,9 @@ public class NettyShuffleEnvironmentConfiguration {
                 configuration.getInteger(
                         NettyShuffleEnvironmentOptions.NETWORK_SORT_SHUFFLE_MIN_PARALLELISM);
 
+        MemorySize fileIOMemorySize =
+                configuration.get(TaskManagerOptions.NETWORK_FILE_IO_MEMORY_SIZE);
+
         boolean isNetworkDetailedMetrics =
                 configuration.getBoolean(NettyShuffleEnvironmentOptions.NETWORK_DETAILED_METRICS);
 
@@ -283,7 +295,8 @@ public class NettyShuffleEnvironmentConfiguration {
                 compressionCodec,
                 maxBuffersPerChannel,
                 sortShuffleMinBuffers,
-                sortShuffleMinParallelism);
+                sortShuffleMinParallelism,
+                fileIOMemorySize);
     }
 
     /**
@@ -419,6 +432,7 @@ public class NettyShuffleEnvironmentConfiguration {
         result = 31 * result + maxBuffersPerChannel;
         result = 31 * result + sortShuffleMinBuffers;
         result = 31 * result + sortShuffleMinParallelism;
+        result = 31 * result + fileIOMemorySize.hashCode();
         return result;
     }
 
@@ -440,6 +454,7 @@ public class NettyShuffleEnvironmentConfiguration {
                     && this.floatingNetworkBuffersPerGate == that.floatingNetworkBuffersPerGate
                     && this.sortShuffleMinBuffers == that.sortShuffleMinBuffers
                     && this.sortShuffleMinParallelism == that.sortShuffleMinParallelism
+                    && this.fileIOMemorySize.equals(that.fileIOMemorySize)
                     && this.requestSegmentsTimeout.equals(that.requestSegmentsTimeout)
                     && (nettyConfig != null
                             ? nettyConfig.equals(that.nettyConfig)
@@ -483,6 +498,8 @@ public class NettyShuffleEnvironmentConfiguration {
                 + sortShuffleMinBuffers
                 + ", sortShuffleMinParallelism="
                 + sortShuffleMinParallelism
+                + ", fileIOMemorySize="
+                + fileIOMemorySize
                 + '}';
     }
 }

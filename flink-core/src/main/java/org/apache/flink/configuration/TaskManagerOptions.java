@@ -498,6 +498,22 @@ public class TaskManagerOptions {
                                     + " size, the min/max size will be used. The exact size of Network Memory can be explicitly specified by"
                                     + " setting the min/max to the same value.");
 
+    /** Memory used by blocking shuffle for file IO. The minimum value can be configured is 16M. */
+    @Documentation.Section(Documentation.Sections.COMMON_MEMORY)
+    public static final ConfigOption<MemorySize> NETWORK_FILE_IO_MEMORY_SIZE =
+            key("taskmanager.memory.batch-shuffle.size")
+                    .memoryType()
+                    .defaultValue(MemorySize.parse("16M"))
+                    .withDescription(
+                            String.format(
+                                    "Memory used by blocking shuffle for file IO. The minimum value"
+                                            + " can be configured is 16M. Notes: 1) this memory is "
+                                            + "cut off from %s so must be smaller than that. If you"
+                                            + " want to increase this config value, you need also "
+                                            + "increase %s. 2) this memory can influence the performance of blocking shuffle.",
+                                    FRAMEWORK_OFF_HEAP_MEMORY.key(),
+                                    FRAMEWORK_OFF_HEAP_MEMORY.key()));
+
     /** Fraction of Total Flink Memory to be used as Network Memory. */
     @Documentation.Section(Documentation.Sections.COMMON_MEMORY)
     public static final ConfigOption<Float> NETWORK_MEMORY_FRACTION =

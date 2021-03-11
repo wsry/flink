@@ -45,7 +45,6 @@ import org.junit.rules.ExpectedException;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.concurrent.Executors;
 
 import static org.apache.flink.runtime.io.network.partition.InputChannelTestUtils.createDummyConnectionManager;
 import static org.apache.flink.runtime.io.network.partition.PartitionTestUtils.createPartition;
@@ -123,7 +122,6 @@ public class NettyShuffleEnvironmentTest extends TestLogger {
         NettyShuffleEnvironment shuffleEnvironment =
                 new NettyShuffleEnvironmentBuilder()
                         .setResultPartitionManager(blockingResultPartitionManager)
-                        .setIoExecutor(Executors.newFixedThreadPool(1))
                         .build();
 
         shuffleEnvironment.releasePartitionsLocally(Collections.singleton(new ResultPartitionID()));
