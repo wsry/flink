@@ -83,6 +83,8 @@ public class SortMergeResultPartitionReader implements Runnable, BufferRecycler 
         this.lock = checkNotNull(lock);
         this.bufferPool = checkNotNull(bufferPool);
         this.ioExecutor = checkNotNull(ioExecutor);
+
+        bufferPool.initialize();
     }
 
     @Override

@@ -39,7 +39,11 @@ import javax.annotation.concurrent.NotThreadSafe;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -48,6 +52,7 @@ import java.util.concurrent.Executor;
 import static org.apache.flink.runtime.io.network.buffer.Buffer.DataType;
 import static org.apache.flink.runtime.io.network.partition.SortBuffer.BufferWithChannel;
 import static org.apache.flink.util.Preconditions.checkElementIndex;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /**
@@ -62,8 +67,6 @@ public class SortMergeResultPartition extends ResultPartition {
 
     private final Object lock = new Object();
 
-    private final FileIOBufferPool ioBufferPool;
-
     /** All active readers which are consuming data from this result partition now. */
     @GuardedBy("lock")
     private final Set<SortMergeSubpartitionReader> readers = new HashSet<>();
@@ -72,8 +75,8 @@ public class SortMergeResultPartition extends ResultPartition {
     @GuardedBy("lock")
     private PartitionedFile resultFile;
 
-    /** A piece of unmanaged memory for data writing. */
-    private final MemorySegment writeBuffer;
+    /** Buffers allocated from file IO buffer pool for data writing. */
+    private final List<MemorySegment> writeBuffers = new ArrayList<>();
 
     /** Size of network buffer and write buffer. */
     private final int networkBufferSize;
@@ -116,12 +119,11 @@ public class SortMergeResultPartition extends ResultPartition {
                 bufferPoolFactory);
 
         this.networkBufferSize = ioBufferPool.getBufferSize();
-        this.writeBuffer = MemorySegmentFactory.allocateUnpooledOffHeapMemory(networkBufferSize);
+        for (int i = 0; i < 128; ++i) {
+            writeBuffers.add(MemorySegmentFactory.allocateUnpooledOffHeapMemory(networkBufferSize));
+        }
         this.subpartitionOrder = getRandomSubpartitionReadOrder(numSubpartitions);
         this.partitionReader = new SortMergeResultPartitionReader(ioBufferPool, ioExecutor, lock);
-
-        this.ioBufferPool = ioBufferPool;
-        ioBufferPool.initialize();
 
         PartitionedFileWriter fileWriter = null;
         try {
@@ -227,31 +229,54 @@ public class SortMergeResultPartition extends ResultPartition {
         if (currentSortBuffer.hasRemaining()) {
             fileWriter.startNewRegion();
 
-            while (currentSortBuffer.hasRemaining()) {
-                BufferWithChannel bufferWithChannel =
-                        currentSortBuffer.copyIntoSegment(writeBuffer);
-                Buffer buffer = bufferWithChannel.getBuffer();
-                int subpartitionIndex = bufferWithChannel.getChannelIndex();
+            List<BufferWithChannel> toWrite = new ArrayList<>();
+            Queue<MemorySegment> segments = getWriteBuffers();
 
-                writeCompressedBufferIfPossible(buffer, subpartitionIndex);
+            while (currentSortBuffer.hasRemaining()) {
+                if (segments.isEmpty()) {
+                    fileWriter.writeBuffers(toWrite);
+                    toWrite.clear();
+                    segments = getWriteBuffers();
+                }
+
+                BufferWithChannel bufferWithChannel =
+                        currentSortBuffer.copyIntoSegment(checkNotNull(segments.poll()));
+                toWrite.add(compressedBufferIfPossible(bufferWithChannel));
             }
+
+            fileWriter.writeBuffers(toWrite);
         }
 
         currentSortBuffer.release();
     }
 
-    private void writeCompressedBufferIfPossible(Buffer buffer, int targetSubpartition)
-            throws IOException {
+    private void releaseWriteBuffers() {
+        synchronized (lock) {
+            if (!writeBuffers.isEmpty()) {
+                writeBuffers.clear();
+            }
+        }
+    }
+
+    private Queue<MemorySegment> getWriteBuffers() {
+        synchronized (lock) {
+            checkState(!writeBuffers.isEmpty(), "No buffer allocated.");
+            return new ArrayDeque<>(writeBuffers);
+        }
+    }
+
+    private BufferWithChannel compressedBufferIfPossible(BufferWithChannel bufferWithChannel) {
+        Buffer buffer = bufferWithChannel.getBuffer();
+        int channelIndex = bufferWithChannel.getChannelIndex();
+
         updateStatistics(buffer);
 
-        try {
-            if (canBeCompressed(buffer)) {
-                buffer = bufferCompressor.compressToIntermediateBuffer(buffer);
-            }
-            fileWriter.writeBuffer(buffer, targetSubpartition);
-        } finally {
-            buffer.recycleBuffer();
+        if (!canBeCompressed(buffer)) {
+            return bufferWithChannel;
         }
+
+        buffer = checkNotNull(bufferCompressor).compressToOriginalBuffer(buffer);
+        return new BufferWithChannel(buffer, channelIndex);
     }
 
     private void updateStatistics(Buffer buffer) {
@@ -266,13 +291,26 @@ public class SortMergeResultPartition extends ResultPartition {
             throws IOException {
         fileWriter.startNewRegion();
 
-        while (record.hasRemaining()) {
-            int toCopy = Math.min(record.remaining(), writeBuffer.size());
-            writeBuffer.put(0, record, toCopy);
-            NetworkBuffer buffer = new NetworkBuffer(writeBuffer, (buf) -> {}, dataType, toCopy);
+        List<BufferWithChannel> toWrite = new ArrayList<>();
+        Queue<MemorySegment> segments = getWriteBuffers();
 
-            writeCompressedBufferIfPossible(buffer, targetSubpartition);
+        while (record.hasRemaining()) {
+            if (segments.isEmpty()) {
+                fileWriter.writeBuffers(toWrite);
+                toWrite.clear();
+                segments = getWriteBuffers();
+            }
+
+            int toCopy = Math.min(record.remaining(), networkBufferSize);
+            MemorySegment writeBuffer = checkNotNull(segments.poll());
+            writeBuffer.put(0, record, toCopy);
+
+            NetworkBuffer buffer = new NetworkBuffer(writeBuffer, (buf) -> {}, dataType, toCopy);
+            BufferWithChannel bufferWithChannel = new BufferWithChannel(buffer, targetSubpartition);
+            toWrite.add(compressedBufferIfPossible(bufferWithChannel));
         }
+
+        fileWriter.writeBuffers(toWrite);
     }
 
     void releaseReader(SortMergeSubpartitionReader reader) {
@@ -307,6 +345,7 @@ public class SortMergeResultPartition extends ResultPartition {
 
     @Override
     public void close() {
+        releaseWriteBuffers();
         releaseCurrentSortBuffer();
         super.close();
 

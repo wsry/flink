@@ -108,12 +108,7 @@ public final class BufferReaderWriterUtil {
             throws IOException {
 
         final ByteBuffer headerBuffer = arrayWithHeaderBuffer[0];
-        headerBuffer.clear();
-        headerBuffer.putShort(buffer.isBuffer() ? HEADER_VALUE_IS_BUFFER : HEADER_VALUE_IS_EVENT);
-        headerBuffer.putShort(
-                buffer.isCompressed() ? BUFFER_IS_COMPRESSED : BUFFER_IS_NOT_COMPRESSED);
-        headerBuffer.putInt(buffer.getSize());
-        headerBuffer.flip();
+        getByteChannelBufferHeader(buffer, headerBuffer);
 
         final ByteBuffer dataBuffer = buffer.getNioBufferReadable();
         arrayWithHeaderBuffer[1] = dataBuffer;
@@ -142,31 +137,12 @@ public final class BufferReaderWriterUtil {
         return -1L;
     }
 
-    static long writeToByteChannel(
-            FileChannel channel,
-            Buffer buffer,
-            ByteBuffer writeDataCache,
-            ByteBuffer[] arrayWithHeaderBuffer)
-            throws IOException {
-
-        final long bytesToWrite = HEADER_LENGTH + buffer.readableBytes();
-        if (bytesToWrite > writeDataCache.remaining()) {
-            writeDataCache.flip();
-            writeBuffer(channel, writeDataCache);
-            writeDataCache.clear();
-        }
-
-        if (bytesToWrite > writeDataCache.remaining()) {
-            return writeToByteChannel(channel, buffer, arrayWithHeaderBuffer);
-        }
-
-        writeDataCache.putShort(buffer.isBuffer() ? HEADER_VALUE_IS_BUFFER : HEADER_VALUE_IS_EVENT);
-        writeDataCache.putShort(
-                buffer.isCompressed() ? BUFFER_IS_COMPRESSED : BUFFER_IS_NOT_COMPRESSED);
-        writeDataCache.putInt(buffer.getSize());
-        writeDataCache.put(buffer.getNioBufferReadable());
-
-        return bytesToWrite;
+    static void getByteChannelBufferHeader(Buffer buffer, ByteBuffer header) {
+        header.clear();
+        header.putShort(buffer.isBuffer() ? HEADER_VALUE_IS_BUFFER : HEADER_VALUE_IS_EVENT);
+        header.putShort(buffer.isCompressed() ? BUFFER_IS_COMPRESSED : BUFFER_IS_NOT_COMPRESSED);
+        header.putInt(buffer.getSize());
+        header.flip();
     }
 
     @Nullable
@@ -282,8 +258,7 @@ public final class BufferReaderWriterUtil {
         }
     }
 
-    private static void writeBuffers(FileChannel channel, ByteBuffer... buffers)
-            throws IOException {
+    static void writeBuffers(FileChannel channel, ByteBuffer... buffers) throws IOException {
         for (ByteBuffer buffer : buffers) {
             writeBuffer(channel, buffer);
         }
