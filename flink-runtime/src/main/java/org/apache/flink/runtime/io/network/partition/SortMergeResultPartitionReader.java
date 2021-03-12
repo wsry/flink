@@ -124,8 +124,15 @@ public class SortMergeResultPartitionReader implements Runnable, BufferRecycler 
             }
         }
 
-        bufferPool.recycle(buffers, this);
-        buffers.clear();
+        if (buffers.size() > 0) {
+            try {
+                bufferPool.recycle(buffers, this);
+                buffers.clear();
+            } catch (Throwable throwable) {
+                // this should never happen so just log the error
+                LOG.error("Failed to release subpartition reader.", throwable);
+            }
+        }
 
         if (removeFinishedAndFailedReaders(finishedReaders, failedReaders) > 0) {
             ioExecutor.execute(this);

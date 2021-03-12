@@ -503,7 +503,7 @@ public class TaskManagerOptions {
     public static final ConfigOption<MemorySize> NETWORK_FILE_IO_MEMORY_SIZE =
             key("taskmanager.memory.batch-shuffle.size")
                     .memoryType()
-                    .defaultValue(MemorySize.parse("16M"))
+                    .defaultValue(MemorySize.parse("32M"))
                     .withDescription(
                             String.format(
                                     "Memory used by blocking shuffle for file IO. The minimum value"

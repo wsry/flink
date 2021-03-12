@@ -19,8 +19,8 @@
 package org.apache.flink.runtime.io.network.partition;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.configuration.NettyShuffleEnvironmentOptions;
 import org.apache.flink.core.memory.MemorySegment;
-import org.apache.flink.core.memory.MemorySegmentFactory;
 import org.apache.flink.runtime.event.AbstractEvent;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.api.serialization.EventSerializer;
@@ -64,6 +64,12 @@ import static org.apache.flink.util.Preconditions.checkState;
  */
 @NotThreadSafe
 public class SortMergeResultPartition extends ResultPartition {
+
+    /**
+     * Maximum number of buffers to allocate for data writing. Currently, it is an empirical value
+     * which can not be configured.
+     */
+    private static final int MAX_WRITE_BUFFERS = 256;
 
     private final Object lock = new Object();
 
@@ -119,9 +125,6 @@ public class SortMergeResultPartition extends ResultPartition {
                 bufferPoolFactory);
 
         this.networkBufferSize = ioBufferPool.getBufferSize();
-        for (int i = 0; i < 128; ++i) {
-            writeBuffers.add(MemorySegmentFactory.allocateUnpooledOffHeapMemory(networkBufferSize));
-        }
         this.subpartitionOrder = getRandomSubpartitionReadOrder(numSubpartitions);
         this.partitionReader = new SortMergeResultPartitionReader(ioBufferPool, ioExecutor, lock);
 
@@ -133,6 +136,39 @@ public class SortMergeResultPartition extends ResultPartition {
             ExceptionUtils.rethrow(throwable);
         }
         this.fileWriter = fileWriter;
+    }
+
+    @Override
+    public void setup() throws IOException {
+        super.setup();
+
+        int expectedSortBuffers = 2 * MAX_WRITE_BUFFERS;
+        int numRequiredBuffer = bufferPool.getNumberOfRequiredMemorySegments();
+        String errorMessage =
+                String.format(
+                        "Too few sort buffers, please increase %s to a larger value (more than %d).",
+                        NettyShuffleEnvironmentOptions.NETWORK_SORT_SHUFFLE_MIN_BUFFERS,
+                        expectedSortBuffers);
+        if (numRequiredBuffer < expectedSortBuffers) {
+            LOG.warn(errorMessage);
+        }
+
+        int numWriteBuffers = Math.min(numRequiredBuffer / 2, MAX_WRITE_BUFFERS);
+        if (numWriteBuffers < 1) {
+            throw new IOException(errorMessage);
+        }
+
+        synchronized (lock) {
+            try {
+                for (int i = 0; i < numWriteBuffers; ++i) {
+                    MemorySegment segment =
+                            bufferPool.requestBufferBuilderBlocking().getMemorySegment();
+                    writeBuffers.add(segment);
+                }
+            } catch (InterruptedException exception) {
+                throw new IOException(exception);
+            }
+        }
     }
 
     @Override
@@ -250,17 +286,9 @@ public class SortMergeResultPartition extends ResultPartition {
         currentSortBuffer.release();
     }
 
-    private void releaseWriteBuffers() {
-        synchronized (lock) {
-            if (!writeBuffers.isEmpty()) {
-                writeBuffers.clear();
-            }
-        }
-    }
-
     private Queue<MemorySegment> getWriteBuffers() {
         synchronized (lock) {
-            checkState(!writeBuffers.isEmpty(), "No buffer allocated.");
+            checkState(!writeBuffers.isEmpty(), "Task has been canceled.");
             return new ArrayDeque<>(writeBuffers);
         }
     }
@@ -341,6 +369,15 @@ public class SortMergeResultPartition extends ResultPartition {
         }
 
         super.finish();
+    }
+
+    private void releaseWriteBuffers() {
+        synchronized (lock) {
+            for (MemorySegment segment : writeBuffers) {
+                bufferPool.recycle(segment);
+            }
+            writeBuffers.clear();
+        }
     }
 
     @Override

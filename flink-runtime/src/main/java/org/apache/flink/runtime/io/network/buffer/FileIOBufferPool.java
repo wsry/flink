@@ -50,7 +50,7 @@ public class FileIOBufferPool {
 
     public static final int MIN_TOTAL_BYTES = 16 * 1024 * 1024;
 
-    public static final int MIN_BYTES_TO_REQUEST = 4 * 1024 * 1024;
+    public static final int MIN_BYTES_TO_REQUEST = 8 * 1024 * 1024;
 
     public static final int MAX_REQUESTED_BYTES = MIN_TOTAL_BYTES;
 
@@ -200,6 +200,10 @@ public class FileIOBufferPool {
     public void recycle(Collection<MemorySegment> segments, Object owner) {
         checkArgument(segments != null, "Buffer list must be not null.");
         checkArgument(owner != null, "Owner must be not null.");
+
+        if (segments.isEmpty()) {
+            return;
+        }
 
         synchronized (buffers) {
             checkState(initialized, "Recycling a buffer before initialization.");
