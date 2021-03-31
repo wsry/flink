@@ -19,6 +19,7 @@
 package org.apache.flink.table.tpcds;
 
 import org.apache.flink.api.java.utils.ParameterTool;
+import org.apache.flink.configuration.NettyShuffleEnvironmentOptions;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.streaming.api.graph.GlobalDataExchangeMode;
 import org.apache.flink.table.api.EnvironmentSettings;
@@ -137,6 +138,14 @@ public class TpcdsTestProgram {
         EnvironmentSettings environmentSettings =
                 EnvironmentSettings.newInstance().useBlinkPlanner().inBatchMode().build();
         TableEnvironment tEnv = TableEnvironment.create(environmentSettings);
+
+        tEnv.getConfig()
+                .getConfiguration()
+                .setInteger(NettyShuffleEnvironmentOptions.NETWORK_SORT_SHUFFLE_MIN_PARALLELISM, 1);
+        tEnv.getConfig()
+                .getConfiguration()
+                .setBoolean(
+                        NettyShuffleEnvironmentOptions.BLOCKING_SHUFFLE_COMPRESSION_ENABLED, true);
 
         // config Optimizer parameters
         tEnv.getConfig()

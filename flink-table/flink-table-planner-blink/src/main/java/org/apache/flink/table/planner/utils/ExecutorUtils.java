@@ -21,6 +21,7 @@ package org.apache.flink.table.planner.utils;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.operators.ResourceSpec;
 import org.apache.flink.api.dag.Transformation;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.jobgraph.JobType;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.graph.GlobalDataExchangeMode;
@@ -35,14 +36,19 @@ public class ExecutorUtils {
 
     /** Generate {@link StreamGraph} by {@link StreamGraphGenerator}. */
     public static StreamGraph generateStreamGraph(
-            StreamExecutionEnvironment execEnv, List<Transformation<?>> transformations) {
+            StreamExecutionEnvironment execEnv,
+            List<Transformation<?>> transformations,
+            Configuration configuration) {
         if (transformations.size() <= 0) {
             throw new IllegalStateException(
                     "No operators defined in streaming topology. Cannot generate StreamGraph.");
         }
         StreamGraphGenerator generator =
                 new StreamGraphGenerator(
-                                transformations, execEnv.getConfig(), execEnv.getCheckpointConfig())
+                                transformations,
+                                execEnv.getConfig(),
+                                execEnv.getCheckpointConfig(),
+                                configuration)
                         .setStateBackend(execEnv.getStateBackend())
                         .setSavepointDir(execEnv.getDefaultSavepointDirectory())
                         .setChaining(execEnv.isChainingEnabled())

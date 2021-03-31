@@ -47,7 +47,8 @@ public class StreamExecutor extends ExecutorBase {
     public Pipeline createPipeline(
             List<Transformation<?>> transformations, TableConfig tableConfig, String jobName) {
         StreamGraph streamGraph =
-                ExecutorUtils.generateStreamGraph(getExecutionEnvironment(), transformations);
+                ExecutorUtils.generateStreamGraph(
+                        getExecutionEnvironment(), transformations, tableConfig.getConfiguration());
         streamGraph.setJobName(getNonEmptyJobName(jobName));
         return streamGraph;
     }

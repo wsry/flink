@@ -18,6 +18,12 @@
 
 package org.apache.flink.table.planner.delegation
 
+import java.util
+
+import org.apache.calcite.plan.{ConventionTraitDef, RelTrait, RelTraitDef}
+import org.apache.calcite.rel.RelCollationTraitDef
+import org.apache.calcite.rel.logical.LogicalTableModify
+import org.apache.calcite.sql.SqlExplainLevel
 import org.apache.flink.api.common.RuntimeExecutionMode
 import org.apache.flink.api.dag.Transformation
 import org.apache.flink.configuration.ExecutionOptions
@@ -37,20 +43,13 @@ import org.apache.flink.table.planner.plan.utils.FlinkRelOptUtil
 import org.apache.flink.table.planner.sinks.{BatchSelectTableSink, SelectTableSinkBase}
 import org.apache.flink.table.planner.utils.{DummyStreamExecutionEnvironment, ExecutorUtils}
 
-import org.apache.calcite.plan.{ConventionTraitDef, RelTrait, RelTraitDef}
-import org.apache.calcite.rel.RelCollationTraitDef
-import org.apache.calcite.rel.logical.LogicalTableModify
-import org.apache.calcite.sql.SqlExplainLevel
-
-import java.util
-
 import scala.collection.JavaConversions._
 
 class BatchPlanner(
-    executor: Executor,
-    config: TableConfig,
-    functionCatalog: FunctionCatalog,
-    catalogManager: CatalogManager)
+                    executor: Executor,
+                    config: TableConfig,
+                    functionCatalog: FunctionCatalog,
+                    catalogManager: CatalogManager)
   extends PlannerBase(executor, config, functionCatalog, catalogManager, isStreamingMode = false) {
 
   override protected def getTraitDefs: Array[RelTraitDef[_ <: RelTrait]] = {
@@ -81,7 +80,7 @@ class BatchPlanner(
       case node: BatchExecNode[_] => node.translateToPlan(planner)
       case _ =>
         throw new TableException("Cannot generate BoundedStream due to an invalid logical plan. " +
-            "This is a bug and should not happen. Please file an issue.")
+          "This is a bug and should not happen. Please file an issue.")
     }
   }
 
@@ -121,7 +120,7 @@ class BatchPlanner(
 
     val execEnv = getExecEnv
     ExecutorUtils.setBatchProperties(execEnv)
-    val streamGraph = ExecutorUtils.generateStreamGraph(execEnv, transformations)
+    val streamGraph = ExecutorUtils.generateStreamGraph(execEnv, transformations, getTableConfig.getConfiguration)
     ExecutorUtils.setBatchProperties(streamGraph, getTableConfig)
 
     val sb = new StringBuilder

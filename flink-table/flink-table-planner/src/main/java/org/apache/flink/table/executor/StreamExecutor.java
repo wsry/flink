@@ -55,7 +55,8 @@ public class StreamExecutor implements Executor {
         return new StreamGraphGenerator(
                         transformations,
                         executionEnvironment.getConfig(),
-                        executionEnvironment.getCheckpointConfig())
+                        executionEnvironment.getCheckpointConfig(),
+                        tableConfig.getConfiguration())
                 .setStateBackend(executionEnvironment.getStateBackend())
                 .setChaining(executionEnvironment.isChainingEnabled())
                 .setUserArtifacts(executionEnvironment.getCachedFiles())

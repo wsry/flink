@@ -18,6 +18,11 @@
 
 package org.apache.flink.table.planner.delegation
 
+import java.util
+
+import org.apache.calcite.plan.{ConventionTraitDef, RelTrait, RelTraitDef}
+import org.apache.calcite.rel.logical.LogicalTableModify
+import org.apache.calcite.sql.SqlExplainLevel
 import org.apache.flink.api.common.RuntimeExecutionMode
 import org.apache.flink.api.dag.Transformation
 import org.apache.flink.configuration.ExecutionOptions
@@ -36,19 +41,13 @@ import org.apache.flink.table.planner.plan.utils.FlinkRelOptUtil
 import org.apache.flink.table.planner.sinks.{SelectTableSinkBase, StreamSelectTableSink}
 import org.apache.flink.table.planner.utils.{DummyStreamExecutionEnvironment, ExecutorUtils}
 
-import org.apache.calcite.plan.{ConventionTraitDef, RelTrait, RelTraitDef}
-import org.apache.calcite.rel.logical.LogicalTableModify
-import org.apache.calcite.sql.SqlExplainLevel
-
-import java.util
-
 import _root_.scala.collection.JavaConversions._
 
 class StreamPlanner(
-    executor: Executor,
-    config: TableConfig,
-    functionCatalog: FunctionCatalog,
-    catalogManager: CatalogManager)
+                     executor: Executor,
+                     config: TableConfig,
+                     functionCatalog: FunctionCatalog,
+                     catalogManager: CatalogManager)
   extends PlannerBase(executor, config, functionCatalog, catalogManager, isStreamingMode = true) {
 
   override protected def getTraitDefs: Array[RelTraitDef[_ <: RelTrait]] = {
@@ -108,7 +107,7 @@ class StreamPlanner(
 
     val transformations = translateToPlan(execGraph)
     cleanupInternalConfigurations()
-    val streamGraph = ExecutorUtils.generateStreamGraph(getExecEnv, transformations)
+    val streamGraph = ExecutorUtils.generateStreamGraph(getExecEnv, transformations, getTableConfig.getConfiguration)
 
     val sb = new StringBuilder
     sb.append("== Abstract Syntax Tree ==")
@@ -160,7 +159,7 @@ class StreamPlanner(
     val transformations = translateToPlan(execGraph)
     cleanupInternalConfigurations()
 
-    val streamGraph = ExecutorUtils.generateStreamGraph(getExecEnv, transformations)
+    val streamGraph = ExecutorUtils.generateStreamGraph(getExecEnv, transformations, getTableConfig.getConfiguration)
 
     val sb = new StringBuilder
     sb.append("== Optimized Execution Plan ==")
