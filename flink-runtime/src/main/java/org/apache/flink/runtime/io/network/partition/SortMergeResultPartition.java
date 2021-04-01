@@ -148,6 +148,8 @@ public class SortMergeResultPartition extends ResultPartition {
             ExceptionUtils.rethrow(throwable);
         }
         this.fileWriter = fileWriter;
+
+        throw new RuntimeException("Test sort-merge result partition exception.");
     }
 
     @Override
