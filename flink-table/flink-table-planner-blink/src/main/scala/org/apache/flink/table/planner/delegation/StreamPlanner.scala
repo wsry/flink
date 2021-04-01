@@ -107,7 +107,8 @@ class StreamPlanner(
 
     val transformations = translateToPlan(execGraph)
     cleanupInternalConfigurations()
-    val streamGraph = ExecutorUtils.generateStreamGraph(getExecEnv, transformations, getTableConfig.getConfiguration)
+    val streamGraph = ExecutorUtils.generateStreamGraph(
+      getExecEnv, transformations, getTableConfig.getConfiguration)
 
     val sb = new StringBuilder
     sb.append("== Abstract Syntax Tree ==")
@@ -159,7 +160,8 @@ class StreamPlanner(
     val transformations = translateToPlan(execGraph)
     cleanupInternalConfigurations()
 
-    val streamGraph = ExecutorUtils.generateStreamGraph(getExecEnv, transformations, getTableConfig.getConfiguration)
+    val streamGraph = ExecutorUtils.generateStreamGraph(
+      getExecEnv, transformations, getTableConfig.getConfiguration)
 
     val sb = new StringBuilder
     sb.append("== Optimized Execution Plan ==")
