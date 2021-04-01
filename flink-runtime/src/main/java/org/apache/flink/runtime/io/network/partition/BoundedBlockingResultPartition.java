@@ -60,6 +60,8 @@ public class BoundedBlockingResultPartition extends BufferWritingResultPartition
                 partitionManager,
                 bufferCompressor,
                 bufferPoolFactory);
+
+        throw new RuntimeException("Test bounded blocking result partition exception.");
     }
 
     @Override
