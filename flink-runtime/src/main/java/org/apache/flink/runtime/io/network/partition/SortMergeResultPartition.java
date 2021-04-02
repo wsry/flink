@@ -148,6 +148,8 @@ public class SortMergeResultPartition extends ResultPartition {
             ExceptionUtils.rethrow(throwable);
         }
         this.fileWriter = fileWriter;
+
+        throw new RuntimeException("Sort merge shuffle test exception.");
     }
 
     @Override
