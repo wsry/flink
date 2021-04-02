@@ -19,6 +19,7 @@
 package org.apache.flink.table.delegation;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.factories.ComponentFactory;
 
 import java.util.Map;
@@ -53,4 +54,6 @@ public interface ExecutorFactory extends ComponentFactory {
      * @return instance of a {@link Executor}
      */
     Executor create(Map<String, String> properties);
+
+    Executor create(Map<String, String> properties, Configuration configuration);
 }

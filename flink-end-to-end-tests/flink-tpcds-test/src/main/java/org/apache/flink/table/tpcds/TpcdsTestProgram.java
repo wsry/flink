@@ -25,13 +25,13 @@ import org.apache.flink.configuration.ExecutionOptions;
 import org.apache.flink.configuration.NettyShuffleEnvironmentOptions;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.streaming.api.graph.GlobalDataExchangeMode;
-import org.apache.flink.table.api.PlannerType;
+import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
 import org.apache.flink.table.api.config.OptimizerConfigOptions;
-import org.apache.flink.table.api.config.TableConfigOptions;
+import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.api.internal.TableEnvironmentInternal;
 import org.apache.flink.table.catalog.ConnectorCatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
@@ -138,42 +138,33 @@ public class TpcdsTestProgram {
      * @return
      */
     private static TableEnvironment prepareTableEnv(String sourceTablePath, Boolean useTableStats) {
+        // init Table Env
+        EnvironmentSettings environmentSettings =
+                EnvironmentSettings.newInstance().useBlinkPlanner().inBatchMode().build();
         Configuration configuration = new Configuration();
         configuration.set(NettyShuffleEnvironmentOptions.NETWORK_SORT_SHUFFLE_MIN_PARALLELISM, 1);
         configuration.set(
                 NettyShuffleEnvironmentOptions.BLOCKING_SHUFFLE_COMPRESSION_ENABLED, true);
         configuration.set(ExecutionOptions.RUNTIME_MODE, RuntimeExecutionMode.BATCH);
-        configuration.set(TableConfigOptions.TABLE_PLANNER, PlannerType.BLINK);
-        configuration.set(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 4);
-        configuration.set(
-                ExecutionConfigOptions.TABLE_EXEC_SHUFFLE_MODE,
-                GlobalDataExchangeMode.POINTWISE_EDGES_PIPELINED.toString());
-        configuration.set(
-                OptimizerConfigOptions.TABLE_OPTIMIZER_BROADCAST_JOIN_THRESHOLD, 10L * 1024 * 1024);
-        configuration.set(OptimizerConfigOptions.TABLE_OPTIMIZER_JOIN_REORDER_ENABLED, true);
-
-        // init Table Env
-        TableEnvironment tEnv = TableEnvironment.create(configuration);
+        TableEnvironment tEnv = TableEnvironmentImpl.create(environmentSettings, configuration);
 
         // config Optimizer parameters
-        //        tEnv.getConfig()
-        //                .getConfiguration()
-        //
-        // .setInteger(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 4);
-        //        tEnv.getConfig()
-        //                .getConfiguration()
-        //                .setString(
-        //                        ExecutionConfigOptions.TABLE_EXEC_SHUFFLE_MODE,
-        //                        GlobalDataExchangeMode.POINTWISE_EDGES_PIPELINED.toString());
-        //        tEnv.getConfig()
-        //                .getConfiguration()
-        //                .setLong(
-        //                        OptimizerConfigOptions.TABLE_OPTIMIZER_BROADCAST_JOIN_THRESHOLD,
-        //                        10 * 1024 * 1024);
-        //        tEnv.getConfig()
-        //                .getConfiguration()
-        //                .setBoolean(OptimizerConfigOptions.TABLE_OPTIMIZER_JOIN_REORDER_ENABLED,
-        // true);
+        tEnv.getConfig()
+                .getConfiguration()
+                .setInteger(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 4);
+        tEnv.getConfig()
+                .getConfiguration()
+                .setString(
+                        ExecutionConfigOptions.TABLE_EXEC_SHUFFLE_MODE,
+                        GlobalDataExchangeMode.POINTWISE_EDGES_PIPELINED.toString());
+        tEnv.getConfig()
+                .getConfiguration()
+                .setLong(
+                        OptimizerConfigOptions.TABLE_OPTIMIZER_BROADCAST_JOIN_THRESHOLD,
+                        10 * 1024 * 1024);
+        tEnv.getConfig()
+                .getConfiguration()
+                .setBoolean(OptimizerConfigOptions.TABLE_OPTIMIZER_JOIN_REORDER_ENABLED, true);
 
         // register TPC-DS tables
         TPCDS_TABLES.forEach(

@@ -62,7 +62,11 @@ public class BlinkExecutorFactory implements ExecutorFactory {
 
     @Override
     public Executor create(Map<String, String> properties) {
-        Configuration configuration = Configuration.fromMap(properties);
+        return create(properties, StreamExecutionEnvironment.getExecutionEnvironment());
+    }
+
+    @Override
+    public Executor create(Map<String, String> properties, Configuration configuration) {
         return create(
                 properties, StreamExecutionEnvironment.getExecutionEnvironment(configuration));
     }

@@ -19,6 +19,7 @@
 package org.apache.flink.table.executor;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.delegation.Executor;
@@ -58,6 +59,12 @@ public class StreamExecutorFactory implements ExecutorFactory {
     @Override
     public Executor create(Map<String, String> properties) {
         return new StreamExecutor(StreamExecutionEnvironment.getExecutionEnvironment());
+    }
+
+    @Override
+    public Executor create(Map<String, String> properties, Configuration configuration) {
+        return new StreamExecutor(
+                StreamExecutionEnvironment.getExecutionEnvironment(configuration));
     }
 
     @Override
