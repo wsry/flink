@@ -18,16 +18,20 @@
 
 package org.apache.flink.table.tpcds;
 
+import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.java.utils.ParameterTool;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.ExecutionOptions;
 import org.apache.flink.configuration.NettyShuffleEnvironmentOptions;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.streaming.api.graph.GlobalDataExchangeMode;
-import org.apache.flink.table.api.EnvironmentSettings;
+import org.apache.flink.table.api.PlannerType;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
 import org.apache.flink.table.api.config.OptimizerConfigOptions;
+import org.apache.flink.table.api.config.TableConfigOptions;
 import org.apache.flink.table.api.internal.TableEnvironmentInternal;
 import org.apache.flink.table.catalog.ConnectorCatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
@@ -134,18 +138,15 @@ public class TpcdsTestProgram {
      * @return
      */
     private static TableEnvironment prepareTableEnv(String sourceTablePath, Boolean useTableStats) {
-        // init Table Env
-        EnvironmentSettings environmentSettings =
-                EnvironmentSettings.newInstance().useBlinkPlanner().inBatchMode().build();
-        TableEnvironment tEnv = TableEnvironment.create(environmentSettings);
+        Configuration configuration = new Configuration();
+        configuration.set(NettyShuffleEnvironmentOptions.NETWORK_SORT_SHUFFLE_MIN_PARALLELISM, 1);
+        configuration.set(
+                NettyShuffleEnvironmentOptions.BLOCKING_SHUFFLE_COMPRESSION_ENABLED, true);
+        configuration.set(ExecutionOptions.RUNTIME_MODE, RuntimeExecutionMode.BATCH);
+        configuration.set(TableConfigOptions.TABLE_PLANNER, PlannerType.BLINK);
 
-        tEnv.getConfig()
-                .getConfiguration()
-                .setInteger(NettyShuffleEnvironmentOptions.NETWORK_SORT_SHUFFLE_MIN_PARALLELISM, 1);
-        tEnv.getConfig()
-                .getConfiguration()
-                .setBoolean(
-                        NettyShuffleEnvironmentOptions.BLOCKING_SHUFFLE_COMPRESSION_ENABLED, true);
+        // init Table Env
+        TableEnvironment tEnv = TableEnvironment.create(configuration);
 
         // config Optimizer parameters
         tEnv.getConfig()
