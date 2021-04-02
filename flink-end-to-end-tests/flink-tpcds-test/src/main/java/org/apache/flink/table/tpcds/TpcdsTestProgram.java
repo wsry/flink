@@ -144,27 +144,36 @@ public class TpcdsTestProgram {
                 NettyShuffleEnvironmentOptions.BLOCKING_SHUFFLE_COMPRESSION_ENABLED, true);
         configuration.set(ExecutionOptions.RUNTIME_MODE, RuntimeExecutionMode.BATCH);
         configuration.set(TableConfigOptions.TABLE_PLANNER, PlannerType.BLINK);
+        configuration.set(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 4);
+        configuration.set(
+                ExecutionConfigOptions.TABLE_EXEC_SHUFFLE_MODE,
+                GlobalDataExchangeMode.POINTWISE_EDGES_PIPELINED.toString());
+        configuration.set(
+                OptimizerConfigOptions.TABLE_OPTIMIZER_BROADCAST_JOIN_THRESHOLD, 10L * 1024 * 1024);
+        configuration.set(OptimizerConfigOptions.TABLE_OPTIMIZER_JOIN_REORDER_ENABLED, true);
 
         // init Table Env
         TableEnvironment tEnv = TableEnvironment.create(configuration);
 
         // config Optimizer parameters
-        tEnv.getConfig()
-                .getConfiguration()
-                .setInteger(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 4);
-        tEnv.getConfig()
-                .getConfiguration()
-                .setString(
-                        ExecutionConfigOptions.TABLE_EXEC_SHUFFLE_MODE,
-                        GlobalDataExchangeMode.POINTWISE_EDGES_PIPELINED.toString());
-        tEnv.getConfig()
-                .getConfiguration()
-                .setLong(
-                        OptimizerConfigOptions.TABLE_OPTIMIZER_BROADCAST_JOIN_THRESHOLD,
-                        10 * 1024 * 1024);
-        tEnv.getConfig()
-                .getConfiguration()
-                .setBoolean(OptimizerConfigOptions.TABLE_OPTIMIZER_JOIN_REORDER_ENABLED, true);
+        //        tEnv.getConfig()
+        //                .getConfiguration()
+        //
+        // .setInteger(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 4);
+        //        tEnv.getConfig()
+        //                .getConfiguration()
+        //                .setString(
+        //                        ExecutionConfigOptions.TABLE_EXEC_SHUFFLE_MODE,
+        //                        GlobalDataExchangeMode.POINTWISE_EDGES_PIPELINED.toString());
+        //        tEnv.getConfig()
+        //                .getConfiguration()
+        //                .setLong(
+        //                        OptimizerConfigOptions.TABLE_OPTIMIZER_BROADCAST_JOIN_THRESHOLD,
+        //                        10 * 1024 * 1024);
+        //        tEnv.getConfig()
+        //                .getConfiguration()
+        //                .setBoolean(OptimizerConfigOptions.TABLE_OPTIMIZER_JOIN_REORDER_ENABLED,
+        // true);
 
         // register TPC-DS tables
         TPCDS_TABLES.forEach(
