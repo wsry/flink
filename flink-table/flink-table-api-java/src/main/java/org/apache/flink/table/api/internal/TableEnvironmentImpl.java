@@ -301,10 +301,9 @@ public class TableEnvironmentImpl implements TableEnvironmentInternal {
                 new FunctionCatalog(tableConfig, catalogManager, moduleManager);
 
         Map<String, String> executorProperties = settings.toExecutorProperties();
-        executorProperties.putAll(configuration.toMap());
         Executor executor =
                 ComponentFactoryService.find(ExecutorFactory.class, executorProperties)
-                        .create(executorProperties);
+                        .create(configuration.toMap());
 
         Map<String, String> plannerProperties = settings.toPlannerProperties();
         Planner planner =
