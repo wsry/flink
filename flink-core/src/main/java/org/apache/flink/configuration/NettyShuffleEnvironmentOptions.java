@@ -205,7 +205,7 @@ public class NettyShuffleEnvironmentOptions {
     public static final ConfigOption<Integer> NETWORK_SORT_SHUFFLE_MIN_PARALLELISM =
             key("taskmanager.network.sort-shuffle.min-parallelism")
                     .intType()
-                    .defaultValue(Integer.MAX_VALUE)
+                    .defaultValue(1)
                     .withDescription(
                             "Parallelism threshold to switch between sort-merge blocking shuffle "
                                     + "and the default hash-based blocking shuffle, which means for small parallelism,"
