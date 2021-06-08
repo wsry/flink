@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.shuffle;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.shuffle.NettyShuffleDescriptor.LocalExecutionPartitionConnectionInfo;
 import org.apache.flink.runtime.shuffle.NettyShuffleDescriptor.NetworkPartitionConnectionInfo;
@@ -26,12 +27,15 @@ import org.apache.flink.runtime.shuffle.NettyShuffleDescriptor.PartitionConnecti
 import java.util.concurrent.CompletableFuture;
 
 /** Default {@link ShuffleMaster} for netty and local file based shuffle implementation. */
-public enum NettyShuffleMaster implements ShuffleMaster<NettyShuffleDescriptor> {
-    INSTANCE;
+public class NettyShuffleMaster implements ShuffleMaster<NettyShuffleDescriptor> {
+
+    public static final NettyShuffleMaster INSTANCE = new NettyShuffleMaster();
 
     @Override
     public CompletableFuture<NettyShuffleDescriptor> registerPartitionWithProducer(
-            PartitionDescriptor partitionDescriptor, ProducerDescriptor producerDescriptor) {
+            JobID jobID,
+            PartitionDescriptor partitionDescriptor,
+            ProducerDescriptor producerDescriptor) {
 
         ResultPartitionID resultPartitionID =
                 new ResultPartitionID(
