@@ -162,7 +162,7 @@ public class NettyShuffleEnvironmentOptions {
     @Documentation.Section(Documentation.Sections.ALL_TASK_MANAGER_NETWORK)
     public static final ConfigOption<Integer> NETWORK_BUFFERS_PER_CHANNEL =
             key("taskmanager.network.memory.buffers-per-channel")
-                    .defaultValue(2)
+                    .defaultValue(0)
                     .withDescription(
                             "Number of exclusive network buffers to use for each outgoing/incoming channel (subpartition/inputchannel)"
                                     + " in the credit-based flow control model. It should be configured at least 2 for good performance."
