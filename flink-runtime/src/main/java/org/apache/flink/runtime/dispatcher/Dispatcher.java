@@ -169,7 +169,10 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 
         this.jobManagerSharedServices =
                 JobManagerSharedServices.fromConfiguration(
-                        configuration, blobServer, fatalErrorHandler);
+                        configuration,
+                        blobServer,
+                        resourceManagerGatewayRetriever,
+                        fatalErrorHandler);
 
         this.runningJobsRegistry = highAvailabilityServices.getRunningJobsRegistry();
 

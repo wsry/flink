@@ -25,10 +25,14 @@ import org.apache.flink.runtime.blob.BlobWriter;
 import org.apache.flink.runtime.execution.librarycache.BlobLibraryCacheManager;
 import org.apache.flink.runtime.execution.librarycache.FlinkUserCodeClassLoaders;
 import org.apache.flink.runtime.execution.librarycache.LibraryCacheManager;
+import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.shuffle.ShuffleMaster;
+import org.apache.flink.runtime.shuffle.ShuffleMasterContext;
+import org.apache.flink.runtime.shuffle.ShuffleMasterContextImpl;
 import org.apache.flink.runtime.shuffle.ShuffleServiceLoader;
 import org.apache.flink.runtime.util.Hardware;
+import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.concurrent.ExecutorThreadFactory;
 
@@ -119,7 +123,10 @@ public class JobManagerSharedServices {
     // ------------------------------------------------------------------------
 
     public static JobManagerSharedServices fromConfiguration(
-            Configuration config, BlobServer blobServer, FatalErrorHandler fatalErrorHandler)
+            Configuration config,
+            BlobServer blobServer,
+            GatewayRetriever<ResourceManagerGateway> rmGatewayRetriever,
+            FatalErrorHandler fatalErrorHandler)
             throws Exception {
 
         checkNotNull(config);
@@ -150,8 +157,11 @@ public class JobManagerSharedServices {
                         Hardware.getNumberCPUCores(),
                         new ExecutorThreadFactory("jobmanager-future"));
 
+        final ShuffleMasterContext shuffleMasterContext =
+                new ShuffleMasterContextImpl(config, rmGatewayRetriever, fatalErrorHandler);
         final ShuffleMaster<?> shuffleMaster =
-                ShuffleServiceLoader.loadShuffleServiceFactory(config).createShuffleMaster(config);
+                ShuffleServiceLoader.loadShuffleServiceFactory(config)
+                        .createShuffleMaster(shuffleMasterContext);
         shuffleMaster.start();
 
         return new JobManagerSharedServices(
