@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.shuffle;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
 import org.apache.flink.runtime.shuffle.NettyShuffleDescriptor.LocalExecutionPartitionConnectionInfo;
 import org.apache.flink.runtime.shuffle.NettyShuffleDescriptor.NetworkPartitionConnectionInfo;
@@ -31,7 +32,9 @@ public enum NettyShuffleMaster implements ShuffleMaster<NettyShuffleDescriptor> 
 
     @Override
     public CompletableFuture<NettyShuffleDescriptor> registerPartitionWithProducer(
-            PartitionDescriptor partitionDescriptor, ProducerDescriptor producerDescriptor) {
+            JobID jobID,
+            PartitionDescriptor partitionDescriptor,
+            ProducerDescriptor producerDescriptor) {
 
         ResultPartitionID resultPartitionID =
                 new ResultPartitionID(
