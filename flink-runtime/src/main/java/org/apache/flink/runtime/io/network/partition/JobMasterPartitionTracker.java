@@ -21,6 +21,7 @@ import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.deployment.ResultPartitionDeploymentDescriptor;
 
 import java.util.Collection;
+import java.util.List;
 
 /**
  * Utility for tracking partitions and issuing release calls to task executors and shuffle masters.
@@ -52,4 +53,7 @@ public interface JobMasterPartitionTracker
      * ID, and stops the tracking of partitions that were released/promoted.
      */
     void stopTrackingAndReleaseOrPromotePartitionsFor(ResourceID producingTaskExecutorId);
+
+    /** Lists all result partitions being tracked by this partition tracker currently. */
+    List<ResultPartitionDeploymentDescriptor> listPartitions();
 }

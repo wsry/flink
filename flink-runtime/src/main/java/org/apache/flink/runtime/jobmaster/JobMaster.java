@@ -74,6 +74,8 @@ import org.apache.flink.runtime.rpc.RpcService;
 import org.apache.flink.runtime.rpc.RpcServiceUtils;
 import org.apache.flink.runtime.scheduler.ExecutionGraphInfo;
 import org.apache.flink.runtime.scheduler.SchedulerNG;
+import org.apache.flink.runtime.shuffle.JobShuffleContext;
+import org.apache.flink.runtime.shuffle.JobShuffleContextImpl;
 import org.apache.flink.runtime.shuffle.ShuffleMaster;
 import org.apache.flink.runtime.slots.ResourceRequirement;
 import org.apache.flink.runtime.state.KeyGroupRange;
@@ -380,6 +382,13 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
     @Override
     protected void onStart() throws JobMasterException {
         try {
+            JobShuffleContext context =
+                    new JobShuffleContextImpl(
+                            jobGraph.getJobID(),
+                            jobMasterConfiguration.getConfiguration(),
+                            partitionTracker,
+                            getMainThreadExecutor());
+            shuffleMaster.registerJob(context);
             startJobExecution();
         } catch (Exception e) {
             final JobMasterException jobMasterException =
@@ -989,7 +998,7 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
                                                             ::stopTrackingAndReleaseOrPromotePartitionsFor
                                                     : partitionTracker
                                                             ::stopTrackingAndReleasePartitionsFor));
-
+            shuffleMaster.unregisterJob(jobGraph.getJobID());
             final ExecutionGraphInfo executionGraphInfo = schedulerNG.requestJob();
             scheduledExecutorService.execute(
                     () -> jobCompletionActions.jobReachedGloballyTerminalState(executionGraphInfo));

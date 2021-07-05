@@ -22,9 +22,11 @@ import org.apache.flink.runtime.deployment.ResultPartitionDeploymentDescriptor;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /** Test {@link JobMasterPartitionTracker} implementation. */
 public class TestingJobMasterPartitionTracker implements JobMasterPartitionTracker {
@@ -39,6 +41,8 @@ public class TestingJobMasterPartitionTracker implements JobMasterPartitionTrack
     private Consumer<Collection<ResultPartitionID>> stopTrackingAndReleasePartitionsConsumer =
             ignored -> {};
     private Consumer<Collection<ResultPartitionID>> stopTrackingPartitionsConsumer = ignored -> {};
+    private Supplier<List<ResultPartitionDeploymentDescriptor>> listPartitionsSupplier =
+            Collections::emptyList;
 
     public void setStartTrackingPartitionsConsumer(
             BiConsumer<ResourceID, ResultPartitionDeploymentDescriptor>
@@ -71,6 +75,11 @@ public class TestingJobMasterPartitionTracker implements JobMasterPartitionTrack
             Consumer<ResourceID> stopTrackingAndReleaseOrPromotePartitionsConsumer) {
         this.stopTrackingAndReleaseOrPromotePartitionsConsumer =
                 stopTrackingAndReleaseOrPromotePartitionsConsumer;
+    }
+
+    public void setListPartitionsSupplier(
+            Supplier<List<ResultPartitionDeploymentDescriptor>> listPartitionsSupplier) {
+        this.listPartitionsSupplier = listPartitionsSupplier;
     }
 
     public void setStopTrackingAndReleasePartitionsConsumer(
@@ -118,6 +127,11 @@ public class TestingJobMasterPartitionTracker implements JobMasterPartitionTrack
     @Override
     public void stopTrackingAndReleaseOrPromotePartitionsFor(ResourceID producingTaskExecutorId) {
         stopTrackingAndReleaseOrPromotePartitionsConsumer.accept(producingTaskExecutorId);
+    }
+
+    @Override
+    public List<ResultPartitionDeploymentDescriptor> listPartitions() {
+        return listPartitionsSupplier.get();
     }
 
     @Override

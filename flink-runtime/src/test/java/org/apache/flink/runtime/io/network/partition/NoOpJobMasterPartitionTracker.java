@@ -22,6 +22,7 @@ import org.apache.flink.runtime.deployment.ResultPartitionDeploymentDescriptor;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 
 /** No-op implementation of {@link JobMasterPartitionTracker}. */
 public enum NoOpJobMasterPartitionTracker implements JobMasterPartitionTracker {
@@ -55,6 +56,11 @@ public enum NoOpJobMasterPartitionTracker implements JobMasterPartitionTracker {
 
     @Override
     public void stopTrackingAndReleaseOrPromotePartitionsFor(ResourceID producingTaskExecutorId) {}
+
+    @Override
+    public List<ResultPartitionDeploymentDescriptor> listPartitions() {
+        return Collections.emptyList();
+    }
 
     @Override
     public boolean isTrackingPartitionsFor(ResourceID producingTaskExecutorId) {

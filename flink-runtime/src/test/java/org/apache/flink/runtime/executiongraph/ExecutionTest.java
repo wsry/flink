@@ -284,9 +284,6 @@ public class ExecutionTest extends TestLogger {
                 ProducerDescriptor producerDescriptor) {
             return new CompletableFuture<>();
         }
-
-        @Override
-        public void releasePartitionExternally(ShuffleDescriptor shuffleDescriptor) {}
     }
 
     @Nonnull

@@ -100,6 +100,12 @@ public class JobManagerSharedServices {
             firstException = t;
         }
 
+        try {
+            shuffleMaster.close();
+        } catch (Throwable t) {
+            firstException = firstException == null ? t : firstException;
+        }
+
         libraryCacheManager.shutdown();
 
         if (firstException != null) {
@@ -146,6 +152,7 @@ public class JobManagerSharedServices {
 
         final ShuffleMaster<?> shuffleMaster =
                 ShuffleServiceLoader.loadShuffleServiceFactory(config).createShuffleMaster(config);
+        shuffleMaster.start();
 
         return new JobManagerSharedServices(
                 futureExecutor, libraryCacheManager, shuffleMaster, blobServer);
