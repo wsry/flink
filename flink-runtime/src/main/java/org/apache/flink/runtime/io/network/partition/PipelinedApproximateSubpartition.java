@@ -43,8 +43,8 @@ public class PipelinedApproximateSubpartition extends PipelinedSubpartition {
     @GuardedBy("buffers")
     private boolean isPartialBufferCleanupRequired = false;
 
-    PipelinedApproximateSubpartition(int index, ResultPartition parent) {
-        super(index, parent);
+    PipelinedApproximateSubpartition(int index, int buffersPerChannel, ResultPartition parent) {
+        super(index, buffersPerChannel, parent);
     }
 
     /**
