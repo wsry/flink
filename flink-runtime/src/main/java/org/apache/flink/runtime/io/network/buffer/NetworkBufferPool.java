@@ -45,6 +45,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -150,18 +151,19 @@ public class NetworkBufferPool
     }
 
     @Nullable
-    public MemorySegment requestMemorySegment() {
+    public MemorySegment requestPooledMemorySegment() {
         synchronized (availableMemorySegments) {
             return internalRequestMemorySegment();
         }
     }
 
-    public List<MemorySegment> requestMemorySegmentsBlocking(int numberOfSegmentsToRequest)
+    public List<MemorySegment> requestPooledMemorySegmentsBlocking(int numberOfSegmentsToRequest)
             throws IOException {
-        return internalRequestMemorySegments(numberOfSegmentsToRequest);
+        return internalRequestMemorySegments(
+                numberOfSegmentsToRequest, this::internalRecycleMemorySegments);
     }
 
-    public void recycle(MemorySegment segment) {
+    public void recyclePooledMemorySegment(MemorySegment segment) {
         // Adds the segment back to the queue, which does not immediately free the memory
         // however, since this happens when references to the global pool are also released,
         // making the availableMemorySegments queue and its contained object reclaimable
@@ -169,7 +171,7 @@ public class NetworkBufferPool
     }
 
     @Override
-    public List<MemorySegment> requestMemorySegments(int numberOfSegmentsToRequest)
+    public List<MemorySegment> requestUnpooledMemorySegments(int numberOfSegmentsToRequest)
             throws IOException {
         checkArgument(
                 numberOfSegmentsToRequest >= 0,
@@ -187,10 +189,13 @@ public class NetworkBufferPool
             tryRedistributeBuffers(numberOfSegmentsToRequest);
         }
 
-        return internalRequestMemorySegments(numberOfSegmentsToRequest);
+        return internalRequestMemorySegments(
+                numberOfSegmentsToRequest,
+                segments -> recycleMemorySegments(segments, numberOfSegmentsToRequest));
     }
 
-    private List<MemorySegment> internalRequestMemorySegments(int numberOfSegmentsToRequest)
+    private List<MemorySegment> internalRequestMemorySegments(
+            int numberOfSegmentsToRequest, Consumer<Collection<MemorySegment>> exceptionHandler)
             throws IOException {
         final List<MemorySegment> segments = new ArrayList<>(numberOfSegmentsToRequest);
         try {
@@ -227,7 +232,7 @@ public class NetworkBufferPool
                 }
             }
         } catch (Throwable e) {
-            recycleMemorySegments(segments, numberOfSegmentsToRequest);
+            exceptionHandler.accept(segments);
             ExceptionUtils.rethrowIOException(e);
         }
 
@@ -246,7 +251,7 @@ public class NetworkBufferPool
     }
 
     @Override
-    public void recycleMemorySegments(Collection<MemorySegment> segments) {
+    public void recycleUnpooledMemorySegments(Collection<MemorySegment> segments) {
         recycleMemorySegments(segments, segments.size());
     }
 
