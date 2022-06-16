@@ -22,6 +22,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutorServiceAdapter;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
 import org.apache.flink.runtime.jobgraph.DistributionPattern;
+import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobGraphBuilder;
 import org.apache.flink.runtime.jobgraph.JobGraphTestUtils;
@@ -158,6 +159,32 @@ public class IntermediateResultPartitionTest extends TestLogger {
     }
 
     @Test
+    public void testReleasePartitionGroups() throws Exception {
+        IntermediateResult result = createResult(ResultPartitionType.BLOCKING, 2);
+
+        IntermediateResultPartition partition1 = result.getPartitions()[0];
+        IntermediateResultPartition partition2 = result.getPartitions()[1];
+        assertFalse(partition1.canBeReleased());
+        assertFalse(partition2.canBeReleased());
+
+        List<ConsumedPartitionGroup> consumedPartitionGroup1 =
+                partition1.getConsumedPartitionGroups();
+        List<ConsumedPartitionGroup> consumedPartitionGroup2 =
+                partition2.getConsumedPartitionGroups();
+        assertEquals(consumedPartitionGroup1, consumedPartitionGroup2);
+
+        assertEquals(2, consumedPartitionGroup1.size());
+        partition1.releaseConsumedPartitionGroup(consumedPartitionGroup1.get(0));
+        assertFalse(partition1.canBeReleased());
+
+        partition1.releaseConsumedPartitionGroup(consumedPartitionGroup1.get(1));
+        assertTrue(partition1.canBeReleased());
+
+        result.resetForNewExecution();
+        assertFalse(partition1.canBeReleased());
+    }
+
+    @Test
     public void testGetNumberOfSubpartitionsForNonDynamicAllToAllGraph() throws Exception {
         testGetNumberOfSubpartitions(7, DistributionPattern.ALL_TO_ALL, false, Arrays.asList(7, 7));
     }
@@ -251,11 +278,24 @@ public class IntermediateResultPartitionTest extends TestLogger {
             v2.setMaxParallelism(consumerMaxParallelism);
         }
 
-        v2.connectNewDataSetAsInput(v1, distributionPattern, ResultPartitionType.BLOCKING);
+        final JobVertex v3 = new JobVertex("v3");
+        v3.setInvokableClass(NoOpInvokable.class);
+        if (consumerParallelism > 0) {
+            v3.setParallelism(consumerParallelism);
+        }
+        if (consumerMaxParallelism > 0) {
+            v3.setMaxParallelism(consumerMaxParallelism);
+        }
+
+        IntermediateDataSetID dataSetId = new IntermediateDataSetID();
+        v2.connectNewDataSetAsInput(
+                v1, distributionPattern, ResultPartitionType.BLOCKING, dataSetId, false);
+        v3.connectNewDataSetAsInput(
+                v1, distributionPattern, ResultPartitionType.BLOCKING, dataSetId, false);
 
         final JobGraph jobGraph =
                 JobGraphBuilder.newBatchJobGraphBuilder()
-                        .addJobVertices(Arrays.asList(v1, v2))
+                        .addJobVertices(Arrays.asList(v1, v2, v3))
                         .build();
 
         final Configuration configuration = new Configuration();
@@ -293,15 +333,23 @@ public class IntermediateResultPartitionTest extends TestLogger {
         source.setInvokableClass(NoOpInvokable.class);
         source.setParallelism(parallelism);
 
-        JobVertex sink = new JobVertex("v2");
-        sink.setInvokableClass(NoOpInvokable.class);
-        sink.setParallelism(parallelism);
+        JobVertex sink1 = new JobVertex("v2");
+        sink1.setInvokableClass(NoOpInvokable.class);
+        sink1.setParallelism(parallelism);
 
-        sink.connectNewDataSetAsInput(source, DistributionPattern.ALL_TO_ALL, resultPartitionType);
+        JobVertex sink2 = new JobVertex("v3");
+        sink2.setInvokableClass(NoOpInvokable.class);
+        sink2.setParallelism(parallelism);
+
+        IntermediateDataSetID dataSetId = new IntermediateDataSetID();
+        sink1.connectNewDataSetAsInput(
+                source, DistributionPattern.ALL_TO_ALL, resultPartitionType, dataSetId, false);
+        sink2.connectNewDataSetAsInput(
+                source, DistributionPattern.ALL_TO_ALL, resultPartitionType, dataSetId, false);
 
         ScheduledExecutorService executorService = new DirectScheduledExecutorService();
 
-        JobGraph jobGraph = JobGraphTestUtils.batchJobGraph(source, sink);
+        JobGraph jobGraph = JobGraphTestUtils.batchJobGraph(source, sink1, sink2);
 
         SchedulerBase scheduler =
                 new DefaultSchedulerBuilder(

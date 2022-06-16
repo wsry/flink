@@ -54,7 +54,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -328,18 +327,24 @@ public class DefaultExecutionTopologyTest extends TestLogger {
 
             assertPartitionEquals(originalPartition, adaptedPartition);
 
-            ConsumerVertexGroup consumerVertexGroup = originalPartition.getConsumerVertexGroup();
-            Optional<ConsumerVertexGroup> adaptedConsumers =
-                    adaptedPartition.getConsumerVertexGroup();
-            assertTrue(adaptedConsumers.isPresent());
-            for (ExecutionVertexID originalId : consumerVertexGroup) {
+            List<ExecutionVertexID> originalConsumerIds = new ArrayList<>();
+            for (ConsumerVertexGroup consumerVertexGroup :
+                    originalPartition.getConsumerVertexGroups()) {
+                for (ExecutionVertexID executionVertexId : consumerVertexGroup) {
+                    originalConsumerIds.add(executionVertexId);
+                }
+            }
+            List<ConsumerVertexGroup> adaptedConsumers = adaptedPartition.getConsumerVertexGroups();
+            assertFalse(adaptedConsumers.isEmpty());
+            for (ExecutionVertexID originalId : originalConsumerIds) {
                 // it is sufficient to verify that some vertex exists with the correct ID here,
                 // since deep equality is verified later in the main loop
                 // this DOES rely on an implicit assumption that the vertices objects returned by
                 // the topology are
                 // identical to those stored in the partition
                 assertTrue(
-                        IterableUtils.toStream(adaptedConsumers.get())
+                        adaptedConsumers.stream()
+                                .flatMap(IterableUtils::toStream)
                                 .anyMatch(adaptedConsumer -> adaptedConsumer.equals(originalId)));
             }
         }

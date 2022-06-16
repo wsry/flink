@@ -92,7 +92,7 @@ public class StreamConfig implements Serializable {
     private static final String TYPE_SERIALIZER_SIDEOUT_PREFIX = "typeSerializer_sideout_";
     private static final String ITERATON_WAIT = "iterationWait";
     private static final String NONCHAINED_OUTPUTS = "nonChainedOutputs";
-    private static final String EDGES_IN_ORDER = "edgesInOrder";
+    private static final String STREAM_OUTPUTS_IN_ORDER = "streamOutputsInOrder";
     private static final String IN_STREAM_EDGES = "inStreamEdges";
     private static final String OPERATOR_NAME = "operatorName";
     private static final String OPERATOR_ID = "operatorID";
@@ -434,15 +434,15 @@ public class StreamConfig implements Serializable {
         return config.getInteger(NUMBER_OF_OUTPUTS, 0);
     }
 
-    public void setNonChainedOutputs(List<StreamEdge> outputvertexIDs) {
-        toBeSerializedConfigObjects.put(NONCHAINED_OUTPUTS, outputvertexIDs);
+    public void setNonChainedOutputs(List<NonChainedOutput> streamOutputs) {
+        toBeSerializedConfigObjects.put(NONCHAINED_OUTPUTS, streamOutputs);
     }
 
-    public List<StreamEdge> getNonChainedOutputs(ClassLoader cl) {
+    public List<NonChainedOutput> getNonChainedOutputs(ClassLoader cl) {
         try {
-            List<StreamEdge> nonChainedOutputs =
+            List<NonChainedOutput> nonChainedOutputs =
                     InstantiationUtil.readObjectFromConfig(this.config, NONCHAINED_OUTPUTS, cl);
-            return nonChainedOutputs == null ? new ArrayList<StreamEdge>() : nonChainedOutputs;
+            return nonChainedOutputs == null ? new ArrayList<>() : nonChainedOutputs;
         } catch (Exception e) {
             throw new StreamTaskException("Could not instantiate non chained outputs.", e);
         }
@@ -520,15 +520,16 @@ public class StreamConfig implements Serializable {
                 ExecutionCheckpointingOptions.ALIGNED_CHECKPOINT_TIMEOUT, alignedCheckpointTimeout);
     }
 
-    public void setOutEdgesInOrder(List<StreamEdge> outEdgeList) {
-        toBeSerializedConfigObjects.put(EDGES_IN_ORDER, outEdgeList);
+    public void setStreamOutputsInOrder(List<NonChainedOutput> streamOutputsInOrder) {
+        toBeSerializedConfigObjects.put(STREAM_OUTPUTS_IN_ORDER, streamOutputsInOrder);
     }
 
-    public List<StreamEdge> getOutEdgesInOrder(ClassLoader cl) {
+    public List<NonChainedOutput> getStreamOutputsInOrder(ClassLoader cl) {
         try {
-            List<StreamEdge> outEdgesInOrder =
-                    InstantiationUtil.readObjectFromConfig(this.config, EDGES_IN_ORDER, cl);
-            return outEdgesInOrder == null ? new ArrayList<StreamEdge>() : outEdgesInOrder;
+            List<NonChainedOutput> outEdgesInOrder =
+                    InstantiationUtil.readObjectFromConfig(
+                            this.config, STREAM_OUTPUTS_IN_ORDER, cl);
+            return outEdgesInOrder == null ? new ArrayList<>() : outEdgesInOrder;
         } catch (Exception e) {
             throw new StreamTaskException("Could not instantiate outputs in order.", e);
         }
@@ -723,9 +724,9 @@ public class StreamConfig implements Serializable {
         builder.append("\nNumber of non-chained outputs: ").append(getNumberOfOutputs());
         builder.append("\nOutput names: ").append(getNonChainedOutputs(cl));
         builder.append("\nPartitioning:");
-        for (StreamEdge output : getNonChainedOutputs(cl)) {
-            int outputname = output.getTargetId();
-            builder.append("\n\t").append(outputname).append(": ").append(output.getPartitioner());
+        for (NonChainedOutput output : getNonChainedOutputs(cl)) {
+            String outputName = output.getDataSetId().toString();
+            builder.append("\n\t").append(outputName).append(": ").append(output.getPartitioner());
         }
 
         builder.append("\nChained subtasks: ").append(getChainedOutputs(cl));

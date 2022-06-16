@@ -26,6 +26,7 @@ import org.apache.flink.core.io.InputSplitSource;
 import org.apache.flink.runtime.JobException;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
 import org.apache.flink.runtime.jobgraph.DistributionPattern;
+import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
@@ -51,6 +52,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 
+import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
@@ -298,6 +300,45 @@ public class DefaultExecutionGraphConstructionTest {
             e.printStackTrace();
             fail(e.getMessage());
         }
+    }
+
+    @Test
+    public void testMultiConsumersForOneIntermediateResult() throws Exception {
+        JobVertex v1 = new JobVertex("vertex1");
+        JobVertex v2 = new JobVertex("vertex2");
+        JobVertex v3 = new JobVertex("vertex3");
+
+        IntermediateDataSetID dataSetId = new IntermediateDataSetID();
+        v2.connectNewDataSetAsInput(
+                v1, DistributionPattern.ALL_TO_ALL, ResultPartitionType.BLOCKING, dataSetId, false);
+        v3.connectNewDataSetAsInput(
+                v1, DistributionPattern.ALL_TO_ALL, ResultPartitionType.BLOCKING, dataSetId, false);
+
+        List<JobVertex> vertices = new ArrayList<>(Arrays.asList(v1, v2, v3));
+        ExecutionGraph eg = createDefaultExecutionGraph(vertices);
+        eg.attachJobGraph(vertices);
+
+        ExecutionJobVertex ejv1 = checkNotNull(eg.getJobVertex(v1.getID()));
+        assertEquals(1, ejv1.getProducedDataSets().length);
+        assertEquals(dataSetId, ejv1.getProducedDataSets()[0].getId());
+
+        ExecutionJobVertex ejv2 = checkNotNull(eg.getJobVertex(v2.getID()));
+        assertEquals(1, ejv2.getInputs().size());
+        assertEquals(dataSetId, ejv2.getInputs().get(0).getId());
+
+        ExecutionJobVertex ejv3 = checkNotNull(eg.getJobVertex(v3.getID()));
+        assertEquals(1, ejv3.getInputs().size());
+        assertEquals(dataSetId, ejv3.getInputs().get(0).getId());
+
+        List<ConsumedPartitionGroup> partitionGroups1 =
+                ejv2.getTaskVertices()[0].getAllConsumedPartitionGroups();
+        assertEquals(1, partitionGroups1.size());
+        assertEquals(dataSetId, partitionGroups1.get(0).getIntermediateDataSetID());
+
+        List<ConsumedPartitionGroup> partitionGroups2 =
+                ejv3.getTaskVertices()[0].getAllConsumedPartitionGroups();
+        assertEquals(1, partitionGroups2.size());
+        assertEquals(dataSetId, partitionGroups2.get(0).getIntermediateDataSetID());
     }
 
     @Test

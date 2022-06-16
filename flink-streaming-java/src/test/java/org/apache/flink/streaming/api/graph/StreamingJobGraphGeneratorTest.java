@@ -49,6 +49,8 @@ import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
 import org.apache.flink.runtime.jobgraph.InputOutputFormatContainer;
 import org.apache.flink.runtime.jobgraph.InputOutputFormatVertex;
+import org.apache.flink.runtime.jobgraph.IntermediateDataSet;
+import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobType;
 import org.apache.flink.runtime.jobgraph.JobVertex;
@@ -116,10 +118,12 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.streaming.api.graph.StreamingJobGraphGenerator.areOperatorsChainable;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -861,9 +865,9 @@ public class StreamingJobGraphGeneratorTest extends TestLogger {
         final JobGraph jobGraph = StreamingJobGraphGenerator.createJobGraph(env.getStreamGraph());
         for (JobVertex vertex : jobGraph.getVertices()) {
             final StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
-            for (StreamEdge streamEdge :
-                    streamConfig.getOutEdgesInOrder(this.getClass().getClassLoader())) {
-                assertThat(streamEdge.getBufferTimeout(), equalTo(-1L));
+            for (NonChainedOutput output :
+                    streamConfig.getStreamOutputsInOrder(this.getClass().getClassLoader())) {
+                assertThat(output.getBufferTimeout(), equalTo(-1L));
             }
         }
     }
@@ -1516,6 +1520,90 @@ public class StreamingJobGraphGeneratorTest extends TestLogger {
         assertEquals("[vertex-1]Source: source2", allVertices.get(1).getName());
         assertEquals("[vertex-2]map1", allVertices.get(2).getName());
         assertEquals("[vertex-3]map2", allVertices.get(3).getName());
+    }
+
+    /**
+     * Tests that multiple downstream consumer vertices can reuse the same intermediate blocking
+     * dataset if they have the same parallelism and partitioner.
+     */
+    @Test
+    public void testIntermediateDataSetReuse() {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setBufferTimeout(-1);
+        DataStream<Integer> source = env.fromElements(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+
+        // these two vertices can reuse the same intermediate dataset
+        source.rebalance().addSink(new DiscardingSink<>()).setParallelism(2).name("sink1");
+        source.rebalance().addSink(new DiscardingSink<>()).setParallelism(2).name("sink2");
+
+        // this can not reuse the same intermediate dataset because of different parallelism
+        source.rebalance().addSink(new DiscardingSink<>()).setParallelism(3);
+
+        // this can not reuse the same intermediate dataset because of different partitioner
+        source.broadcast().addSink(new DiscardingSink<>()).setParallelism(2);
+
+        // these two vertices can reuse the same intermediate dataset because of the pipelined edge
+        source.forward().addSink(new DiscardingSink<>()).setParallelism(1).disableChaining();
+        source.forward().addSink(new DiscardingSink<>()).setParallelism(1).disableChaining();
+
+        DataStream<Integer> mapStream = source.forward().map(value -> value).setParallelism(1);
+
+        // these two vertices can reuse the same intermediate dataset
+        mapStream.broadcast().addSink(new DiscardingSink<>()).setParallelism(2).name("sink3");
+        mapStream.broadcast().addSink(new DiscardingSink<>()).setParallelism(2).name("sink4");
+
+        StreamGraph streamGraph = env.getStreamGraph();
+        streamGraph.setGlobalStreamExchangeMode(GlobalStreamExchangeMode.FORWARD_EDGES_PIPELINED);
+        JobGraph jobGraph = StreamingJobGraphGenerator.createJobGraph(streamGraph);
+
+        List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
+        assertEquals(9, vertices.size());
+
+        JobVertex sourceVertex = vertices.get(0);
+        List<IntermediateDataSetID> producedDataSet =
+                sourceVertex.getProducedDataSets().stream()
+                        .map(IntermediateDataSet::getId)
+                        .collect(Collectors.toList());
+        assertEquals(6, producedDataSet.size());
+
+        JobVertex sinkVertex1 = checkNotNull(findJobVertexWithName(vertices, "sink1"));
+        JobVertex sinkVertex2 = checkNotNull(findJobVertexWithName(vertices, "sink2"));
+        JobVertex sinkVertex3 = checkNotNull(findJobVertexWithName(vertices, "sink3"));
+        JobVertex sinkVertex4 = checkNotNull(findJobVertexWithName(vertices, "sink4"));
+
+        assertEquals(
+                sinkVertex1.getInputs().get(0).getSource().getId(),
+                sinkVertex2.getInputs().get(0).getSource().getId());
+        assertEquals(
+                sinkVertex3.getInputs().get(0).getSource().getId(),
+                sinkVertex4.getInputs().get(0).getSource().getId());
+        assertNotEquals(
+                sinkVertex1.getInputs().get(0).getSource().getId(),
+                sinkVertex3.getInputs().get(0).getSource().getId());
+
+        StreamConfig streamConfig = new StreamConfig(sourceVertex.getConfiguration());
+        List<IntermediateDataSetID> nonChainedOutputs =
+                streamConfig.getNonChainedOutputs(getClass().getClassLoader()).stream()
+                        .map(NonChainedOutput::getDataSetId)
+                        .collect(Collectors.toList());
+        assertEquals(5, nonChainedOutputs.size());
+        assertFalse(nonChainedOutputs.contains(sinkVertex3.getInputs().get(0).getSource().getId()));
+
+        List<IntermediateDataSetID> streamOutputsInOrder =
+                streamConfig.getStreamOutputsInOrder(getClass().getClassLoader()).stream()
+                        .map(NonChainedOutput::getDataSetId)
+                        .collect(Collectors.toList());
+        assertEquals(6, streamOutputsInOrder.size());
+        assertArrayEquals(producedDataSet.toArray(), streamOutputsInOrder.toArray());
+    }
+
+    private static JobVertex findJobVertexWithName(List<JobVertex> vertices, String name) {
+        for (JobVertex jobVertex : vertices) {
+            if (jobVertex.getName().contains(name)) {
+                return jobVertex;
+            }
+        }
+        return null;
     }
 
     private JobGraph createJobGraphWithDescription(

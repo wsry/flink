@@ -497,10 +497,7 @@ public class Execution
     }
 
     private static int getPartitionMaxParallelism(IntermediateResultPartition partition) {
-        return partition
-                .getIntermediateResult()
-                .getConsumerExecutionJobVertex()
-                .getMaxParallelism();
+        return partition.getIntermediateResult().getConsumersMaxParallelism();
     }
 
     /**
@@ -718,31 +715,34 @@ public class Execution
     }
 
     private void updatePartitionConsumers(final IntermediateResultPartition partition) {
-        final Optional<ConsumerVertexGroup> consumerVertexGroup =
-                partition.getConsumerVertexGroupOptional();
-        if (!consumerVertexGroup.isPresent()) {
+        final List<ConsumerVertexGroup> consumerVertexGroups = partition.getConsumerVertexGroups();
+        if (consumerVertexGroups.isEmpty()) {
             return;
         }
-        for (ExecutionVertexID consumerVertexId : consumerVertexGroup.get()) {
-            final ExecutionVertex consumerVertex =
-                    vertex.getExecutionGraphAccessor().getExecutionVertexOrThrow(consumerVertexId);
-            final Execution consumer = consumerVertex.getCurrentExecutionAttempt();
-            final ExecutionState consumerState = consumer.getState();
+        for (ConsumerVertexGroup consumerVertexGroup : consumerVertexGroups) {
+            for (ExecutionVertexID consumerVertexId : consumerVertexGroup) {
+                final ExecutionVertex consumerVertex =
+                        vertex.getExecutionGraphAccessor()
+                                .getExecutionVertexOrThrow(consumerVertexId);
+                final Execution consumer = consumerVertex.getCurrentExecutionAttempt();
+                final ExecutionState consumerState = consumer.getState();
 
-            // ----------------------------------------------------------------
-            // Consumer is recovering or running => send update message now
-            // Consumer is deploying => cache the partition info which would be
-            // sent after switching to running
-            // ----------------------------------------------------------------
-            if (consumerState == DEPLOYING
-                    || consumerState == RUNNING
-                    || consumerState == INITIALIZING) {
-                final PartitionInfo partitionInfo = createPartitionInfo(partition);
+                // ----------------------------------------------------------------
+                // Consumer is recovering or running => send update message now
+                // Consumer is deploying => cache the partition info which would be
+                // sent after switching to running
+                // ----------------------------------------------------------------
+                if (consumerState == DEPLOYING
+                        || consumerState == RUNNING
+                        || consumerState == INITIALIZING) {
+                    final PartitionInfo partitionInfo = createPartitionInfo(partition);
 
-                if (consumerState == DEPLOYING) {
-                    consumerVertex.cachePartitionInfo(partitionInfo);
-                } else {
-                    consumer.sendUpdatePartitionInfoRpcCall(Collections.singleton(partitionInfo));
+                    if (consumerState == DEPLOYING) {
+                        consumerVertex.cachePartitionInfo(partitionInfo);
+                    } else {
+                        consumer.sendUpdatePartitionInfoRpcCall(
+                                Collections.singleton(partitionInfo));
+                    }
                 }
             }
         }
