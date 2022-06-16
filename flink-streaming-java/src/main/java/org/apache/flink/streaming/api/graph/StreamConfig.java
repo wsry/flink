@@ -26,6 +26,7 @@ import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
+import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.util.CorruptConfigurationException;
 import org.apache.flink.runtime.state.CheckpointStorage;
@@ -50,6 +51,7 @@ import java.io.Serializable;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -374,6 +376,12 @@ public class StreamConfig implements Serializable {
     }
 
     public void setNonChainedOutputs(List<StreamEdge> outputvertexIDs) {
+        Map<IntermediateDataSetID, List<StreamEdge>> outputs = new HashMap<>();
+        outputs.put(new IntermediateDataSetID(), outputvertexIDs);
+        setNonChainedOutputs(outputs);
+    }
+
+    public void setNonChainedOutputs(Map<IntermediateDataSetID, List<StreamEdge>> outputvertexIDs) {
         try {
             InstantiationUtil.writeObjectToConfig(outputvertexIDs, this.config, NONCHAINED_OUTPUTS);
         } catch (IOException e) {
@@ -381,11 +389,11 @@ public class StreamConfig implements Serializable {
         }
     }
 
-    public List<StreamEdge> getNonChainedOutputs(ClassLoader cl) {
+    public Map<IntermediateDataSetID, List<StreamEdge>> getNonChainedOutputs(ClassLoader cl) {
         try {
-            List<StreamEdge> nonChainedOutputs =
+            Map<IntermediateDataSetID, List<StreamEdge>> nonChainedOutputs =
                     InstantiationUtil.readObjectFromConfig(this.config, NONCHAINED_OUTPUTS, cl);
-            return nonChainedOutputs == null ? new ArrayList<StreamEdge>() : nonChainedOutputs;
+            return nonChainedOutputs == null ? new HashMap<>() : nonChainedOutputs;
         } catch (Exception e) {
             throw new StreamTaskException("Could not instantiate non chained outputs.", e);
         }
@@ -472,6 +480,13 @@ public class StreamConfig implements Serializable {
     }
 
     public void setOutEdgesInOrder(List<StreamEdge> outEdgeList) {
+        LinkedHashMap<IntermediateDataSetID, List<StreamEdge>> outEdges = new LinkedHashMap<>();
+        outEdges.put(new IntermediateDataSetID(), outEdgeList);
+        setOutEdgesInOrder(outEdges);
+    }
+
+    public void setOutEdgesInOrder(
+            LinkedHashMap<IntermediateDataSetID, List<StreamEdge>> outEdgeList) {
         try {
             InstantiationUtil.writeObjectToConfig(outEdgeList, this.config, EDGES_IN_ORDER);
         } catch (IOException e) {
@@ -479,11 +494,12 @@ public class StreamConfig implements Serializable {
         }
     }
 
-    public List<StreamEdge> getOutEdgesInOrder(ClassLoader cl) {
+    public LinkedHashMap<IntermediateDataSetID, List<StreamEdge>> getOutEdgesInOrder(
+            ClassLoader cl) {
         try {
-            List<StreamEdge> outEdgesInOrder =
+            LinkedHashMap<IntermediateDataSetID, List<StreamEdge>> outEdgesInOrder =
                     InstantiationUtil.readObjectFromConfig(this.config, EDGES_IN_ORDER, cl);
-            return outEdgesInOrder == null ? new ArrayList<StreamEdge>() : outEdgesInOrder;
+            return outEdgesInOrder == null ? new LinkedHashMap<>() : outEdgesInOrder;
         } catch (Exception e) {
             throw new StreamTaskException("Could not instantiate outputs in order.", e);
         }
@@ -713,9 +729,14 @@ public class StreamConfig implements Serializable {
         builder.append("\nNumber of non-chained outputs: ").append(getNumberOfOutputs());
         builder.append("\nOutput names: ").append(getNonChainedOutputs(cl));
         builder.append("\nPartitioning:");
-        for (StreamEdge output : getNonChainedOutputs(cl)) {
-            int outputname = output.getTargetId();
-            builder.append("\n\t").append(outputname).append(": ").append(output.getPartitioner());
+        for (List<StreamEdge> outputs : getNonChainedOutputs(cl).values()) {
+            for (StreamEdge output : outputs) {
+                int outputname = output.getTargetId();
+                builder.append("\n\t")
+                        .append(outputname)
+                        .append(": ")
+                        .append(output.getPartitioner());
+            }
         }
 
         builder.append("\nChained subtasks: ").append(getChainedOutputs(cl));

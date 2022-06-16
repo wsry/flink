@@ -34,10 +34,12 @@ import org.apache.flink.runtime.shuffle.ShuffleDescriptor;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
 
 public class IntermediateResult {
 
@@ -67,6 +69,8 @@ public class IntermediateResult {
 
     private final Map<ConsumedPartitionGroup, MaybeOffloaded<ShuffleDescriptor[]>>
             shuffleDescriptorCache;
+
+    private int consumerParallelism = Integer.MIN_VALUE;
 
     public IntermediateResult(
             IntermediateDataSet intermediateDataSet,
@@ -162,20 +166,36 @@ public class IntermediateResult {
         return numParallelProducers;
     }
 
-    ExecutionJobVertex getConsumerExecutionJobVertex() {
-        final JobEdge consumer = checkNotNull(intermediateDataSet.getConsumer());
-        final JobVertexID consumerJobVertexId = consumer.getTarget().getID();
-        return checkNotNull(getProducer().getGraph().getJobVertex(consumerJobVertexId));
+    int getConsumersParallelism() {
+        final List<JobEdge> consumers = intermediateDataSet.getConsumers();
+        checkState(!consumers.isEmpty());
+
+        InternalExecutionGraphAccessor graph = getProducer().getGraph();
+        int parallelism = graph.getJobVertex(consumers.get(0).getTarget().getID()).getParallelism();
+        for (JobEdge consumer : consumers) {
+            JobVertexID jvid = consumer.getTarget().getID();
+            checkState(parallelism == graph.getJobVertex(jvid).getParallelism());
+        }
+        return parallelism;
+    }
+
+    int getConsumersMaxParallelism() {
+        final List<JobEdge> consumers = intermediateDataSet.getConsumers();
+        checkState(!consumers.isEmpty());
+
+        return consumers.stream()
+                .map(edge -> getProducer().getGraph().getJobVertex(edge.getTarget().getID()))
+                .mapToInt(ExecutionJobVertex::getMaxParallelism)
+                .max()
+                .getAsInt();
     }
 
     public DistributionPattern getConsumingDistributionPattern() {
-        final JobEdge consumer = checkNotNull(intermediateDataSet.getConsumer());
-        return consumer.getDistributionPattern();
+        return intermediateDataSet.getDistributionPattern();
     }
 
     public boolean isBroadcast() {
-        final JobEdge consumer = checkNotNull(intermediateDataSet.getConsumer());
-        return consumer.isBroadcast();
+        return intermediateDataSet.isBroadcast();
     }
 
     public int getConnectionIndex() {

@@ -142,7 +142,7 @@ public class TaskDeploymentDescriptorFactory {
 
     public static SubpartitionIndexRange computeConsumedSubpartitionRange(
             IntermediateResultPartition resultPartition, int consumerSubtaskIndex) {
-        int numConsumers = resultPartition.getConsumerVertexGroup().size();
+        int numConsumers = resultPartition.getConsumerVertexGroups().get(0).size();
         int consumerIndex = consumerSubtaskIndex % numConsumers;
         IntermediateResult consumedIntermediateResult = resultPartition.getIntermediateResult();
         int numSubpartitions = resultPartition.getNumberOfSubpartitions();

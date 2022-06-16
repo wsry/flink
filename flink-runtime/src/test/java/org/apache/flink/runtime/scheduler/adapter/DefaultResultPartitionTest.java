@@ -29,7 +29,9 @@ import org.apache.flink.util.TestLogger;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -52,8 +54,8 @@ public class DefaultResultPartitionTest extends TestLogger {
 
     private DefaultResultPartition resultPartition;
 
-    private final Map<IntermediateResultPartitionID, ConsumerVertexGroup> consumerVertexGroups =
-            new HashMap<>();
+    private final Map<IntermediateResultPartitionID, List<ConsumerVertexGroup>>
+            consumerVertexGroups = new HashMap<>();
 
     @Before
     public void setUp() {
@@ -80,14 +82,15 @@ public class DefaultResultPartitionTest extends TestLogger {
     @Test
     public void testGetConsumerVertexGroup() {
 
-        assertFalse(resultPartition.getConsumerVertexGroup().isPresent());
+        assertTrue(resultPartition.getConsumerVertexGroups().isEmpty());
 
         // test update consumers
         ExecutionVertexID executionVertexId = new ExecutionVertexID(new JobVertexID(), 0);
         consumerVertexGroups.put(
-                resultPartition.getId(), ConsumerVertexGroup.fromSingleVertex(executionVertexId));
-        assertTrue(resultPartition.getConsumerVertexGroup().isPresent());
-        assertThat(resultPartition.getConsumerVertexGroup().get(), contains(executionVertexId));
+                resultPartition.getId(),
+                Collections.singletonList(ConsumerVertexGroup.fromSingleVertex(executionVertexId)));
+        assertFalse(resultPartition.getConsumerVertexGroups().isEmpty());
+        assertThat(resultPartition.getConsumerVertexGroups().get(0), contains(executionVertexId));
     }
 
     /** A test {@link ResultPartitionState} supplier. */

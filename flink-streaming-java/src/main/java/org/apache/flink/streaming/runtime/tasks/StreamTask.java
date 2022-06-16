@@ -56,6 +56,7 @@ import org.apache.flink.runtime.io.network.api.writer.SingleRecordWriter;
 import org.apache.flink.runtime.io.network.partition.ChannelStateHolder;
 import org.apache.flink.runtime.io.network.partition.consumer.IndexedInputGate;
 import org.apache.flink.runtime.io.network.partition.consumer.InputGate;
+import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.RestoreMode;
 import org.apache.flink.runtime.jobgraph.tasks.CheckpointableTask;
@@ -123,7 +124,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -1586,16 +1589,18 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
                     StreamConfig configuration, Environment environment) {
         List<RecordWriter<SerializationDelegate<StreamRecord<OUT>>>> recordWriters =
                 new ArrayList<>();
-        List<StreamEdge> outEdgesInOrder =
+        LinkedHashMap<IntermediateDataSetID, List<StreamEdge>> outEdgesInOrder =
                 configuration.getOutEdgesInOrder(
                         environment.getUserCodeClassLoader().asClassLoader());
 
-        for (int i = 0; i < outEdgesInOrder.size(); i++) {
-            StreamEdge edge = outEdgesInOrder.get(i);
+        int index = 0;
+        for (Map.Entry<IntermediateDataSetID, List<StreamEdge>> entry :
+                outEdgesInOrder.entrySet()) {
+            StreamEdge edge = entry.getValue().get(0);
             recordWriters.add(
                     createRecordWriter(
                             edge,
-                            i,
+                            index++,
                             environment,
                             environment.getTaskInfo().getTaskNameWithSubtasks(),
                             edge.getBufferTimeout()));

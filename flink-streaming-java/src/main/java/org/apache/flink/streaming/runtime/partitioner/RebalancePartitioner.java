@@ -63,6 +63,11 @@ public class RebalancePartitioner<T> extends StreamPartitioner<T> {
     }
 
     @Override
+    public boolean isResultDataSetReusable() {
+        return true;
+    }
+
+    @Override
     public String toString() {
         return "REBALANCE";
     }

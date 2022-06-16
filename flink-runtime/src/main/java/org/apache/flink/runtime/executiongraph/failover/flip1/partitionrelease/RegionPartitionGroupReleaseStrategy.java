@@ -151,7 +151,7 @@ public class RegionPartitionGroupReleaseStrategy
                 // At present, there's only one ConsumerVertexGroup for each
                 // ConsumedPartitionGroup, so if a ConsumedPartitionGroup is fully consumed, all
                 // its partitions are releasable.
-                releasablePartitionGroups.add(consumedPartitionGroup);
+                // releasablePartitionGroups.add(consumedPartitionGroup);
             }
         }
 

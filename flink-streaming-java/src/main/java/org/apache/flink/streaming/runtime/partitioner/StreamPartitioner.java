@@ -78,4 +78,8 @@ public abstract class StreamPartitioner<T>
     public abstract SubtaskStateMapper getDownstreamSubtaskStateMapper();
 
     public abstract boolean isPointwise();
+
+    public boolean isResultDataSetReusable() {
+        return false;
+    }
 }

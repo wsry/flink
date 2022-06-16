@@ -80,6 +80,11 @@ public class KeyGroupStreamPartitioner<T, K> extends StreamPartitioner<T>
     }
 
     @Override
+    public boolean isResultDataSetReusable() {
+        return true;
+    }
+
+    @Override
     public String toString() {
         return "HASH";
     }
