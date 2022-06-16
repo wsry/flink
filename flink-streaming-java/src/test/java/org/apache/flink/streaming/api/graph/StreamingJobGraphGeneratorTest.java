@@ -862,7 +862,11 @@ public class StreamingJobGraphGeneratorTest extends TestLogger {
         for (JobVertex vertex : jobGraph.getVertices()) {
             final StreamConfig streamConfig = new StreamConfig(vertex.getConfiguration());
             for (StreamEdge streamEdge :
-                    streamConfig.getOutEdgesInOrder(this.getClass().getClassLoader())) {
+                    streamConfig
+                            .getOutEdgesInOrder(this.getClass().getClassLoader())
+                            .values()
+                            .iterator()
+                            .next()) {
                 assertThat(streamEdge.getBufferTimeout(), equalTo(-1L));
             }
         }

@@ -58,6 +58,11 @@ public class RescalePartitioner<T> extends StreamPartitioner<T> {
     }
 
     @Override
+    public boolean isResultDataSetReusable() {
+        return true;
+    }
+
+    @Override
     public SubtaskStateMapper getDownstreamSubtaskStateMapper() {
         return SubtaskStateMapper.UNSUPPORTED;
     }

@@ -52,6 +52,11 @@ public class GlobalPartitioner<T> extends StreamPartitioner<T> {
     }
 
     @Override
+    public boolean isResultDataSetReusable() {
+        return true;
+    }
+
+    @Override
     public String toString() {
         return "GLOBAL";
     }

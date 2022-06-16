@@ -33,6 +33,7 @@ import org.apache.flink.runtime.io.network.api.StopMode;
 import org.apache.flink.runtime.io.network.api.writer.RecordWriter;
 import org.apache.flink.runtime.io.network.api.writer.RecordWriterDelegate;
 import org.apache.flink.runtime.io.network.partition.consumer.IndexedInputGate;
+import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
@@ -74,6 +75,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -164,8 +166,9 @@ public abstract class OperatorChain<OUT, OP extends StreamOperator<OUT>>
 
         // create the final output stream writers
         // we iterate through all the out edges from this job vertex and create a stream output
-        List<StreamEdge> outEdgesInOrder = configuration.getOutEdgesInOrder(userCodeClassloader);
-        Map<StreamEdge, RecordWriterOutput<?>> streamOutputMap =
+        LinkedHashMap<IntermediateDataSetID, List<StreamEdge>> outEdgesInOrder =
+                configuration.getOutEdgesInOrder(userCodeClassloader);
+        Map<IntermediateDataSetID, RecordWriterOutput<?>> streamOutputMap =
                 new HashMap<>(outEdgesInOrder.size());
         this.streamOutputs = new RecordWriterOutput<?>[outEdgesInOrder.size()];
         this.finishedOnRestoreInput =
@@ -499,23 +502,26 @@ public abstract class OperatorChain<OUT, OP extends StreamOperator<OUT>>
     // ------------------------------------------------------------------------
 
     private void createChainOutputs(
-            List<StreamEdge> outEdgesInOrder,
+            LinkedHashMap<IntermediateDataSetID, List<StreamEdge>> outEdgesInOrder,
             RecordWriterDelegate<SerializationDelegate<StreamRecord<OUT>>> recordWriterDelegate,
             Map<Integer, StreamConfig> chainedConfigs,
             StreamTask<OUT, OP> containingTask,
-            Map<StreamEdge, RecordWriterOutput<?>> streamOutputMap) {
-        for (int i = 0; i < outEdgesInOrder.size(); i++) {
-            StreamEdge outEdge = outEdgesInOrder.get(i);
+            Map<IntermediateDataSetID, RecordWriterOutput<?>> streamOutputMap) {
+        int index = 0;
+        for (Map.Entry<IntermediateDataSetID, List<StreamEdge>> entry :
+                outEdgesInOrder.entrySet()) {
+            StreamEdge outEdge = entry.getValue().get(0);
 
             RecordWriterOutput<?> streamOutput =
                     createStreamOutput(
-                            recordWriterDelegate.getRecordWriter(i),
+                            recordWriterDelegate.getRecordWriter(index),
                             outEdge,
                             chainedConfigs.get(outEdge.getSourceId()),
                             containingTask.getEnvironment());
 
-            this.streamOutputs[i] = streamOutput;
-            streamOutputMap.put(outEdge, streamOutput);
+            this.streamOutputs[index] = streamOutput;
+            ++index;
+            streamOutputMap.put(entry.getKey(), streamOutput);
         }
     }
 
@@ -647,18 +653,19 @@ public abstract class OperatorChain<OUT, OP extends StreamOperator<OUT>>
             StreamConfig operatorConfig,
             Map<Integer, StreamConfig> chainedConfigs,
             ClassLoader userCodeClassloader,
-            Map<StreamEdge, RecordWriterOutput<?>> streamOutputs,
+            Map<IntermediateDataSetID, RecordWriterOutput<?>> streamOutputs,
             List<StreamOperatorWrapper<?, ?>> allOperatorWrappers,
             MailboxExecutorFactory mailboxExecutorFactory) {
-        List<Tuple2<WatermarkGaugeExposingOutput<StreamRecord<T>>, StreamEdge>> allOutputs =
-                new ArrayList<>(4);
+        List<WatermarkGaugeExposingOutput<StreamRecord<T>>> allOutputs = new ArrayList<>(4);
 
         // create collectors for the network outputs
-        for (StreamEdge outputEdge : operatorConfig.getNonChainedOutputs(userCodeClassloader)) {
+        for (Map.Entry<IntermediateDataSetID, List<StreamEdge>> entry :
+                operatorConfig.getNonChainedOutputs(userCodeClassloader).entrySet()) {
             @SuppressWarnings("unchecked")
-            RecordWriterOutput<T> output = (RecordWriterOutput<T>) streamOutputs.get(outputEdge);
+            RecordWriterOutput<T> output =
+                    (RecordWriterOutput<T>) streamOutputs.get(entry.getKey());
 
-            allOutputs.add(new Tuple2<>(output, outputEdge));
+            allOutputs.add(output);
         }
 
         // Create collectors for the chained outputs
@@ -676,18 +683,18 @@ public abstract class OperatorChain<OUT, OP extends StreamOperator<OUT>>
                             allOperatorWrappers,
                             outputEdge.getOutputTag(),
                             mailboxExecutorFactory);
-            allOutputs.add(new Tuple2<>(output, outputEdge));
+            allOutputs.add(output);
         }
 
         if (allOutputs.size() == 1) {
-            return allOutputs.get(0).f0;
+            return allOutputs.get(0);
         } else {
             // send to N outputs. Note that this includes the special case
             // of sending to zero outputs
             @SuppressWarnings({"unchecked"})
             Output<StreamRecord<T>>[] asArray = new Output[allOutputs.size()];
             for (int i = 0; i < allOutputs.size(); i++) {
-                asArray[i] = allOutputs.get(i).f0;
+                asArray[i] = allOutputs.get(i);
             }
 
             // This is the inverse of creating the normal ChainingOutput.
@@ -710,7 +717,7 @@ public abstract class OperatorChain<OUT, OP extends StreamOperator<OUT>>
             StreamConfig operatorConfig,
             Map<Integer, StreamConfig> chainedConfigs,
             ClassLoader userCodeClassloader,
-            Map<StreamEdge, RecordWriterOutput<?>> streamOutputs,
+            Map<IntermediateDataSetID, RecordWriterOutput<?>> streamOutputs,
             List<StreamOperatorWrapper<?, ?>> allOperatorWrappers,
             OutputTag<IN> outputTag,
             MailboxExecutorFactory mailboxExecutorFactory) {

@@ -36,7 +36,9 @@ import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -73,7 +75,7 @@ public class JobVertex implements java.io.Serializable {
     private final List<OperatorIDPair> operatorIDs;
 
     /** List of produced data sets, one per writer. */
-    private final ArrayList<IntermediateDataSet> results = new ArrayList<>();
+    private final Map<IntermediateDataSetID, IntermediateDataSet> results = new LinkedHashMap<>();
 
     /** List of edges with incoming data. One per Reader. */
     private final ArrayList<JobEdge> inputs = new ArrayList<>();
@@ -360,7 +362,7 @@ public class JobVertex implements java.io.Serializable {
     }
 
     public List<IntermediateDataSet> getProducedDataSets() {
-        return this.results;
+        return new ArrayList<>(this.results.values());
     }
 
     public List<JobEdge> getInputs() {
@@ -473,16 +475,28 @@ public class JobVertex implements java.io.Serializable {
 
     public IntermediateDataSet createAndAddResultDataSet(
             IntermediateDataSetID id, ResultPartitionType partitionType) {
-
-        IntermediateDataSet result = new IntermediateDataSet(id, partitionType, this);
-        this.results.add(result);
-        return result;
+        return this.results.computeIfAbsent(
+                id, key -> new IntermediateDataSet(id, partitionType, this));
     }
 
     public JobEdge connectNewDataSetAsInput(
             JobVertex input, DistributionPattern distPattern, ResultPartitionType partitionType) {
 
         IntermediateDataSet dataSet = input.createAndAddResultDataSet(partitionType);
+
+        JobEdge edge = new JobEdge(dataSet, this, distPattern);
+        this.inputs.add(edge);
+        dataSet.addConsumer(edge);
+        return edge;
+    }
+
+    public JobEdge connectNewDataSetAsInput(
+            JobVertex input,
+            DistributionPattern distPattern,
+            ResultPartitionType partitionType,
+            IntermediateDataSetID dataSetId) {
+
+        IntermediateDataSet dataSet = input.createAndAddResultDataSet(dataSetId, partitionType);
 
         JobEdge edge = new JobEdge(dataSet, this, distPattern);
         this.inputs.add(edge);

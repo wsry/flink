@@ -58,7 +58,13 @@ public class ForwardForUnspecifiedPartitionerTest extends TestLogger {
         JobVertex sourceVertex = jobGraph.getVerticesSortedTopologicallyFromSources().get(0);
 
         StreamConfig sourceConfig = new StreamConfig(sourceVertex.getConfiguration());
-        StreamEdge edge = sourceConfig.getNonChainedOutputs(getClass().getClassLoader()).get(0);
+        StreamEdge edge =
+                sourceConfig
+                        .getNonChainedOutputs(getClass().getClassLoader())
+                        .values()
+                        .iterator()
+                        .next()
+                        .get(0);
         assertThat(edge.getPartitioner(), instanceOf(RescalePartitioner.class));
     }
 }

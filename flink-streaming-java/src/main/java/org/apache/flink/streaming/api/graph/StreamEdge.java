@@ -18,6 +18,7 @@
 package org.apache.flink.streaming.api.graph;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.streaming.api.transformations.StreamExchangeMode;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.util.OutputTag;
@@ -72,6 +73,8 @@ public class StreamEdge implements Serializable {
     private long bufferTimeout;
 
     private boolean supportsUnalignedCheckpoints = true;
+
+    private IntermediateDataSetID consumedDataSet;
 
     public StreamEdge(
             StreamNode sourceVertex,
@@ -186,6 +189,14 @@ public class StreamEdge implements Serializable {
 
     public boolean supportsUnalignedCheckpoints() {
         return supportsUnalignedCheckpoints;
+    }
+
+    public void setConsumedDataSet(IntermediateDataSetID consumedDataSet) {
+        this.consumedDataSet = consumedDataSet;
+    }
+
+    public IntermediateDataSetID getConsumedDataSet() {
+        return consumedDataSet;
     }
 
     @Override

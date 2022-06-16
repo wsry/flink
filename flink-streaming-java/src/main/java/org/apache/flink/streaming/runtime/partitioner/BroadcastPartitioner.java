@@ -67,6 +67,11 @@ public class BroadcastPartitioner<T> extends StreamPartitioner<T> {
     }
 
     @Override
+    public boolean isResultDataSetReusable() {
+        return true;
+    }
+
+    @Override
     public String toString() {
         return "BROADCAST";
     }

@@ -25,7 +25,6 @@ import org.apache.flink.runtime.scheduler.strategy.ConsumedPartitionGroup;
 import org.apache.flink.runtime.scheduler.strategy.ConsumerVertexGroup;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -79,14 +78,13 @@ public class IntermediateResultPartition {
     }
 
     public ConsumerVertexGroup getConsumerVertexGroup() {
-        Optional<ConsumerVertexGroup> consumerVertexGroup = getConsumerVertexGroupOptional();
-        checkState(consumerVertexGroup.isPresent());
-        return consumerVertexGroup.get();
+        List<ConsumerVertexGroup> consumerVertexGroups = getConsumerVertexGroups();
+        checkState(!consumerVertexGroups.isEmpty());
+        return consumerVertexGroups.get(0);
     }
 
-    public Optional<ConsumerVertexGroup> getConsumerVertexGroupOptional() {
-        return Optional.ofNullable(
-                getEdgeManager().getConsumerVertexGroupForPartition(partitionId));
+    public List<ConsumerVertexGroup> getConsumerVertexGroups() {
+        return getEdgeManager().getConsumerVertexGroupForPartition(partitionId);
     }
 
     public List<ConsumedPartitionGroup> getConsumedPartitionGroups() {
@@ -106,12 +104,12 @@ public class IntermediateResultPartition {
 
     private int computeNumberOfSubpartitions() {
         if (!getProducer().getExecutionGraphAccessor().isDynamic()) {
-            ConsumerVertexGroup consumerVertexGroup = getConsumerVertexGroup();
-            checkState(consumerVertexGroup.size() > 0);
+            List<ConsumerVertexGroup> consumerVertexGroups = getConsumerVertexGroups();
+            checkState(!consumerVertexGroups.isEmpty() && consumerVertexGroups.get(0).size() > 0);
 
             // The produced data is partitioned among a number of subpartitions, one for each
             // consuming sub task.
-            return consumerVertexGroup.size();
+            return consumerVertexGroups.get(0).size();
         } else {
             if (totalResult.isBroadcast()) {
                 // for dynamic graph and broadcast result, we only produced one subpartition,
@@ -124,18 +122,16 @@ public class IntermediateResultPartition {
     }
 
     private int computeNumberOfMaxPossiblePartitionConsumers() {
-        final ExecutionJobVertex consumerJobVertex =
-                getIntermediateResult().getConsumerExecutionJobVertex();
         final DistributionPattern distributionPattern =
                 getIntermediateResult().getConsumingDistributionPattern();
 
         // decide the max possible consumer job vertex parallelism
-        int maxConsumerJobVertexParallelism = consumerJobVertex.getParallelism();
+        int maxConsumerJobVertexParallelism = getIntermediateResult().getConsumersParallelism();
         if (maxConsumerJobVertexParallelism <= 0) {
+            maxConsumerJobVertexParallelism = getIntermediateResult().getConsumersMaxParallelism();
             checkState(
-                    consumerJobVertex.getMaxParallelism() > 0,
+                    maxConsumerJobVertexParallelism > 0,
                     "Neither the parallelism nor the max parallelism of a job vertex is set");
-            maxConsumerJobVertexParallelism = consumerJobVertex.getMaxParallelism();
         }
 
         // compute number of subpartitions according to the distribution pattern

@@ -103,4 +103,22 @@ public class ConsumedPartitionGroup implements Iterable<IntermediateResultPartit
     public boolean areAllPartitionsFinished() {
         return unfinishedPartitions.get() == 0;
     }
+
+    //    @Override
+    //    public boolean equals(Object o) {
+    //        if (this == o) {
+    //            return true;
+    //        }
+    //        if (o == null || getClass() != o.getClass()) {
+    //            return false;
+    //        }
+    //        ConsumedPartitionGroup that = (ConsumedPartitionGroup) o;
+    //        return Objects.equals(intermediateDataSetID, that.intermediateDataSetID)
+    //                && Objects.equals(resultPartitions, that.resultPartitions);
+    //    }
+    //
+    //    @Override
+    //    public int hashCode() {
+    //        return Objects.hash(resultPartitions, intermediateDataSetID);
+    //    }
 }
