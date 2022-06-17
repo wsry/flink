@@ -62,6 +62,8 @@ public class CatalogColumnStatisticsDataBoolean extends CatalogColumnStatisticsD
                 + trueCount
                 + ", falseCount="
                 + falseCount
+                + ", nullCount="
+                + getNullCount()
                 + '}';
     }
 }

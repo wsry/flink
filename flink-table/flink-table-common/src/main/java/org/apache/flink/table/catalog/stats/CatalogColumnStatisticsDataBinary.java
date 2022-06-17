@@ -62,6 +62,8 @@ public class CatalogColumnStatisticsDataBinary extends CatalogColumnStatisticsDa
                 + maxLength
                 + ", avgLength="
                 + avgLength
+                + ", nullCount="
+                + getNullCount()
                 + '}';
     }
 }

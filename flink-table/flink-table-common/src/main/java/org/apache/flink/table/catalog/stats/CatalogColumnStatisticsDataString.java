@@ -78,6 +78,8 @@ public class CatalogColumnStatisticsDataString extends CatalogColumnStatisticsDa
                 + avgLength
                 + ", ndv="
                 + ndv
+                + ", nullCount="
+                + getNullCount()
                 + '}';
     }
 }

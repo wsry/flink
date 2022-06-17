@@ -73,6 +73,8 @@ public class CatalogColumnStatisticsDataDate extends CatalogColumnStatisticsData
                 + max
                 + ", ndv="
                 + ndv
+                + ", nullCount="
+                + getNullCount()
                 + '}';
     }
 }

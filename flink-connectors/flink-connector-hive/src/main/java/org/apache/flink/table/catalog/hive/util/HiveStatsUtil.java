@@ -209,7 +209,7 @@ public class HiveStatsUtil {
             HiveCatalog hiveCatalog,
             Map<String, Long> cachePartitionRowCount,
             ObjectPath tablePath) {
-        boolean ndvSum = hiveCatalog.getHiveConf().getBoolean("ndv-sum", true);
+        boolean ndvSum = hiveCatalog.getHiveConf().getBoolean("ndv-sum", false);
         Preconditions.checkArgument(columnStatisticsDataList.size() > 0);
         CatalogColumnStatisticsDataBase colStat = columnStatisticsDataList.get(0);
         if (colStat instanceof CatalogColumnStatisticsDataBinary) {
