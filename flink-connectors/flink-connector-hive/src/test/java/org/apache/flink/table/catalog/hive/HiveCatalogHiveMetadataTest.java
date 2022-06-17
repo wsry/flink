@@ -29,6 +29,7 @@ import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogFunction;
 import org.apache.flink.table.catalog.CatalogFunctionImpl;
 import org.apache.flink.table.catalog.CatalogPartition;
+import org.apache.flink.table.catalog.CatalogPartitionImpl;
 import org.apache.flink.table.catalog.CatalogPartitionSpec;
 import org.apache.flink.table.catalog.CatalogPropertiesUtil;
 import org.apache.flink.table.catalog.CatalogTable;
@@ -60,6 +61,7 @@ import org.apache.hadoop.hive.ql.udf.generic.GenericUDFAbs;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -240,6 +242,101 @@ class HiveCatalogHiveMetadataTest extends HiveCatalogMetadataTestBase {
                 catalog.getPartitionColumnStatistics(path1, partitionSpec));
     }
 
+    void t1() throws Exception {
+        catalog.createDatabase(db1, createDb(), false);
+        CatalogTable catalogTable = createPartitionedTable();
+        catalog.createTable(path1, catalogTable, false);
+        CatalogPartitionSpec partition1Spec =
+                new CatalogPartitionSpec(
+                        new HashMap<String, String>() {
+                            {
+                                put("second", "2010-04-21 09:45:00");
+                                put("third", "2000");
+                            }
+                        });
+        CatalogPartitionSpec partition2Spec =
+                new CatalogPartitionSpec(
+                        new HashMap<String, String>() {
+                            {
+                                put("second", "2010-04-22 09:45:00");
+                                put("third", "2000");
+                            }
+                        });
+        catalog.createPartition(path1, partition1Spec, createPartition(), true);
+        catalog.createPartition(path1, partition2Spec, createPartition(), true);
+
+        Map<String, CatalogColumnStatisticsDataBase> columnStatisticsDataBaseMap = new HashMap<>();
+
+        columnStatisticsDataBaseMap.put(
+                "first", new CatalogColumnStatisticsDataString(10L, 3.0, 2L, 100L));
+        columnStatisticsDataBaseMap.put(
+                "second", new CatalogColumnStatisticsDataString(10L, 5.2, 3L, 100L));
+
+        catalog.alterTableColumnStatistics(
+                path1, new CatalogColumnStatistics(columnStatisticsDataBaseMap), false);
+        CatalogColumnStatistics catalogColumnStatistics =
+                new CatalogColumnStatistics(columnStatisticsDataBaseMap);
+        checkEquals(catalogColumnStatistics, catalog.getTableColumnStatistics(path1));
+    }
+
+    @Test
+    void testPartitionedTableColumnStatistics() throws Exception {
+        catalog.createDatabase(db1, createDb(), false);
+        CatalogTable catalogTable = createPartitionedTable();
+        catalog.createTable(path1, catalogTable, false);
+        CatalogPartitionSpec partition1Spec =
+                new CatalogPartitionSpec(
+                        new HashMap<String, String>() {
+                            {
+                                put("second", "2010-04-21 09:45:00");
+                                put("third", "2000");
+                            }
+                        });
+        CatalogPartitionSpec partition2Spec =
+                new CatalogPartitionSpec(
+                        new HashMap<String, String>() {
+                            {
+                                put("second", "2010-04-22 09:45:00");
+                                put("third", "2000");
+                            }
+                        });
+        catalog.createPartition(path1, partition1Spec, createPartition(), true);
+        catalog.createPartition(path1, partition2Spec, createPartition(), true);
+        Map<String, CatalogColumnStatisticsDataBase> columnStatisticsDataBaseMap = new HashMap<>();
+
+        columnStatisticsDataBaseMap.put(
+                "first", new CatalogColumnStatisticsDataString(10L, 3.0, 2L, 100L));
+        CatalogColumnStatistics catalogColumnStatistics =
+                new CatalogColumnStatistics(columnStatisticsDataBaseMap);
+        catalog.alterPartitionColumnStatistics(
+                path1, partition1Spec, catalogColumnStatistics, false);
+
+        columnStatisticsDataBaseMap.put(
+                "first", new CatalogColumnStatisticsDataString(0L, 1.0, 4L, 100L));
+        catalogColumnStatistics = new CatalogColumnStatistics(columnStatisticsDataBaseMap);
+        catalog.alterPartitionColumnStatistics(
+                path1, partition2Spec, catalogColumnStatistics, false);
+
+        // we haven't set partition statistic, so we can't calculate avgLength of all partitions
+        // for we can't know how many rows in each partition
+        columnStatisticsDataBaseMap.put(
+                "first", new CatalogColumnStatisticsDataString(10L, 2.0, 6L, 200L));
+        catalogColumnStatistics = new CatalogColumnStatistics(columnStatisticsDataBaseMap);
+        checkEquals(catalogColumnStatistics, catalog.getTableColumnStatistics(path1));
+
+        // now set partition statistic, so that we can calculate avgLength from all partitions
+        catalog.alterPartitionStatistics(
+                path1, partition1Spec, new CatalogTableStatistics(3L, 1L, 2L, 2L), false);
+        catalog.alterPartitionStatistics(
+                path1, partition2Spec, new CatalogTableStatistics(1L, 1L, 2L, 2L), false);
+
+        // avgLength = (3 * 3 + 1 * 1) / (3 + 1)
+        columnStatisticsDataBaseMap.put(
+                "first", new CatalogColumnStatisticsDataString(10L, 2.5, 4L, 200L));
+        catalogColumnStatistics = new CatalogColumnStatistics(columnStatisticsDataBaseMap);
+        checkEquals(catalogColumnStatistics, catalog.getTableColumnStatistics(path1));
+    }
+
     @Test
     void testHiveStatistics() throws Exception {
         catalog.createDatabase(db1, createDb(), false);
@@ -309,8 +406,8 @@ class HiveCatalogHiveMetadataTest extends HiveCatalogMetadataTestBase {
     }
 
     private void checkStatistics(int inputStat, int expectStat) throws Exception {
+        // check statistics for non-partitioned table
         catalog.dropTable(path1, true);
-
         Map<String, String> properties = new HashMap<>();
         properties.put(FactoryUtil.CONNECTOR.key(), SqlCreateHiveTable.IDENTIFIER);
         properties.put(StatsSetupConst.ROW_COUNT, String.valueOf(inputStat));
