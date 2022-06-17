@@ -19,7 +19,6 @@
 package org.apache.flink.table.planner.plan.nodes.exec.processor;
 
 import org.apache.flink.annotation.VisibleForTesting;
-import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.streaming.api.transformations.SourceTransformation;
@@ -442,9 +441,11 @@ public class MultipleInputNodeCreationProcessor implements ExecNodeGraphProcesso
             // translateToPlan will cache the transformation,
             // this is OK because sources do not have any input so the transformation will never
             // change.
-            Transformation<?> transformation =
-                    node.translateToPlan(Preconditions.checkNotNull(context).getPlanner());
-            return transformation instanceof SourceTransformation;
+            return true;
+            //            Transformation<?> transformation =
+            //
+            // node.translateToPlan(Preconditions.checkNotNull(context).getPlanner());
+            //            return transformation instanceof SourceTransformation;
         }
         return false;
     }
