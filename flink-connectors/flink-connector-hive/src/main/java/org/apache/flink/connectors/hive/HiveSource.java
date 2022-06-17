@@ -22,6 +22,7 @@ import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.connector.file.src.AbstractFileSource;
 import org.apache.flink.connector.file.src.ContinuousEnumerationSettings;
 import org.apache.flink.connector.file.src.PendingSplitsCheckpoint;
@@ -59,12 +60,12 @@ public class HiveSource<T> extends AbstractFileSource<T, HiveSourceSplit> {
 
     private static final long serialVersionUID = 1L;
 
-    private final int threadNum;
     private final JobConfWrapper jobConfWrapper;
     private final List<String> partitionKeys;
     private final ContinuousPartitionFetcher<Partition, ?> fetcher;
     private final HiveTableSource.HiveContinuousPartitionFetcherContext<?> fetcherContext;
     private final ObjectPath tablePath;
+    private final ReadableConfig flinkConf;
 
     HiveSource(
             Path[] inputPaths,
@@ -72,8 +73,8 @@ public class HiveSource<T> extends AbstractFileSource<T, HiveSourceSplit> {
             FileSplitAssigner.Provider splitAssigner,
             BulkFormat<T, HiveSourceSplit> readerFormat,
             @Nullable ContinuousEnumerationSettings continuousEnumerationSettings,
-            int threadNum,
             JobConf jobConf,
+            ReadableConfig flinkConf,
             ObjectPath tablePath,
             List<String> partitionKeys,
             @Nullable ContinuousPartitionFetcher<Partition, ?> fetcher,
@@ -84,12 +85,8 @@ public class HiveSource<T> extends AbstractFileSource<T, HiveSourceSplit> {
                 splitAssigner,
                 readerFormat,
                 continuousEnumerationSettings);
-        Preconditions.checkArgument(
-                threadNum >= 1,
-                HiveOptions.TABLE_EXEC_HIVE_LOAD_PARTITION_SPLITS_THREAD_NUM.key()
-                        + " cannot be less than 1");
-        this.threadNum = threadNum;
         this.jobConfWrapper = new JobConfWrapper(jobConf);
+        this.flinkConf = flinkConf;
         this.tablePath = tablePath;
         this.partitionKeys = partitionKeys;
         this.fetcher = fetcher;
@@ -163,8 +160,8 @@ public class HiveSource<T> extends AbstractFileSource<T, HiveSourceSplit> {
                 seenPartitions,
                 getAssignerFactory().create(new ArrayList<>(splits)),
                 getContinuousEnumerationSettings().getDiscoveryInterval().toMillis(),
-                threadNum,
                 jobConfWrapper.conf(),
+                flinkConf,
                 tablePath,
                 fetcher,
                 fetcherContext);
