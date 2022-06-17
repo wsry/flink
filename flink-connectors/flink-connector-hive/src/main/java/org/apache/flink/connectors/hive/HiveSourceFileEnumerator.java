@@ -18,7 +18,6 @@
 
 package org.apache.flink.connectors.hive;
 
-import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.connector.file.src.FileSourceSplit;
 import org.apache.flink.connector.file.src.enumerate.FileEnumerator;
 import org.apache.flink.connectors.hive.read.HiveSourceSplit;
@@ -56,38 +55,40 @@ public class HiveSourceFileEnumerator implements FileEnumerator {
     // empty.
     private final List<HiveTablePartition> partitions;
     private final JobConf jobConf;
-    private final ReadableConfig flinkConf;
 
-    public HiveSourceFileEnumerator(
-            List<HiveTablePartition> partitions, JobConf jobConf, ReadableConfig flinkConf) {
+    public HiveSourceFileEnumerator(List<HiveTablePartition> partitions, JobConf jobConf) {
         this.partitions = partitions;
         this.jobConf = jobConf;
-        this.flinkConf = flinkConf;
     }
 
     @Override
     public Collection<FileSourceSplit> enumerateSplits(Path[] paths, int minDesiredSplits)
             throws IOException {
-        return new ArrayList<>(createInputSplits(minDesiredSplits, partitions, jobConf, flinkConf));
+        return new ArrayList<>(createInputSplits(minDesiredSplits, partitions, jobConf));
     }
 
     public static List<HiveSourceSplit> createInputSplits(
-            int minNumSplits,
-            List<HiveTablePartition> partitions,
-            JobConf jobConf,
-            ReadableConfig flinkConf)
+            int minNumSplits, List<HiveTablePartition> partitions, JobConf jobConf)
             throws IOException {
         if (minNumSplits == 0) {
             // it's for infer parallelism
             LOGGER.info(
                     "The minNumSplits is {}, try to infer parallelism, set it to default parallelism {}.",
                     minNumSplits,
-                    flinkConf.get(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM));
+                    jobConf.get(
+                            ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM.key()));
             minNumSplits =
-                    flinkConf.get(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM);
+                    Integer.parseInt(
+                            jobConf.get(
+                                    ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM
+                                            .key()));
         }
         setSplitMaxSize(partitions, jobConf, minNumSplits);
-        int threadNum = flinkConf.get(HiveOptions.TABLE_EXEC_HIVE_LOAD_PARTITION_SPLITS_THREAD_NUM);
+        int threadNum =
+                Integer.parseInt(
+                        jobConf.get(
+                                HiveOptions.TABLE_EXEC_HIVE_LOAD_PARTITION_SPLITS_THREAD_NUM
+                                        .key()));
         List<HiveSourceSplit> hiveSplits = new ArrayList<>();
         try (MRSplitsGetter splitsGetter = new MRSplitsGetter(threadNum)) {
             for (HiveTablePartitionSplits partitionSplits :
@@ -209,20 +210,15 @@ public class HiveSourceFileEnumerator implements FileEnumerator {
 
         private final List<HiveTablePartition> partitions;
         private final JobConfWrapper jobConfWrapper;
-        private final ReadableConfig flinkConf;
 
-        public Provider(
-                List<HiveTablePartition> partitions,
-                JobConfWrapper jobConfWrapper,
-                ReadableConfig flinkConf) {
+        public Provider(List<HiveTablePartition> partitions, JobConfWrapper jobConfWrapper) {
             this.partitions = partitions;
             this.jobConfWrapper = jobConfWrapper;
-            this.flinkConf = flinkConf;
         }
 
         @Override
         public FileEnumerator create() {
-            return new HiveSourceFileEnumerator(partitions, jobConfWrapper.conf(), flinkConf);
+            return new HiveSourceFileEnumerator(partitions, jobConfWrapper.conf());
         }
     }
 }
