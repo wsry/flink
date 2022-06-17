@@ -18,7 +18,9 @@
 
 package org.apache.flink.table.catalog.hive.util;
 
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.apache.flink.table.catalog.hive.client.HiveShim;
 import org.apache.flink.table.catalog.hive.client.HiveShimLoader;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatisticsDataBase;
@@ -28,8 +30,10 @@ import org.apache.flink.table.catalog.stats.CatalogColumnStatisticsDataDate;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatisticsDataDouble;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatisticsDataLong;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatisticsDataString;
+import org.apache.flink.table.catalog.stats.Date;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
+import org.apache.flink.util.Preconditions;
 
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
@@ -90,6 +94,66 @@ public class HiveStatsUtil {
         return colStats;
     }
 
+    /**
+     * Create a map of Flink column stats from the given Hive partition and columns statistic of the
+     * partition.
+     *
+     * <p>The basic idea is to merge the column's statistic of all partitions to get completed
+     * statistic for one column.
+     */
+    public static Map<String, CatalogColumnStatisticsDataBase> createCatalogColumnStats(
+            Map<String, List<ColumnStatisticsObj>> partitionColumnStatistics,
+            String hiveVersion,
+            HiveCatalog hiveCatalog,
+            ObjectPath tablePath) {
+        // column -> the column statistic of all partitions
+        Map<String, List<CatalogColumnStatisticsDataBase>> colPartitionStats = new HashMap<>();
+        // column -> partition that the column statistic belongs
+        // the mapping is need to when we merge the avgLength statistic
+        Map<String, List<String>> columnPartitions = new HashMap<>();
+
+        // iterate each partition and the columns' statistic
+        for (Map.Entry<String, List<ColumnStatisticsObj>> partitionColumnStatisticsEntry :
+                partitionColumnStatistics.entrySet()) {
+            String partition = partitionColumnStatisticsEntry.getKey();
+            List<ColumnStatisticsObj> columnStatisticsObjList =
+                    partitionColumnStatisticsEntry.getValue();
+            // iterate each column to get statistic
+            for (ColumnStatisticsObj colStatsObj : columnStatisticsObjList) {
+                // create catalog column statistic
+                CatalogColumnStatisticsDataBase columnStats =
+                        createTableColumnStats(
+                                HiveTypeUtil.toFlinkType(
+                                        TypeInfoUtils.getTypeInfoFromTypeString(
+                                                colStatsObj.getColType())),
+                                colStatsObj.getStatsData(),
+                                hiveVersion);
+                // record the column and the corresponding column statistic
+                colPartitionStats.putIfAbsent(colStatsObj.getColName(), new ArrayList<>());
+                colPartitionStats.get(colStatsObj.getColName()).add(columnStats);
+                // record the column and partition that the column statistic belongs,
+                columnPartitions.putIfAbsent(colStatsObj.getColName(), new ArrayList<>());
+                columnPartitions.get(colStatsObj.getColName()).add(partition);
+            }
+        }
+
+        // column -> merged column statistic
+        Map<String, CatalogColumnStatisticsDataBase> colStats = new HashMap<>();
+        // partition -> row count in partition
+        Map<String, Long> cachePartitionRowCount = new HashMap<>();
+        colPartitionStats.forEach(
+                (colName, colPartitionStatisticList) ->
+                        colStats.put(
+                                colName,
+                                mergeCatalogTableColumnStats(
+                                        colPartitionStatisticList,
+                                        columnPartitions.get(colName),
+                                        hiveCatalog,
+                                        cachePartitionRowCount,
+                                        tablePath)));
+        return colStats;
+    }
+
     /** Create columnStatistics from the given Hive column stats of a hive table. */
     public static ColumnStatistics createTableColumnStats(
             Table hiveTable,
@@ -136,8 +200,237 @@ public class HiveStatsUtil {
                 colStatsList.add(columnStatisticsObj);
             }
         }
-
         return new ColumnStatistics(desc, colStatsList);
+    }
+
+    private static CatalogColumnStatisticsDataBase mergeCatalogTableColumnStats(
+            List<CatalogColumnStatisticsDataBase> columnStatisticsDataList,
+            List<String> partitions,
+            HiveCatalog hiveCatalog,
+            Map<String, Long> cachePartitionRowCount,
+            ObjectPath tablePath) {
+        boolean ndvSum = hiveCatalog.getHiveConf().getBoolean("ndv-sum", false);
+        Preconditions.checkArgument(columnStatisticsDataList.size() > 0);
+        CatalogColumnStatisticsDataBase colStat = columnStatisticsDataList.get(0);
+        if (colStat instanceof CatalogColumnStatisticsDataBinary) {
+            return mergeCatalogColumnStatisticsDataBinary(
+                    columnStatisticsDataList,
+                    partitions,
+                    hiveCatalog,
+                    cachePartitionRowCount,
+                    tablePath);
+        } else if (colStat instanceof CatalogColumnStatisticsDataBoolean) {
+            return mergeCatalogColumnStatisticsDataBoolean(columnStatisticsDataList);
+        } else if (colStat instanceof CatalogColumnStatisticsDataDate) {
+            return mergeCatalogColumnStatisticsDataDate(columnStatisticsDataList, ndvSum);
+        } else if (colStat instanceof CatalogColumnStatisticsDataDouble) {
+            return mergeCatalogColumnStatisticsDataDouble(columnStatisticsDataList, ndvSum);
+        } else if (colStat instanceof CatalogColumnStatisticsDataLong) {
+            return mergeCatalogColumnStatisticsDataLong(columnStatisticsDataList, ndvSum);
+        } else if (colStat instanceof CatalogColumnStatisticsDataString) {
+            return mergeCatalogColumnStatisticsDataString(
+                    columnStatisticsDataList,
+                    partitions,
+                    hiveCatalog,
+                    cachePartitionRowCount,
+                    tablePath,
+                    ndvSum);
+        } else {
+            return null;
+        }
+    }
+
+    private static Long getPartitionRowCount(
+            Map<String, Long> cachePartitionRowCountMap,
+            String partition,
+            HiveCatalog hiveCatalog,
+            ObjectPath objectPath) {
+        if (!cachePartitionRowCountMap.containsKey(partition)) {
+            Long rowCount;
+            try {
+                rowCount =
+                        hiveCatalog
+                                .getPartitionStatistics(
+                                        objectPath,
+                                        HiveCatalog.createPartitionSpec(
+                                                partition, "__HIVE_DEFAULT_PARTITION__"))
+                                .getRowCount();
+            } catch (Exception e) {
+                LOG.info(
+                        String.format(
+                                "Can't get row count for partition %s, so return null directly.",
+                                partition),
+                        e);
+                rowCount = null;
+            }
+            cachePartitionRowCountMap.put(partition, rowCount);
+        }
+        return cachePartitionRowCountMap.get(partition);
+    }
+
+    private static CatalogColumnStatisticsDataBase mergeCatalogColumnStatisticsDataBinary(
+            List<CatalogColumnStatisticsDataBase> columnStatisticsDataList,
+            List<String> partitions,
+            HiveCatalog hiveCatalog,
+            Map<String, Long> cachePartitionRowCountMap,
+            ObjectPath tablePath) {
+        CatalogColumnStatisticsDataBinary colStat =
+                (CatalogColumnStatisticsDataBinary) columnStatisticsDataList.get(0);
+        Long maxLength = colStat.getMaxLength();
+        Double avgLength = colStat.getAvgLength();
+        Long currentRowsCount =
+                getPartitionRowCount(
+                        cachePartitionRowCountMap, partitions.get(0), hiveCatalog, tablePath);
+        Long nullCount = colStat.getNullCount();
+        Map<String, String> props = new HashMap<>(colStat.getProperties());
+        for (int i = 1; i < columnStatisticsDataList.size(); i++) {
+            CatalogColumnStatisticsDataBinary anotherColStat =
+                    (CatalogColumnStatisticsDataBinary) columnStatisticsDataList.get(i);
+            maxLength = max(maxLength, anotherColStat.getMaxLength());
+            Long anotherRowsCount =
+                    getPartitionRowCount(
+                            cachePartitionRowCountMap, partitions.get(i), hiveCatalog, tablePath);
+            avgLength =
+                    average(
+                            avgLength,
+                            currentRowsCount,
+                            anotherColStat.getAvgLength(),
+                            anotherRowsCount);
+            currentRowsCount = add(currentRowsCount, anotherRowsCount);
+            nullCount = add(nullCount, anotherColStat.getNullCount());
+            props.putAll(anotherColStat.getProperties());
+        }
+
+        return new CatalogColumnStatisticsDataBinary(maxLength, avgLength, nullCount, props);
+    }
+
+    private static CatalogColumnStatisticsDataBase mergeCatalogColumnStatisticsDataBoolean(
+            List<CatalogColumnStatisticsDataBase> columnStatisticsDataList) {
+        CatalogColumnStatisticsDataBoolean colStat =
+                (CatalogColumnStatisticsDataBoolean) columnStatisticsDataList.get(0);
+        Long trueCount = colStat.getTrueCount();
+        Long falseCount = colStat.getFalseCount();
+        Long nullCount = colStat.getNullCount();
+        Map<String, String> props = new HashMap<>(colStat.getProperties());
+        for (int i = 1; i < columnStatisticsDataList.size(); i++) {
+            CatalogColumnStatisticsDataBoolean anotherColStat =
+                    (CatalogColumnStatisticsDataBoolean) columnStatisticsDataList.get(i);
+            trueCount = add(trueCount, anotherColStat.getTrueCount());
+            falseCount = add(falseCount, anotherColStat.getFalseCount());
+            nullCount = add(nullCount, anotherColStat.getNullCount());
+            props.putAll(anotherColStat.getProperties());
+        }
+
+        return new CatalogColumnStatisticsDataBoolean(trueCount, falseCount, nullCount, props);
+    }
+
+    private static CatalogColumnStatisticsDataBase mergeCatalogColumnStatisticsDataString(
+            List<CatalogColumnStatisticsDataBase> columnStatisticsDataList,
+            List<String> partitions,
+            HiveCatalog hiveCatalog,
+            Map<String, Long> cachePartitionRowCountMap,
+            ObjectPath tablePath,
+            boolean ndvSum) {
+        CatalogColumnStatisticsDataString colStat =
+                (CatalogColumnStatisticsDataString) columnStatisticsDataList.get(0);
+        Long maxLength = colStat.getMaxLength();
+        Double avgLength = colStat.getAvgLength();
+        Long ndv = colStat.getNdv();
+        Long nullCount = colStat.getNullCount();
+        Long currentRowsCount =
+                getPartitionRowCount(
+                        cachePartitionRowCountMap, partitions.get(0), hiveCatalog, tablePath);
+        Map<String, String> props = new HashMap<>(colStat.getProperties());
+        for (int i = 1; i < columnStatisticsDataList.size(); i++) {
+            CatalogColumnStatisticsDataString anotherColStat =
+                    (CatalogColumnStatisticsDataString) columnStatisticsDataList.get(i);
+            maxLength = max(maxLength, anotherColStat.getMaxLength());
+            Long anotherRowsCount =
+                    getPartitionRowCount(
+                            cachePartitionRowCountMap, partitions.get(i), hiveCatalog, tablePath);
+            avgLength =
+                    average(
+                            avgLength,
+                            currentRowsCount,
+                            anotherColStat.getAvgLength(),
+                            anotherRowsCount);
+            currentRowsCount = add(currentRowsCount, anotherRowsCount);
+            // note: currently, we have no way to get ndv according the statistic from every single
+            // partition, so we use max ndx among partitions, which may be inaccuracy
+            ndv = ndvSum ? add(ndv, anotherColStat.getNdv()) : max(ndv, anotherColStat.getNdv());
+            nullCount = add(nullCount, anotherColStat.getNullCount());
+            props.putAll(anotherColStat.getProperties());
+        }
+        return new CatalogColumnStatisticsDataString(maxLength, avgLength, ndv, nullCount, props);
+    }
+
+    private static CatalogColumnStatisticsDataBase mergeCatalogColumnStatisticsDataLong(
+            List<CatalogColumnStatisticsDataBase> columnStatisticsDataList, boolean ndvSum) {
+        CatalogColumnStatisticsDataLong colStat =
+                (CatalogColumnStatisticsDataLong) columnStatisticsDataList.get(0);
+        Long min = colStat.getMin();
+        Long max = colStat.getMax();
+        Long ndv = colStat.getNdv();
+        Long nullCount = colStat.getNullCount();
+        Map<String, String> props = new HashMap<>(colStat.getProperties());
+        for (int i = 1; i < columnStatisticsDataList.size(); i++) {
+            CatalogColumnStatisticsDataLong anotherColStat =
+                    (CatalogColumnStatisticsDataLong) columnStatisticsDataList.get(i);
+            min = min(min, anotherColStat.getMin());
+            max = max(max, anotherColStat.getMax());
+            // note: currently, we have no way to get ndv according the statistic from every single
+            // partition, so we use max ndx among partitions, which may be inaccuracy
+            ndv = ndvSum ? add(ndv, anotherColStat.getNdv()) : max(ndv, anotherColStat.getNdv());
+            nullCount = add(nullCount, anotherColStat.getNullCount());
+            props.putAll(anotherColStat.getProperties());
+        }
+        return new CatalogColumnStatisticsDataLong(min, max, ndv, nullCount, props);
+    }
+
+    private static CatalogColumnStatisticsDataBase mergeCatalogColumnStatisticsDataDouble(
+            List<CatalogColumnStatisticsDataBase> columnStatisticsDataList, boolean ndvSum) {
+        CatalogColumnStatisticsDataDouble colStat =
+                (CatalogColumnStatisticsDataDouble) columnStatisticsDataList.get(0);
+        Double min = colStat.getMin();
+        Double max = colStat.getMax();
+        Long ndv = colStat.getNdv();
+        Long nullCount = colStat.getNullCount();
+        Map<String, String> props = new HashMap<>(colStat.getProperties());
+        for (int i = 1; i < columnStatisticsDataList.size(); i++) {
+            CatalogColumnStatisticsDataDouble anotherColStat =
+                    (CatalogColumnStatisticsDataDouble) columnStatisticsDataList.get(i);
+            min = min(min, anotherColStat.getMin());
+            max = max(max, anotherColStat.getMax());
+            // note: currently, we have no way to get ndv according the statistic from every single
+            // partition, so we use max ndx among partitions, which may be inaccuracy
+            ndv = ndvSum ? add(ndv, anotherColStat.getNdv()) : max(ndv, anotherColStat.getNdv());
+            nullCount = add(nullCount, anotherColStat.getNullCount());
+            props.putAll(anotherColStat.getProperties());
+        }
+        return new CatalogColumnStatisticsDataDouble(min, max, ndv, nullCount, props);
+    }
+
+    private static CatalogColumnStatisticsDataBase mergeCatalogColumnStatisticsDataDate(
+            List<CatalogColumnStatisticsDataBase> columnStatisticsDataList, boolean ndvSum) {
+        CatalogColumnStatisticsDataDate colStat =
+                (CatalogColumnStatisticsDataDate) columnStatisticsDataList.get(0);
+        Date min = colStat.getMin();
+        Date max = colStat.getMax();
+        Long ndv = colStat.getNdv();
+        Long nullCount = colStat.getNullCount();
+        Map<String, String> props = new HashMap<>();
+        for (int i = 1; i < columnStatisticsDataList.size(); i++) {
+            CatalogColumnStatisticsDataDate anotherColStat =
+                    (CatalogColumnStatisticsDataDate) columnStatisticsDataList.get(i);
+            min = min(min, anotherColStat.getMin());
+            max = max(max, anotherColStat.getMax());
+            // note: currently, we have no way to get ndv according the statistic from every single
+            // partition, so we use max ndx among partitions, which may be inaccuracy
+            ndv = ndvSum ? add(ndv, anotherColStat.getNdv()) : max(ndv, anotherColStat.getNdv());
+            nullCount = add(nullCount, anotherColStat.getNullCount());
+            props.putAll(anotherColStat.getProperties());
+        }
+        return new CatalogColumnStatisticsDataDate(min, max, ndv, nullCount, props);
     }
 
     /** Create Flink ColumnStats from Hive ColumnStatisticsData. */
@@ -178,7 +471,7 @@ public class HiveStatsUtil {
                     stringStats.isSetMaxColLen() ? stringStats.getMaxColLen() : null,
                     stringStats.isSetAvgColLen() ? stringStats.getAvgColLen() : null,
                     stringStats.isSetNumDVs() ? stringStats.getNumDVs() : null,
-                    stringStats.isSetNumDVs() ? stringStats.getNumNulls() : null);
+                    stringStats.isSetNumNulls() ? stringStats.getNumNulls() : null);
         } else if (stats.isSetDecimalStats()) {
             DecimalColumnStatsData decimalStats = stats.getDecimalStats();
             // for now, just return CatalogColumnStatisticsDataDouble for decimal columns
@@ -199,6 +492,18 @@ public class HiveStatsUtil {
                     stats,
                     colType);
             return null;
+        }
+    }
+
+    private static CatalogColumnStatisticsDataBase createTableColumnStatsFromPartitionedName(
+            String partitionName) {
+        if (partitionName.equals("__HIVE_DEFAULT_PARTITION__")) {
+            // when it's default partition, the ndv should be 1 and null count should be 1
+            return new CatalogColumnStatisticsDataLong(null, null, 1L, 1L);
+        } else {
+            // the partition type should always bigint, so the partitionName should always be xxxx
+            Long partitionValue = Long.valueOf(partitionName);
+            return new CatalogColumnStatisticsDataLong(partitionValue, partitionValue, 1L, 0L);
         }
     }
 
@@ -361,16 +666,6 @@ public class HiveStatsUtil {
         return HiveDecimal.create(new BigInteger(decimal.getUnscaled()), decimal.getScale());
     }
 
-    public static int parsePositiveIntStat(Map<String, String> parameters, String key) {
-        String value = parameters.get(key);
-        if (value == null) {
-            return DEFAULT_UNKNOWN_STATS_VALUE;
-        } else {
-            int v = Integer.parseInt(value);
-            return v > 0 ? v : DEFAULT_UNKNOWN_STATS_VALUE;
-        }
-    }
-
     public static long parsePositiveLongStat(Map<String, String> parameters, String key) {
         String value = parameters.get(key);
         if (value == null) {
@@ -379,5 +674,72 @@ public class HiveStatsUtil {
             long v = Long.parseLong(value);
             return v > 0 ? v : DEFAULT_UNKNOWN_STATS_VALUE;
         }
+    }
+
+    // Utilities for merge statistic
+    private static Double average(Double a, Long ac, Double b, Long bc) {
+        if (a == null || ac == null) {
+            return b;
+        }
+        if (b == null || bc == null) {
+            return a;
+        }
+        return ac + bc == 0 ? null : (a * ac + b * bc) / (ac + bc);
+    }
+
+    public static Long min(Long a, Long b) {
+        if (a == null || b == null) {
+            return a == null ? b : a;
+        }
+
+        return Math.min(a, b);
+    }
+
+    private static Double min(Double a, Double b) {
+        if (a == null || b == null) {
+            return a == null ? b : a;
+        }
+
+        return Math.min(a, b);
+    }
+
+    private static Date min(Date a, Date b) {
+        if (a == null || b == null) {
+            return a == null ? b : a;
+        }
+
+        return a.getDaysSinceEpoch() <= b.getDaysSinceEpoch() ? a : b;
+    }
+
+    public static Long max(Long a, Long b) {
+        if (a == null || b == null) {
+            return a == null ? b : a;
+        }
+
+        return Math.max(a, b);
+    }
+
+    private static Double max(Double a, Double b) {
+        if (a == null || b == null) {
+            return a == null ? b : a;
+        }
+
+        return Math.max(a, b);
+    }
+
+    private static Date max(Date a, Date b) {
+        if (a == null || b == null) {
+            return a == null ? b : a;
+        }
+
+        return a.getDaysSinceEpoch() >= b.getDaysSinceEpoch() ? a : b;
+    }
+
+    public static Long add(Long a, Long b) {
+        if (a == null || b == null) {
+            return a == null ? b : a;
+        }
+
+        return a + b;
     }
 }
