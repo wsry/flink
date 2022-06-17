@@ -19,6 +19,7 @@
 package org.apache.flink.table.catalog;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotEmptyException;
@@ -41,6 +42,7 @@ import org.apache.flink.table.factories.FunctionDefinitionFactory;
 import org.apache.flink.table.factories.TableFactory;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -398,6 +400,9 @@ public interface Catalog {
      */
     boolean partitionExists(ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
             throws CatalogException;
+
+    Tuple2<CatalogTableStatistics, CatalogColumnStatistics> getPartitionTableStats(
+            ObjectPath tablePath, List<Map<String, String>> remainingPartitions) throws Exception;
 
     /**
      * Create a partition.

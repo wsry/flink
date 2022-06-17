@@ -45,6 +45,7 @@ import org.apache.flink.table.connector.ProviderContext;
 import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
+import org.apache.flink.table.connector.source.abilities.SupportsDynamicPartitionPruning;
 import org.apache.flink.table.connector.source.abilities.SupportsLimitPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsPartitionPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsProjectionPushDown;
@@ -70,13 +71,15 @@ import static org.apache.flink.connector.file.table.FileSystemConnectorOptions.P
 import static org.apache.flink.connectors.hive.HiveOptions.STREAMING_SOURCE_CONSUME_START_OFFSET;
 import static org.apache.flink.connectors.hive.HiveOptions.STREAMING_SOURCE_ENABLE;
 import static org.apache.flink.connectors.hive.util.HivePartitionUtils.getAllPartitions;
+import static org.apache.flink.util.Preconditions.checkArgument;
 
 /** A TableSource implementation to read data from Hive tables. */
 public class HiveTableSource
         implements ScanTableSource,
                 SupportsPartitionPushDown,
                 SupportsProjectionPushDown,
-                SupportsLimitPushDown {
+                SupportsLimitPushDown,
+                SupportsDynamicPartitionPruning {
 
     private static final String HIVE_TRANSFORMATION = "hive";
 
@@ -92,6 +95,7 @@ public class HiveTableSource
     @Nullable private List<Map<String, String>> remainingPartitions = null;
     protected int[] projectedFields;
     private Long limit = null;
+    @Nullable private List<String> dynamicPartitionKeys = null;
 
     public HiveTableSource(
             JobConf jobConf,
@@ -151,6 +155,7 @@ public class HiveTableSource
             providerContext.generateUid(HIVE_TRANSFORMATION).ifPresent(sourceStream::uid);
             return sourceStream;
         } else {
+            long startTime = System.currentTimeMillis();
             List<HiveTablePartition> hivePartitionsToRead =
                     getAllPartitions(
                             jobConf,
@@ -158,6 +163,10 @@ public class HiveTableSource
                             tablePath,
                             catalogTable.getPartitionKeys(),
                             remainingPartitions);
+            System.out.println(
+                    String.format(
+                            "hive table source to get all partition cost: %s",
+                            System.currentTimeMillis() - startTime));
 
             int parallelism =
                     new HiveParallelismInference(tablePath, flinkConf)
@@ -174,6 +183,7 @@ public class HiveTableSource
                             execEnv,
                             sourceBuilder
                                     .setPartitions(hivePartitionsToRead)
+                                    .setDynamicPartitionKeys(dynamicPartitionKeys)
                                     .buildWithDefaultBulkFormat())
                     .setParallelism(parallelism);
         }
@@ -231,12 +241,28 @@ public class HiveTableSource
 
     @Override
     public void applyPartitions(List<Map<String, String>> remainingPartitions) {
+        checkArgument(dynamicPartitionKeys == null);
         if (catalogTable.getPartitionKeys() != null
                 && catalogTable.getPartitionKeys().size() != 0) {
             this.remainingPartitions = remainingPartitions;
         } else {
             throw new UnsupportedOperationException(
                     "Should not apply partitions to a non-partitioned table.");
+        }
+    }
+
+    @Override
+    public void applyDynamicPartitionPruning(List<String> dynamicPartitionKeys) {
+        checkArgument(remainingPartitions == null);
+        if (catalogTable.getPartitionKeys() != null
+                && catalogTable.getPartitionKeys().size() != 0) {
+            checkArgument(!dynamicPartitionKeys.isEmpty());
+            checkArgument(catalogTable.getPartitionKeys().containsAll(dynamicPartitionKeys));
+
+            this.dynamicPartitionKeys = dynamicPartitionKeys;
+        } else {
+            throw new UnsupportedOperationException(
+                    "Should not apply dynamic partitions to a non-partitioned table.");
         }
     }
 
@@ -266,6 +292,7 @@ public class HiveTableSource
         source.remainingPartitions = remainingPartitions;
         source.projectedFields = projectedFields;
         source.limit = limit;
+        source.dynamicPartitionKeys = dynamicPartitionKeys;
         return source;
     }
 

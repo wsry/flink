@@ -91,6 +91,7 @@ public class HiveSourceBuilder {
     private int[] projectedFields;
     private Long limit;
     private List<HiveTablePartition> partitions;
+    private List<String> dynamicPartitionKeys;
 
     /**
      * Creates a builder to read a hive table.
@@ -233,9 +234,8 @@ public class HiveSourceBuilder {
                         : SimpleSplitAssigner::new;
         return new HiveSource<>(
                 new Path[1],
-                new HiveSourceFileEnumerator.Provider(
-                        partitions != null ? partitions : Collections.emptyList(),
-                        new JobConfWrapper(jobConf)),
+                dynamicPartitionKeys,
+                partitions,
                 splitAssigner,
                 bulkFormat,
                 continuousSourceSettings,
@@ -252,6 +252,11 @@ public class HiveSourceBuilder {
      */
     public HiveSourceBuilder setPartitions(List<HiveTablePartition> partitions) {
         this.partitions = partitions;
+        return this;
+    }
+
+    public HiveSourceBuilder setDynamicPartitionKeys(List<String> dynamicPartitionKeys) {
+        this.dynamicPartitionKeys = dynamicPartitionKeys;
         return this;
     }
 

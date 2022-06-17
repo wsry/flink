@@ -20,17 +20,21 @@ package org.apache.flink.connector.jdbc.catalog;
 
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
+import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
+import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Map;
 
 /** Catalogs for relational databases via JDBC. */
 @PublicEvolving
@@ -78,6 +82,12 @@ public class JdbcCatalog extends AbstractJdbcCatalog {
     public CatalogBaseTable getTable(ObjectPath tablePath)
             throws TableNotExistException, CatalogException {
         return internal.getTable(tablePath);
+    }
+
+    @Override
+    public Tuple2<CatalogTableStatistics, CatalogColumnStatistics> getPartitionTableStats(
+            ObjectPath tablePath, List<Map<String, String>> remainingPartitions) throws Exception {
+        return null;
     }
 
     @Override

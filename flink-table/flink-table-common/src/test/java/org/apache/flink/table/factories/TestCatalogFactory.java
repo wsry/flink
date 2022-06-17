@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.factories;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.table.catalog.Catalog;
@@ -131,6 +132,13 @@ public class TestCatalogFactory implements CatalogFactory {
         @Override
         public void createDatabase(String name, CatalogDatabase database, boolean ignoreIfExists)
                 throws DatabaseAlreadyExistException, CatalogException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Tuple2<CatalogTableStatistics, CatalogColumnStatistics> getPartitionTableStats(
+                ObjectPath tablePath, List<Map<String, String>> remainingPartitions)
+                throws Exception {
             throw new UnsupportedOperationException();
         }
 

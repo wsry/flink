@@ -45,7 +45,9 @@ class BatchPhysicalTableSourceScanRule
       case tst: TableSourceTable =>
         tst.tableSource match {
           case sts: ScanTableSource =>
-            sts.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE).isBounded
+            val startTime = System.currentTimeMillis()
+            val isBound = sts.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE).isBounded
+            isBound
           case _ => false
         }
       case _ => false

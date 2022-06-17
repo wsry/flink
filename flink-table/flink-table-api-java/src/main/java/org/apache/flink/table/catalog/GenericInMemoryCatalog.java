@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.catalog;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotEmptyException;
@@ -101,6 +102,12 @@ public class GenericInMemoryCatalog extends AbstractCatalog {
         } else {
             databases.put(databaseName, db.copy());
         }
+    }
+
+    @Override
+    public Tuple2<CatalogTableStatistics, CatalogColumnStatistics> getPartitionTableStats(
+            ObjectPath tablePath, List<Map<String, String>> remainingPartitions) throws Exception {
+        return null;
     }
 
     @Override
