@@ -20,6 +20,7 @@ package org.apache.flink.table.tpcds.plan;
 
 import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
+import org.apache.flink.table.catalog.hive.HiveCatalogWrapper;
 
 import org.junit.Test;
 
@@ -35,10 +36,16 @@ public class TpcdsWithHiveCatalogOnMultiPartitionPlanTest extends TpcdsPlanTest 
 
     @Test
     public void getExecPlan() {
-        HiveCatalog catalog =
-                new HiveCatalog("hive", multiPartition_database, HIVE_CONF_DIR, HIVE_VERSION);
-        tEnv.registerCatalog("hive", catalog);
+        HiveCatalogWrapper catalogWrapper =
+                new HiveCatalogWrapper(
+                        "hive", multiPartition_database, HIVE_CONF_DIR, HIVE_VERSION);
+        tEnv.registerCatalog("hive", catalogWrapper);
         tEnv.useCatalog("hive");
+        //        HiveCatalog catalog =
+        //                new HiveCatalog("hive", multiPartition_database, HIVE_CONF_DIR,
+        // HIVE_VERSION);
+        //        tEnv.registerCatalog("hive", catalog);
+        //        tEnv.useCatalog("hive");
 
         String sql = getSqlFile(caseName);
         util.verifyExecPlan(sql);

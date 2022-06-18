@@ -162,7 +162,7 @@ public class HiveCatalog extends AbstractCatalog {
     private static final String FLINK_PYTHON_FUNCTION_PREFIX = "flink:python:";
 
     private final HiveConf hiveConf;
-    private final String hiveVersion;
+    protected final String hiveVersion;
     private final HiveShim hiveShim;
 
     @VisibleForTesting HiveMetastoreClientWrapper client;
@@ -1430,7 +1430,7 @@ public class HiveCatalog extends AbstractCatalog {
                 );
     }
 
-    private static boolean isTablePartitioned(Table hiveTable) {
+    protected static boolean isTablePartitioned(Table hiveTable) {
         return hiveTable.getPartitionKeysSize() != 0;
     }
 
@@ -1530,7 +1530,7 @@ public class HiveCatalog extends AbstractCatalog {
                 StatsSetupConst.RAW_DATA_SIZE, String.valueOf(newTableStats.getRawDataSize()));
     }
 
-    private static CatalogTableStatistics createCatalogTableStatistics(
+    protected static CatalogTableStatistics createCatalogTableStatistics(
             Map<String, String> parameters) {
         return new CatalogTableStatistics(
                 parsePositiveLongStat(parameters, StatsSetupConst.ROW_COUNT),
@@ -1778,7 +1778,7 @@ public class HiveCatalog extends AbstractCatalog {
         }
     }
 
-    private String getPartitionName(List<String> partitionKeys, Partition p) {
+    protected String getPartitionName(List<String> partitionKeys, Partition p) {
         List<String> paritionSpec = new ArrayList<>();
         List<String> values = p.getValues();
         for (int i = 0; i < partitionKeys.size(); i++) {
