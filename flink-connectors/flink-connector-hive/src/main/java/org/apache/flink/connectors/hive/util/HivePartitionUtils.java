@@ -35,6 +35,7 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -165,13 +166,10 @@ public class HivePartitionUtils {
             if (partitionColNames != null && partitionColNames.size() > 0) {
                 List<Partition> partitions = new ArrayList<>();
                 if (remainingPartitions != null) {
-                    for (Map<String, String> spec : remainingPartitions) {
-                        partitions.add(
-                                client.getPartition(
-                                        dbName,
-                                        tableName,
-                                        partitionSpecToValues(spec, partitionColNames)));
-                    }
+                    List<String> partitionNames =
+                            getPartitionNames(remainingPartitions, partitionColNames);
+                    partitions.addAll(
+                            client.getPartitionsByNames(dbName, tableName, partitionNames));
                 } else {
                     partitions.addAll(client.listPartitions(dbName, tableName, (short) -1));
                 }
@@ -187,6 +185,31 @@ public class HivePartitionUtils {
             throw new FlinkHiveException("Failed to collect all partitions from hive metaStore", e);
         }
         return allHivePartitions;
+    }
+
+    /**
+     * Get the partitions' name by partitions' spec. When the value for one partition column in the
+     * spec is null or empty string, it will match anything for the partition column.
+     *
+     * @param partitionsSpec a list contains the spec of the partitions, the map for the spec of
+     *     partition can be unordered.
+     * @param partitionColNames the partition column's name
+     * @return a list contains the partitions' name like "p1=v1/p2=v2"
+     */
+    public static List<String> getPartitionNames(
+            List<Map<String, String>> partitionsSpec, List<String> partitionColNames) {
+        List<String> partitionNames = new ArrayList<>(partitionsSpec.size());
+        for (Map<String, String> partitionSpec : partitionsSpec) {
+            List<String> pVals = new ArrayList<>();
+            for (String p : partitionColNames) {
+                pVals.add(partitionSpec.get(p));
+            }
+            // Construct a pattern of the form: partKey=partVal/partKey2=partVal2/...
+            // where partVal is either the escaped partition value given as input,
+            // or a regex of the form ".*" when partVal is null or empty string
+            partitionNames.add(FileUtils.makePartName(partitionColNames, pVals, ".*"));
+        }
+        return partitionNames;
     }
 
     public static List<String> partitionSpecToValues(
