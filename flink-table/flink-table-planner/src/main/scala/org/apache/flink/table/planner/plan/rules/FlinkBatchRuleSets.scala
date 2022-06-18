@@ -438,6 +438,10 @@ object FlinkBatchRuleSets {
     DynamicPartitionPruningRule1.FACT_IN_RIGHT,
     DynamicPartitionPruningRule2.FACT_IN_LEFT,
     DynamicPartitionPruningRule3.FACT_IN_RIGHT,
-    DynamicPartitionPruningRule4.FACT_IN_LEFT
+    DynamicPartitionPruningRule4.FACT_IN_LEFT,
+    DynamicPartitionPruningRule5.FACT_IN_RIGHT,
+    DynamicPartitionPruningRule6.FACT_IN_LEFT,
+    DynamicPartitionPruningRule7.FACT_IN_RIGHT,
+    DynamicPartitionPruningRule8.FACT_IN_LEFT
   )
 }

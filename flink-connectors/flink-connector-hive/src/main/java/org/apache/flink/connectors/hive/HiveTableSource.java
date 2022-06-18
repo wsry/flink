@@ -253,7 +253,6 @@ public class HiveTableSource
 
     @Override
     public void applyDynamicPartitionPruning(List<String> dynamicPartitionKeys) {
-        checkArgument(remainingPartitions == null);
         if (catalogTable.getPartitionKeys() != null
                 && catalogTable.getPartitionKeys().size() != 0) {
             checkArgument(!dynamicPartitionKeys.isEmpty());
