@@ -21,22 +21,25 @@ package org.apache.flink.runtime.io.network.partition;
 import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferRecycler;
+import org.apache.flink.runtime.io.network.buffer.NetworkBuffer;
+import org.apache.flink.util.MathUtils;
 
 import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.apache.flink.runtime.io.network.partition.BufferReaderWriterUtil.readFromByteChannel;
+import static org.apache.flink.runtime.io.network.partition.BufferReaderWriterUtil.parseBufferHeader;
+import static org.apache.flink.runtime.io.network.partition.BufferReaderWriterUtil.readByteBufferFully;
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** Reader which can read all data of the target subpartition from a {@link PartitionedFile}. */
 class PartitionedFileReader {
-
-    /** Used to read buffers from file channel. */
-    private final ByteBuffer headerBuf = BufferReaderWriterUtil.allocatedHeaderBuffer();
 
     /** Used to read index entry from index file. */
     private final ByteBuffer indexEntryBuf;
@@ -59,8 +62,10 @@ class PartitionedFileReader {
     /** Next file offset to be read. */
     private long nextOffsetToRead;
 
-    /** Number of remaining buffers in the current data region read. */
-    private int currentRegionRemainingBuffers;
+    /** Remaining data size in bytes in the current data region to read. */
+    private long currentRegionRemainingBytes;
+
+    private PartialBuffer partialBuffer;
 
     PartitionedFileReader(
             PartitionedFile partitionedFile,
@@ -81,12 +86,12 @@ class PartitionedFileReader {
     }
 
     private void moveToNextReadableRegion() throws IOException {
-        while (currentRegionRemainingBuffers <= 0
+        while (currentRegionRemainingBytes <= 0
                 && nextRegionToRead < partitionedFile.getNumRegions()) {
             partitionedFile.getIndexEntry(
                     indexFileChannel, indexEntryBuf, nextRegionToRead, targetSubpartition);
             nextOffsetToRead = indexEntryBuf.getLong();
-            currentRegionRemainingBuffers = indexEntryBuf.getInt();
+            currentRegionRemainingBytes = indexEntryBuf.getLong();
             ++nextRegionToRead;
         }
     }
@@ -102,25 +107,105 @@ class PartitionedFileReader {
      * @return A {@link Buffer} containing the data read.
      */
     @Nullable
-    Buffer readCurrentRegion(MemorySegment target, BufferRecycler recycler) throws IOException {
-        if (currentRegionRemainingBuffers == 0) {
+    List<Buffer> readCurrentRegion(MemorySegment target, BufferRecycler recycler)
+            throws IOException {
+        if (currentRegionRemainingBytes == 0) {
             return null;
         }
 
+        int segmentOffset = 0;
+        if (partialBuffer != null) {
+            target.put(
+                    0,
+                    partialBuffer.segment.wrap(partialBuffer.offset, partialBuffer.length),
+                    partialBuffer.length);
+            segmentOffset = partialBuffer.length;
+            partialBuffer.recycle();
+            partialBuffer = null;
+        }
+
         dataFileChannel.position(nextOffsetToRead);
-        Buffer buffer = readFromByteChannel(dataFileChannel, headerBuf, target, recycler);
-        nextOffsetToRead = dataFileChannel.position();
-        --currentRegionRemainingBuffers;
-        return buffer;
+        int bytesRead =
+                MathUtils.checkedDownCast(
+                        Math.min(currentRegionRemainingBytes, target.size() - segmentOffset));
+        readByteBufferFully(dataFileChannel, target.wrap(segmentOffset, bytesRead));
+        nextOffsetToRead += bytesRead;
+        currentRegionRemainingBytes -= bytesRead;
+
+        int position = 0;
+        int totalBytes = segmentOffset + bytesRead;
+        List<Buffer> buffers = new ArrayList<>(16);
+        AtomicInteger referenceCount = new AtomicInteger(0);
+        BufferRecycler recyclerWrapper =
+                segment -> {
+                    checkArgument(segment == target, "Invalid buffer recycle.");
+                    int count = referenceCount.decrementAndGet();
+                    if (count == 0) {
+                        recycler.recycle(segment);
+                    } else if (count < 0) {
+                        throw new IllegalStateException("Illegal reference count.");
+                    }
+                };
+        while (position < totalBytes) {
+            int remainingBytes = totalBytes - position;
+            if (remainingBytes < BufferReaderWriterUtil.HEADER_LENGTH) {
+                referenceCount.incrementAndGet();
+                partialBuffer =
+                        new PartialBuffer(position, remainingBytes, target, recyclerWrapper);
+                break;
+            }
+
+            ByteBuffer headerBuffer = target.wrap(position, BufferReaderWriterUtil.HEADER_LENGTH);
+            BufferReaderWriterUtil.BufferHeader header = parseBufferHeader(headerBuffer);
+            if (remainingBytes - BufferReaderWriterUtil.HEADER_LENGTH < header.getLength()) {
+                referenceCount.incrementAndGet();
+                partialBuffer =
+                        new PartialBuffer(position, remainingBytes, target, recyclerWrapper);
+                break;
+            } else {
+                int readerIndex = position + BufferReaderWriterUtil.HEADER_LENGTH;
+                position = readerIndex + header.getLength();
+                referenceCount.incrementAndGet();
+                NetworkBuffer buffer =
+                        new NetworkBuffer(
+                                target, recyclerWrapper, header.getDataType(), false, position);
+                Buffer slicedBuffer = buffer.readOnlySlice(readerIndex, header.getLength());
+                slicedBuffer.setCompressed(header.isCompressed());
+                buffers.add(slicedBuffer);
+            }
+        }
+        return buffers;
     }
 
     boolean hasRemaining() throws IOException {
         moveToNextReadableRegion();
-        return currentRegionRemainingBuffers > 0;
+        return currentRegionRemainingBytes > 0;
     }
 
     /** Gets read priority of this file reader. Smaller value indicates higher priority. */
     long getPriority() {
         return nextOffsetToRead;
+    }
+
+    private static class PartialBuffer {
+
+        private final int offset;
+
+        private final int length;
+
+        private final MemorySegment segment;
+
+        private final BufferRecycler recycler;
+
+        PartialBuffer(int offset, int length, MemorySegment segment, BufferRecycler recycler) {
+            this.offset = offset;
+            this.length = length;
+            this.segment = checkNotNull(segment);
+            this.recycler = checkNotNull(recycler);
+        }
+
+        void recycle() {
+            recycler.recycle(segment);
+        }
     }
 }

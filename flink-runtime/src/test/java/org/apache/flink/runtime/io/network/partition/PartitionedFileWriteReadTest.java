@@ -57,6 +57,7 @@ public class PartitionedFileWriteReadTest {
     public void testWriteAndReadPartitionedFile() throws Exception {
         int numSubpartitions = 10;
         int bufferSize = 1024;
+        int readBufferSize = 10000;
         int numBuffers = 1000;
         int numRegions = 10;
         Random random = new Random(1111);
@@ -112,9 +113,10 @@ public class PartitionedFileWriteReadTest {
                     new PartitionedFileReader(
                             partitionedFile, subpartition, dataFileChannel, indexFileChannel);
             while (fileReader.hasRemaining()) {
-                MemorySegment readBuffer = MemorySegmentFactory.allocateUnpooledSegment(bufferSize);
-                Buffer buffer = fileReader.readCurrentRegion(readBuffer, (buf) -> {});
-                buffersRead[subpartition].add(buffer);
+                MemorySegment readBuffer =
+                        MemorySegmentFactory.allocateUnpooledSegment(readBufferSize);
+                List<Buffer> buffers = fileReader.readCurrentRegion(readBuffer, (buf) -> {});
+                buffersRead[subpartition].addAll(buffers);
             }
         }
         IOUtils.closeAllQuietly(dataFileChannel, indexFileChannel);
@@ -133,6 +135,7 @@ public class PartitionedFileWriteReadTest {
         int numRegions = 10;
         int numSubpartitions = 5;
         int bufferSize = 1024;
+        int readBufferSize = 10000;
         Random random = new Random(1111);
 
         Queue<Buffer>[] subpartitionBuffers = new ArrayDeque[numSubpartitions];
@@ -160,9 +163,16 @@ public class PartitionedFileWriteReadTest {
                     new PartitionedFileReader(
                             partitionedFile, subpartition, dataFileChannel, indexFileChannel);
             while (fileReader.hasRemaining()) {
-                MemorySegment readBuffer = MemorySegmentFactory.allocateUnpooledSegment(bufferSize);
-                Buffer buffer = checkNotNull(fileReader.readCurrentRegion(readBuffer, (buf) -> {}));
-                assertBufferEquals(checkNotNull(subpartitionBuffers[subpartition].poll()), buffer);
+                MemorySegment readBuffer =
+                        MemorySegmentFactory.allocateUnpooledSegment(readBufferSize);
+                Queue<Buffer> buffers =
+                        new ArrayDeque<>(
+                                checkNotNull(
+                                        fileReader.readCurrentRegion(readBuffer, (buf) -> {})));
+                while (!buffers.isEmpty()) {
+                    assertBufferEquals(
+                            checkNotNull(subpartitionBuffers[subpartition].poll()), buffers.poll());
+                }
             }
             assertTrue(subpartitionBuffers[subpartition].isEmpty());
         }

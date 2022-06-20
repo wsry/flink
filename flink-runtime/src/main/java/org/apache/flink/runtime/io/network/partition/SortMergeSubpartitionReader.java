@@ -70,8 +70,6 @@ class SortMergeSubpartitionReader
     /** Sequence number of the next buffer to be sent to the consumer. */
     private int sequenceNumber;
 
-    private long totalBuffersSize;
-
     SortMergeSubpartitionReader(
             BufferAvailabilityListener listener, PartitionedFileReader fileReader) {
         this.availabilityListener = checkNotNull(listener);
@@ -90,7 +88,6 @@ class SortMergeSubpartitionReader
             if (buffer.isBuffer()) {
                 --dataBufferBacklog;
             }
-            totalBuffersSize -= buffer.getSize();
 
             Buffer lookAhead = buffersRead.peek();
             return BufferAndBacklog.fromBufferAndLookahead(
@@ -101,7 +98,7 @@ class SortMergeSubpartitionReader
         }
     }
 
-    private void addBuffer(Buffer buffer) {
+    private void addBuffer(List<Buffer> buffers) {
         boolean notifyAvailable = false;
         boolean needRecycleBuffer = false;
 
@@ -111,16 +108,17 @@ class SortMergeSubpartitionReader
             } else {
                 notifyAvailable = buffersRead.isEmpty();
 
-                buffersRead.add(buffer);
-                if (buffer.isBuffer()) {
-                    ++dataBufferBacklog;
+                buffersRead.addAll(buffers);
+                for (Buffer buffer : buffers) {
+                    if (buffer.isBuffer()) {
+                        ++dataBufferBacklog;
+                    }
                 }
-                totalBuffersSize += buffer.getSize();
             }
         }
 
         if (needRecycleBuffer) {
-            buffer.recycleBuffer();
+            buffers.forEach(Buffer::recycleBuffer);
             throw new IllegalStateException("Subpartition reader has been already released.");
         }
 
@@ -134,9 +132,9 @@ class SortMergeSubpartitionReader
         while (!buffers.isEmpty()) {
             MemorySegment segment = buffers.poll();
 
-            Buffer buffer;
+            List<Buffer> buffersRead;
             try {
-                if ((buffer = fileReader.readCurrentRegion(segment, recycler)) == null) {
+                if ((buffersRead = fileReader.readCurrentRegion(segment, recycler)) == null) {
                     buffers.add(segment);
                     break;
                 }
@@ -144,7 +142,10 @@ class SortMergeSubpartitionReader
                 buffers.add(segment);
                 throw throwable;
             }
-            addBuffer(buffer);
+
+            if (!buffersRead.isEmpty()) {
+                addBuffer(buffersRead);
+            }
         }
         return fileReader.hasRemaining();
     }

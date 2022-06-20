@@ -241,7 +241,7 @@ public class LocalInputChannel extends InputChannel implements BufferAvailabilit
             buffer = ((FileRegionBuffer) buffer).readInto(inputGate.getUnpooledSegment());
         }
 
-        numBytesIn.inc(buffer.getSize());
+        numBytesIn.inc(buffer.readableBytes());
         numBuffersIn.inc();
         channelStatePersister.checkForBarrier(buffer);
         channelStatePersister.maybePersist(buffer);

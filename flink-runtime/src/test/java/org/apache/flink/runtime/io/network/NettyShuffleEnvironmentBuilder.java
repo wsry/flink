@@ -213,6 +213,7 @@ public class NettyShuffleEnvironmentBuilder {
                         compressionCodec,
                         maxBuffersPerChannel,
                         batchShuffleReadMemoryBytes,
+                        bufferSize,
                         sortShuffleMinBuffers,
                         sortShuffleMinParallelism,
                         debloatConfiguration,
