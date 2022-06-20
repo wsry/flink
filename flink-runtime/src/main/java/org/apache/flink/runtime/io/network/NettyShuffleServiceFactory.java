@@ -177,7 +177,9 @@ public class NettyShuffleServiceFactory
                                 1,
                                 Math.min(
                                         batchShuffleReadBufferPool.getMaxConcurrentRequests(),
-                                        4 * Hardware.getNumberCPUCores())),
+                                        Math.min(
+                                                fileChannelManager.getPaths().length,
+                                                4 * Hardware.getNumberCPUCores()))),
                         new ExecutorThreadFactory("blocking-shuffle-io"));
 
         registerShuffleMetrics(metricGroup, networkBufferPool);
