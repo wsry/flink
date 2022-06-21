@@ -1,0 +1,105 @@
+  <TestCase name="getExecPlan[q92]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query92.tpl and seed 2031708268
+select  
+   sum(ws_ext_discount_amt)  as `Excess Discount Amount` 
+from 
+    web_sales 
+   ,item 
+   ,date_dim
+where
+i_manufact_id = 269
+and i_item_sk = ws_item_sk 
+and d_date between '1998-03-18' and 
+        (cast('1998-03-18' as date) + interval '90' day)
+and d_date_sk = ws_sold_date_sk 
+and ws_ext_discount_amt  
+     > ( 
+         SELECT 
+            1.3 * avg(ws_ext_discount_amt) 
+         FROM 
+            web_sales 
+           ,date_dim
+         WHERE 
+              ws_item_sk = i_item_sk 
+          and d_date between '1998-03-18' and
+                             (cast('1998-03-18' as date) + interval '90' day)
+          and d_date_sk = ws_sold_date_sk 
+      ) 
+order by sum(ws_ext_discount_amt)
+limit 100
+
+-- end query 1 in stream 0 using template query92.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], dir0=[ASC-nulls-first], fetch=[100])
++- LogicalAggregate(group=[{}], Excess Discount Amount=[SUM($0)])
+   +- LogicalProject(ws_ext_discount_amt=[$21])
+      +- LogicalFilter(condition=[AND(=($47, 269), =($34, $2), >=($58, CAST(_UTF-16LE'1998-03-18'):DATE NOT NULL), <=($58, +(CAST(_UTF-16LE'1998-03-18'):DATE NOT NULL, 7776000000:INTERVAL DAY)), =($56, $33), >($21, $SCALAR_QUERY({
+LogicalProject(EXPR$0=[*(1.3:DECIMAL(2, 1), $0)])
+  LogicalAggregate(group=[{}], agg#0=[AVG($0)])
+    LogicalProject(ws_ext_discount_amt=[$21])
+      LogicalFilter(condition=[AND(=($2, $cor0.i_item_sk), >=($36, CAST(_UTF-16LE'1998-03-18'):DATE NOT NULL), <=($36, +(CAST(_UTF-16LE'1998-03-18'):DATE NOT NULL, 7776000000:INTERVAL DAY)), =($34, $33))])
+        LogicalJoin(condition=[true], joinType=[inner])
+          LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+          LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+})))], variablesSet=[[$cor0]])
+         +- LogicalJoin(condition=[true], joinType=[inner])
+            :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+            :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+            +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[Excess Discount Amount ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[Excess Discount Amount ASC], offset=[0], fetch=[100], global=[false])
+      +- HashAggregate(isMerge=[true], select=[Final_SUM(sum$0) AS Excess Discount Amount])
+         +- Exchange(distribution=[single])
+            +- LocalHashAggregate(select=[Partial_SUM(ws_ext_discount_amt) AS sum$0])
+               +- Calc(select=[ws_ext_discount_amt])
+                  +- HashJoin(joinType=[InnerJoin], where=[(d_date_sk = ws_sold_date_sk)], select=[ws_ext_discount_amt, ws_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                     :- Calc(select=[ws_ext_discount_amt, ws_sold_date_sk])
+                     :  +- HashJoin(joinType=[InnerJoin], where=[((ws_ext_discount_amt > (1.3 * $f1)) AND (i_item_sk = ws_item_sk))], select=[ws_ext_discount_amt, ws_sold_date_sk, i_item_sk, ws_item_sk, $f1], isBroadcast=[true], build=[right])
+                     :     :- Calc(select=[ws_ext_discount_amt, ws_sold_date_sk, i_item_sk])
+                     :     :  +- HashJoin(joinType=[InnerJoin], where=[(i_item_sk = ws_item_sk)], select=[ws_item_sk, ws_ext_discount_amt, ws_sold_date_sk, i_item_sk], isBroadcast=[true], build=[right])
+                     :     :     :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales, project=[ws_item_sk, ws_ext_discount_amt, ws_sold_date_sk]]], fields=[ws_item_sk, ws_ext_discount_amt, ws_sold_date_sk])
+                     :     :     +- Exchange(distribution=[broadcast])
+                     :     :        +- Calc(select=[i_item_sk], where=[(i_manufact_id = 269)])
+                     :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_manufact_id]]], fields=[i_item_sk, i_manufact_id])
+                     :     +- Exchange(distribution=[broadcast])
+                     :        +- HashAggregate(isMerge=[true], groupBy=[ws_item_sk], select=[ws_item_sk, Final_AVG(sum$0, count$1) AS $f1])
+                     :           +- Exchange(distribution=[hash[ws_item_sk]])
+                     :              +- LocalHashAggregate(groupBy=[ws_item_sk], select=[ws_item_sk, Partial_AVG(ws_ext_discount_amt) AS (sum$0, count$1)])
+                     :                 +- Calc(select=[ws_item_sk, ws_ext_discount_amt])
+                     :                    +- HashJoin(joinType=[InnerJoin], where=[(d_date_sk = ws_sold_date_sk)], select=[ws_item_sk, ws_ext_discount_amt, ws_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                     :                       :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales, project=[ws_item_sk, ws_ext_discount_amt, ws_sold_date_sk], project=[ws_item_sk, ws_ext_discount_amt, ws_sold_date_sk]]], fields=[ws_item_sk, ws_ext_discount_amt, ws_sold_date_sk], dpp=[d_date_sk])
+                     :                       +- Exchange(distribution=[broadcast])(reuse_id=[1])
+                     :                          +- Calc(select=[d_date_sk], where=[SEARCH(d_date, Sarg[[1998-03-18..1998-06-16]])])
+                     :                             +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_date]]], fields=[d_date_sk, d_date])
+                     +- Reused(reference_id=[1])
+]]>
+    </Resource>
+  </TestCase>

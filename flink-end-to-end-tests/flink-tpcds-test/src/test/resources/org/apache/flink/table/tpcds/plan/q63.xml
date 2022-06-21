@@ -1,0 +1,100 @@
+  <TestCase name="getExecPlan[q63]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query63.tpl and seed 1819994127
+select  * 
+from (select i_manager_id
+             ,sum(ss_sales_price) sum_sales
+             ,avg(sum(ss_sales_price)) over (partition by i_manager_id) avg_monthly_sales
+      from item
+          ,store_sales
+          ,date_dim
+          ,store
+      where ss_item_sk = i_item_sk
+        and ss_sold_date_sk = d_date_sk
+        and ss_store_sk = s_store_sk
+        and d_month_seq in (1212,1212+1,1212+2,1212+3,1212+4,1212+5,1212+6,1212+7,1212+8,1212+9,1212+10,1212+11)
+        and ((    i_category in ('Books','Children','Electronics')
+              and i_class in ('personal','portable','refernece','self-help')
+              and i_brand in ('scholaramalgamalg #14','scholaramalgamalg #7',
+		                  'exportiunivamalg #9','scholaramalgamalg #9'))
+           or(    i_category in ('Women','Music','Men')
+              and i_class in ('accessories','classical','fragrances','pants')
+              and i_brand in ('amalgimporto #1','edu packscholar #1','exportiimporto #1',
+		                 'importoamalg #1')))
+group by i_manager_id, d_moy) tmp1
+where case when avg_monthly_sales > 0 then abs (sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
+order by i_manager_id
+        ,avg_monthly_sales
+        ,sum_sales
+limit 100
+
+-- end query 1 in stream 0 using template query63.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], sort1=[$2], sort2=[$1], dir0=[ASC-nulls-first], dir1=[ASC-nulls-first], dir2=[ASC-nulls-first], fetch=[100])
++- LogicalProject(i_manager_id=[$0], sum_sales=[$1], avg_monthly_sales=[$2])
+   +- LogicalFilter(condition=[>(CASE(>($2, 0), /(ABS(-($1, $2)), $2), null:DOUBLE), 0.1:DECIMAL(2, 1))])
+      +- LogicalProject(i_manager_id=[$0], sum_sales=[$2], avg_monthly_sales=[/(CASE(>(COUNT($2) OVER (PARTITION BY $0), 0), $SUM0($2) OVER (PARTITION BY $0), null:DOUBLE), COUNT($2) OVER (PARTITION BY $0))])
+         +- LogicalAggregate(group=[{0, 1}], sum_sales=[SUM($2)])
+            +- LogicalProject(i_manager_id=[$20], d_moy=[$53], ss_sales_price=[$34])
+               +- LogicalFilter(condition=[AND(=($23, $0), =($44, $45), =($28, $73), OR(=($48, 1212), =($48, +(1212, 1)), =($48, +(1212, 2)), =($48, +(1212, 3)), =($48, +(1212, 4)), =($48, +(1212, 5)), =($48, +(1212, 6)), =($48, +(1212, 7)), =($48, +(1212, 8)), =($48, +(1212, 9)), =($48, +(1212, 10)), =($48, +(1212, 11))), OR(AND(OR(=($12, _UTF-16LE'Books'), =($12, _UTF-16LE'Children'), =($12, _UTF-16LE'Electronics')), OR(=($10, _UTF-16LE'personal'), =($10, _UTF-16LE'portable'), =($10, _UTF-16LE'refernece'), =($10, _UTF-16LE'self-help')), OR(=($8, _UTF-16LE'scholaramalgamalg #14'), =($8, _UTF-16LE'scholaramalgamalg #7'), =($8, _UTF-16LE'exportiunivamalg #9'), =($8, _UTF-16LE'scholaramalgamalg #9'))), AND(OR(=($12, _UTF-16LE'Women'), =($12, _UTF-16LE'Music'), =($12, _UTF-16LE'Men')), OR(=($10, _UTF-16LE'accessories'), =($10, _UTF-16LE'classical'), =($10, _UTF-16LE'fragrances'), =($10, _UTF-16LE'pants')), OR(=($8, _UTF-16LE'amalgimporto #1'), =($8, _UTF-16LE'edu packscholar #1'), =($8, _UTF-16LE'exportiimporto #1'), =($8, _UTF-16LE'importoamalg #1')))))])
+                  +- LogicalJoin(condition=[true], joinType=[inner])
+                     :- LogicalJoin(condition=[true], joinType=[inner])
+                     :  :- LogicalJoin(condition=[true], joinType=[inner])
+                     :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+                     :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+                     :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+                     +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[i_manager_id ASC, avg_monthly_sales ASC, sum_sales ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[i_manager_id ASC, avg_monthly_sales ASC, sum_sales ASC], offset=[0], fetch=[100], global=[false])
+      +- Calc(select=[i_manager_id, sum_sales, (CASE((w0$o0 > 0), w0$o1, null:DOUBLE) / w0$o0) AS avg_monthly_sales], where=[CASE(((CASE((w0$o0 > 0), w0$o1, null:DOUBLE) / w0$o0) > 0), ((ABS((sum_sales - (CASE((w0$o0 > 0), w0$o1, null:DOUBLE) / w0$o0))) / (CASE((w0$o0 > 0), w0$o1, null:DOUBLE) / w0$o0)) > 0.1), false)])
+         +- OverAggregate(partitionBy=[i_manager_id], window#0=[COUNT(sum_sales) AS w0$o0, $SUM0(sum_sales) AS w0$o1 RANG BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING], select=[i_manager_id, sum_sales, w0$o0, w0$o1])
+            +- Sort(orderBy=[i_manager_id ASC])
+               +- Exchange(distribution=[hash[i_manager_id]])
+                  +- Calc(select=[i_manager_id, sum_sales])
+                     +- HashAggregate(isMerge=[true], groupBy=[i_manager_id, d_moy], select=[i_manager_id, d_moy, Final_SUM(sum$0) AS sum_sales])
+                        +- Exchange(distribution=[hash[i_manager_id, d_moy]])
+                           +- LocalHashAggregate(groupBy=[i_manager_id, d_moy], select=[i_manager_id, d_moy, Partial_SUM(ss_sales_price) AS sum$0])
+                              +- Calc(select=[i_manager_id, d_moy, ss_sales_price])
+                                 +- HashJoin(joinType=[InnerJoin], where=[(ss_store_sk = s_store_sk)], select=[ss_store_sk, ss_sales_price, i_manager_id, d_moy, s_store_sk], isBroadcast=[true], build=[right])
+                                    :- Calc(select=[ss_store_sk, ss_sales_price, i_manager_id, d_moy])
+                                    :  +- HashJoin(joinType=[InnerJoin], where=[(ss_sold_date_sk = d_date_sk)], select=[ss_store_sk, ss_sales_price, ss_sold_date_sk, i_manager_id, d_date_sk, d_moy], isBroadcast=[true], build=[right])
+                                    :     :- Calc(select=[ss_store_sk, ss_sales_price, ss_sold_date_sk, i_manager_id])
+                                    :     :  +- HashJoin(joinType=[InnerJoin], where=[(ss_item_sk = i_item_sk)], select=[ss_item_sk, ss_store_sk, ss_sales_price, ss_sold_date_sk, i_item_sk, i_manager_id], isBroadcast=[true], build=[right])
+                                    :     :     :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_item_sk, ss_store_sk, ss_sales_price, ss_sold_date_sk]]], fields=[ss_item_sk, ss_store_sk, ss_sales_price, ss_sold_date_sk])
+                                    :     :     +- Exchange(distribution=[broadcast])
+                                    :     :        +- Calc(select=[i_item_sk, i_manager_id], where=[((SEARCH(i_category, Sarg[_UTF-16LE'Books', _UTF-16LE'Children', _UTF-16LE'Electronics']) AND SEARCH(i_class, Sarg[_UTF-16LE'personal', _UTF-16LE'portable', _UTF-16LE'refernece', _UTF-16LE'self-help']) AND SEARCH(i_brand, Sarg[_UTF-16LE'exportiunivamalg #9', _UTF-16LE'scholaramalgamalg #14', _UTF-16LE'scholaramalgamalg #7', _UTF-16LE'scholaramalgamalg #9'])) OR (SEARCH(i_category, Sarg[_UTF-16LE'Men', _UTF-16LE'Music', _UTF-16LE'Women']) AND SEARCH(i_class, Sarg[_UTF-16LE'accessories', _UTF-16LE'classical', _UTF-16LE'fragrances', _UTF-16LE'pants']) AND SEARCH(i_brand, Sarg[_UTF-16LE'amalgimporto #1', _UTF-16LE'edu packscholar #1', _UTF-16LE'exportiimporto #1', _UTF-16LE'importoamalg #1'])))])
+                                    :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_brand, i_class, i_category, i_manager_id]]], fields=[i_item_sk, i_brand, i_class, i_category, i_manager_id])
+                                    :     +- Exchange(distribution=[broadcast])
+                                    :        +- Calc(select=[d_date_sk, d_moy], where=[SEARCH(d_month_seq, Sarg[1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223])])
+                                    :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_month_seq, d_moy]]], fields=[d_date_sk, d_month_seq, d_moy])
+                                    +- Exchange(distribution=[broadcast])
+                                       +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store, project=[s_store_sk]]], fields=[s_store_sk])
+]]>
+    </Resource>
+  </TestCase>

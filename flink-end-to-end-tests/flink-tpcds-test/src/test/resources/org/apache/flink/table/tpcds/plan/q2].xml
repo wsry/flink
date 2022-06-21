@@ -1,0 +1,150 @@
+  <TestCase name="getExecPlan[q2]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query2.tpl and seed 1819994127
+with wscs as
+ (select sold_date_sk
+        ,sales_price
+  from (select ws_sold_date_sk sold_date_sk
+              ,ws_ext_sales_price sales_price
+        from web_sales) x
+        union all
+       (select cs_sold_date_sk sold_date_sk
+              ,cs_ext_sales_price sales_price
+        from catalog_sales)),
+ wswscs as 
+ (select d_week_seq,
+        sum(case when (d_day_name='Sunday') then sales_price else null end) sun_sales,
+        sum(case when (d_day_name='Monday') then sales_price else null end) mon_sales,
+        sum(case when (d_day_name='Tuesday') then sales_price else  null end) tue_sales,
+        sum(case when (d_day_name='Wednesday') then sales_price else null end) wed_sales,
+        sum(case when (d_day_name='Thursday') then sales_price else null end) thu_sales,
+        sum(case when (d_day_name='Friday') then sales_price else null end) fri_sales,
+        sum(case when (d_day_name='Saturday') then sales_price else null end) sat_sales
+ from wscs
+     ,date_dim
+ where d_date_sk = sold_date_sk
+ group by d_week_seq)
+ select d_week_seq1
+       ,round(sun_sales1/sun_sales2,2)
+       ,round(mon_sales1/mon_sales2,2)
+       ,round(tue_sales1/tue_sales2,2)
+       ,round(wed_sales1/wed_sales2,2)
+       ,round(thu_sales1/thu_sales2,2)
+       ,round(fri_sales1/fri_sales2,2)
+       ,round(sat_sales1/sat_sales2,2)
+ from
+ (select wswscs.d_week_seq d_week_seq1
+        ,sun_sales sun_sales1
+        ,mon_sales mon_sales1
+        ,tue_sales tue_sales1
+        ,wed_sales wed_sales1
+        ,thu_sales thu_sales1
+        ,fri_sales fri_sales1
+        ,sat_sales sat_sales1
+  from wswscs,date_dim 
+  where date_dim.d_week_seq = wswscs.d_week_seq and
+        d_year = 2001) y,
+ (select wswscs.d_week_seq d_week_seq2
+        ,sun_sales sun_sales2
+        ,mon_sales mon_sales2
+        ,tue_sales tue_sales2
+        ,wed_sales wed_sales2
+        ,thu_sales thu_sales2
+        ,fri_sales fri_sales2
+        ,sat_sales sat_sales2
+  from wswscs
+      ,date_dim 
+  where date_dim.d_week_seq = wswscs.d_week_seq and
+        d_year = 2001+1) z
+ where d_week_seq1=d_week_seq2-53
+ order by d_week_seq1
+
+-- end query 1 in stream 0 using template query2.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], dir0=[ASC-nulls-first])
++- LogicalProject(d_week_seq1=[$0], EXPR$1=[ROUND(/($1, $9), 2)], EXPR$2=[ROUND(/($2, $10), 2)], EXPR$3=[ROUND(/($3, $11), 2)], EXPR$4=[ROUND(/($4, $12), 2)], EXPR$5=[ROUND(/($5, $13), 2)], EXPR$6=[ROUND(/($6, $14), 2)], EXPR$7=[ROUND(/($7, $15), 2)])
+   +- LogicalFilter(condition=[=($0, -($8, 53))])
+      +- LogicalJoin(condition=[true], joinType=[inner])
+         :- LogicalProject(d_week_seq1=[$0], sun_sales1=[$1], mon_sales1=[$2], tue_sales1=[$3], wed_sales1=[$4], thu_sales1=[$5], fri_sales1=[$6], sat_sales1=[$7])
+         :  +- LogicalFilter(condition=[AND(=($12, $0), =($14, 2001))])
+         :     +- LogicalJoin(condition=[true], joinType=[inner])
+         :        :- LogicalAggregate(group=[{0}], sun_sales=[SUM($1)], mon_sales=[SUM($2)], tue_sales=[SUM($3)], wed_sales=[SUM($4)], thu_sales=[SUM($5)], fri_sales=[SUM($6)], sat_sales=[SUM($7)])
+         :        :  +- LogicalProject(d_week_seq=[$6], $f1=[CASE(=($16, _UTF-16LE'Sunday'), $1, null:DOUBLE)], $f2=[CASE(=($16, _UTF-16LE'Monday'), $1, null:DOUBLE)], $f3=[CASE(=($16, _UTF-16LE'Tuesday'), $1, null:DOUBLE)], $f4=[CASE(=($16, _UTF-16LE'Wednesday'), $1, null:DOUBLE)], $f5=[CASE(=($16, _UTF-16LE'Thursday'), $1, null:DOUBLE)], $f6=[CASE(=($16, _UTF-16LE'Friday'), $1, null:DOUBLE)], $f7=[CASE(=($16, _UTF-16LE'Saturday'), $1, null:DOUBLE)])
+         :        :     +- LogicalFilter(condition=[=($2, $0)])
+         :        :        +- LogicalJoin(condition=[true], joinType=[inner])
+         :        :           :- LogicalUnion(all=[true])
+         :        :           :  :- LogicalProject(sold_date_sk=[$33], sales_price=[$22])
+         :        :           :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+         :        :           :  +- LogicalProject(sold_date_sk=[$33], sales_price=[$22])
+         :        :           :     +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+         :        :           +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :        +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         +- LogicalProject(d_week_seq2=[$0], sun_sales2=[$1], mon_sales2=[$2], tue_sales2=[$3], wed_sales2=[$4], thu_sales2=[$5], fri_sales2=[$6], sat_sales2=[$7])
+            +- LogicalFilter(condition=[AND(=($12, $0), =($14, +(2001, 1)))])
+               +- LogicalJoin(condition=[true], joinType=[inner])
+                  :- LogicalAggregate(group=[{0}], sun_sales=[SUM($1)], mon_sales=[SUM($2)], tue_sales=[SUM($3)], wed_sales=[SUM($4)], thu_sales=[SUM($5)], fri_sales=[SUM($6)], sat_sales=[SUM($7)])
+                  :  +- LogicalProject(d_week_seq=[$6], $f1=[CASE(=($16, _UTF-16LE'Sunday'), $1, null:DOUBLE)], $f2=[CASE(=($16, _UTF-16LE'Monday'), $1, null:DOUBLE)], $f3=[CASE(=($16, _UTF-16LE'Tuesday'), $1, null:DOUBLE)], $f4=[CASE(=($16, _UTF-16LE'Wednesday'), $1, null:DOUBLE)], $f5=[CASE(=($16, _UTF-16LE'Thursday'), $1, null:DOUBLE)], $f6=[CASE(=($16, _UTF-16LE'Friday'), $1, null:DOUBLE)], $f7=[CASE(=($16, _UTF-16LE'Saturday'), $1, null:DOUBLE)])
+                  :     +- LogicalFilter(condition=[=($2, $0)])
+                  :        +- LogicalJoin(condition=[true], joinType=[inner])
+                  :           :- LogicalUnion(all=[true])
+                  :           :  :- LogicalProject(sold_date_sk=[$33], sales_price=[$22])
+                  :           :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+                  :           :  +- LogicalProject(sold_date_sk=[$33], sales_price=[$22])
+                  :           :     +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+                  :           +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+                  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Sort(orderBy=[d_week_seq1 ASC])
++- Exchange(distribution=[single])
+   +- Calc(select=[d_week_seq1, ROUND((sun_sales1 / sun_sales2), 2) AS EXPR$1, ROUND((mon_sales1 / mon_sales2), 2) AS EXPR$2, ROUND((tue_sales1 / tue_sales2), 2) AS EXPR$3, ROUND((wed_sales1 / wed_sales2), 2) AS EXPR$4, ROUND((thu_sales1 / thu_sales2), 2) AS EXPR$5, ROUND((fri_sales1 / fri_sales2), 2) AS EXPR$6, ROUND((sat_sales1 / sat_sales2), 2) AS EXPR$7])
+      +- HashJoin(joinType=[InnerJoin], where=[(d_week_seq1 = $f8)], select=[sun_sales2, mon_sales2, tue_sales2, wed_sales2, thu_sales2, fri_sales2, sat_sales2, $f8, d_week_seq1, sun_sales1, mon_sales1, tue_sales1, wed_sales1, thu_sales1, fri_sales1, sat_sales1], isBroadcast=[true], build=[right])
+         :- Exchange(distribution=[any], shuffle_mode=[BATCH])
+         :  +- Calc(select=[sun_sales AS sun_sales2, mon_sales AS mon_sales2, tue_sales AS tue_sales2, wed_sales AS wed_sales2, thu_sales AS thu_sales2, fri_sales AS fri_sales2, sat_sales AS sat_sales2, (d_week_seq - 53) AS $f8])
+         :     +- HashJoin(joinType=[InnerJoin], where=[(d_week_seq = d_week_seq0)], select=[d_week_seq, d_week_seq0, sun_sales, mon_sales, tue_sales, wed_sales, thu_sales, fri_sales, sat_sales], isBroadcast=[true], build=[left])
+         :        :- Exchange(distribution=[broadcast])
+         :        :  +- Calc(select=[d_week_seq], where=[(d_year = 2002)])
+         :        :     +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_week_seq, d_year]]], fields=[d_week_seq, d_year])(reuse_id=[1])
+         :        +- HashAggregate(isMerge=[true], groupBy=[d_week_seq], select=[d_week_seq, Final_SUM(sum$0) AS sun_sales, Final_SUM(sum$1) AS mon_sales, Final_SUM(sum$2) AS tue_sales, Final_SUM(sum$3) AS wed_sales, Final_SUM(sum$4) AS thu_sales, Final_SUM(sum$5) AS fri_sales, Final_SUM(sum$6) AS sat_sales])(reuse_id=[2])
+         :           +- Exchange(distribution=[hash[d_week_seq]])
+         :              +- LocalHashAggregate(groupBy=[d_week_seq], select=[d_week_seq, Partial_SUM($f1) AS sum$0, Partial_SUM($f2) AS sum$1, Partial_SUM($f3) AS sum$2, Partial_SUM($f4) AS sum$3, Partial_SUM($f5) AS sum$4, Partial_SUM($f6) AS sum$5, Partial_SUM($f7) AS sum$6])
+         :                 +- Calc(select=[d_week_seq, CASE((d_day_name = 'Sunday'), ws_ext_sales_price, null:DOUBLE) AS $f1, CASE((d_day_name = 'Monday'), ws_ext_sales_price, null:DOUBLE) AS $f2, CASE((d_day_name = 'Tuesday'), ws_ext_sales_price, null:DOUBLE) AS $f3, CASE((d_day_name = 'Wednesday'), ws_ext_sales_price, null:DOUBLE) AS $f4, CASE((d_day_name = 'Thursday'), ws_ext_sales_price, null:DOUBLE) AS $f5, CASE((d_day_name = 'Friday'), ws_ext_sales_price, null:DOUBLE) AS $f6, CASE((d_day_name = 'Saturday'), ws_ext_sales_price, null:DOUBLE) AS $f7])
+         :                    +- HashJoin(joinType=[InnerJoin], where=[(d_date_sk = ws_sold_date_sk)], select=[ws_sold_date_sk, ws_ext_sales_price, d_date_sk, d_week_seq, d_day_name], isBroadcast=[true], build=[right])
+         :                       :- Union(all=[true], union=[ws_sold_date_sk, ws_ext_sales_price])
+         :                       :  :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales, project=[ws_sold_date_sk, ws_ext_sales_price]]], fields=[ws_sold_date_sk, ws_ext_sales_price])
+         :                       :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales, project=[cs_sold_date_sk, cs_ext_sales_price]]], fields=[cs_sold_date_sk, cs_ext_sales_price])
+         :                       +- Exchange(distribution=[broadcast])
+         :                          +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_week_seq, d_day_name]]], fields=[d_date_sk, d_week_seq, d_day_name])
+         +- Exchange(distribution=[broadcast])
+            +- Calc(select=[d_week_seq AS d_week_seq1, sun_sales AS sun_sales1, mon_sales AS mon_sales1, tue_sales AS tue_sales1, wed_sales AS wed_sales1, thu_sales AS thu_sales1, fri_sales AS fri_sales1, sat_sales AS sat_sales1])
+               +- HashJoin(joinType=[InnerJoin], where=[(d_week_seq = d_week_seq0)], select=[d_week_seq, d_week_seq0, sun_sales, mon_sales, tue_sales, wed_sales, thu_sales, fri_sales, sat_sales], isBroadcast=[true], build=[left])
+                  :- Exchange(distribution=[broadcast])
+                  :  +- Calc(select=[d_week_seq], where=[(d_year = 2001)])
+                  :     +- Reused(reference_id=[1])
+                  +- Reused(reference_id=[2])
+]]>
+    </Resource>
+  </TestCase>

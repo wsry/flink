@@ -1,0 +1,125 @@
+  <TestCase name="getExecPlan[q39b]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+with inv as
+(select w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy
+       ,stdev,mean, case mean when 0 then null else stdev/mean end cov
+ from(select w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy
+            ,stddev_samp(inv_quantity_on_hand) stdev,avg(inv_quantity_on_hand) mean
+      from inventory
+          ,item
+          ,warehouse
+          ,date_dim
+      where inv_item_sk = i_item_sk
+        and inv_warehouse_sk = w_warehouse_sk
+        and inv_date_sk = d_date_sk
+        and d_year =1999
+      group by w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy) foo
+ where case mean when 0 then 0 else stdev/mean end > 1)
+select inv1.w_warehouse_sk,inv1.i_item_sk,inv1.d_moy,inv1.mean, inv1.cov
+        ,inv2.w_warehouse_sk,inv2.i_item_sk,inv2.d_moy,inv2.mean, inv2.cov
+from inv inv1,inv inv2
+where inv1.i_item_sk = inv2.i_item_sk
+  and inv1.w_warehouse_sk =  inv2.w_warehouse_sk
+  and inv1.d_moy=4
+  and inv2.d_moy=4+1
+  and inv1.cov > 1.5
+order by inv1.w_warehouse_sk,inv1.i_item_sk,inv1.d_moy,inv1.mean,inv1.cov
+        ,inv2.d_moy,inv2.mean, inv2.cov
+
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], sort5=[$7], sort6=[$8], sort7=[$9], dir0=[ASC-nulls-first], dir1=[ASC-nulls-first], dir2=[ASC-nulls-first], dir3=[ASC-nulls-first], dir4=[ASC-nulls-first], dir5=[ASC-nulls-first], dir6=[ASC-nulls-first], dir7=[ASC-nulls-first])
++- LogicalProject(w_warehouse_sk=[$1], i_item_sk=[$2], d_moy=[$3], mean=[$5], cov=[$6], w_warehouse_sk0=[$8], i_item_sk0=[$9], d_moy0=[$10], mean0=[$12], cov0=[$13])
+   +- LogicalFilter(condition=[AND(=($2, $9), =($1, $8), =($3, 4), =($10, +(4, 1)), >($6, 1.5:DECIMAL(2, 1)))])
+      +- LogicalJoin(condition=[true], joinType=[inner])
+         :- LogicalProject(w_warehouse_name=[$0], w_warehouse_sk=[$1], i_item_sk=[$2], d_moy=[$3], stdev=[$4], mean=[$5], cov=[CASE(=($5, 0), null:INTEGER, /($4, $5))])
+         :  +- LogicalFilter(condition=[>(CASE(=($5, 0), 0, /($4, $5)), 1)])
+         :     +- LogicalAggregate(group=[{0, 1, 2, 3}], stdev=[STDDEV_SAMP($4)], mean=[AVG($4)])
+         :        +- LogicalProject(w_warehouse_name=[$28], w_warehouse_sk=[$26], i_item_sk=[$4], d_moy=[$48], inv_quantity_on_hand=[$3])
+         :           +- LogicalFilter(condition=[AND(=($1, $4), =($2, $26), =($0, $40), =($46, 1999))])
+         :              +- LogicalJoin(condition=[true], joinType=[inner])
+         :                 :- LogicalJoin(condition=[true], joinType=[inner])
+         :                 :  :- LogicalJoin(condition=[true], joinType=[inner])
+         :                 :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, inventory]])
+         :                 :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+         :                 :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, warehouse]])
+         :                 +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         +- LogicalProject(w_warehouse_name=[$0], w_warehouse_sk=[$1], i_item_sk=[$2], d_moy=[$3], stdev=[$4], mean=[$5], cov=[CASE(=($5, 0), null:INTEGER, /($4, $5))])
+            +- LogicalFilter(condition=[>(CASE(=($5, 0), 0, /($4, $5)), 1)])
+               +- LogicalAggregate(group=[{0, 1, 2, 3}], stdev=[STDDEV_SAMP($4)], mean=[AVG($4)])
+                  +- LogicalProject(w_warehouse_name=[$28], w_warehouse_sk=[$26], i_item_sk=[$4], d_moy=[$48], inv_quantity_on_hand=[$3])
+                     +- LogicalFilter(condition=[AND(=($1, $4), =($2, $26), =($0, $40), =($46, 1999))])
+                        +- LogicalJoin(condition=[true], joinType=[inner])
+                           :- LogicalJoin(condition=[true], joinType=[inner])
+                           :  :- LogicalJoin(condition=[true], joinType=[inner])
+                           :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, inventory]])
+                           :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+                           :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, warehouse]])
+                           +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Sort(orderBy=[w_warehouse_sk ASC, i_item_sk ASC, d_moy ASC, mean ASC, cov ASC, d_moy0 ASC, mean0 ASC, cov0 ASC])
++- Calc(select=[w_warehouse_sk0 AS w_warehouse_sk, i_item_sk0 AS i_item_sk, CAST(4 AS INTEGER) AS d_moy, mean0 AS mean, cov0 AS cov, w_warehouse_sk AS w_warehouse_sk0, i_item_sk AS i_item_sk0, CAST(5 AS INTEGER) AS d_moy0, mean AS mean0, cov AS cov0])
+   +- Exchange(distribution=[single])
+      +- HashJoin(joinType=[InnerJoin], where=[((i_item_sk0 = i_item_sk) AND (w_warehouse_sk0 = w_warehouse_sk))], select=[w_warehouse_sk, i_item_sk, mean, cov, w_warehouse_sk0, i_item_sk0, mean0, cov0], build=[right])
+         :- Exchange(distribution=[hash[i_item_sk, w_warehouse_sk]])
+         :  +- Calc(select=[w_warehouse_sk, i_item_sk, CAST(($f4 / $f5) AS INTEGER) AS mean, CASE((CAST(($f4 / $f5) AS INTEGER) = 0), null:INTEGER, (CAST(POWER((($f3 - (($f4 * $f4) / $f5)) / CASE(($f5 = 1), null:BIGINT, ($f5 - 1))), 0.5) AS INTEGER) / CAST(($f4 / $f5) AS INTEGER))) AS cov], where=[CASE((CAST(($f4 / $f5) AS INTEGER) = 0), false, ((CAST(POWER((($f3 - (($f4 * $f4) / $f5)) / CASE(($f5 = 1), null:BIGINT, ($f5 - 1))), 0.5) AS INTEGER) / CAST(($f4 / $f5) AS INTEGER)) > 1))])
+         :     +- HashAggregate(isMerge=[false], groupBy=[w_warehouse_sk, i_item_sk, d_moy], select=[w_warehouse_sk, i_item_sk, d_moy, SUM($f5) AS $f3, SUM(inv_quantity_on_hand) AS $f4, COUNT(inv_quantity_on_hand) AS $f5])
+         :        +- Exchange(distribution=[hash[w_warehouse_sk, i_item_sk, d_moy]])
+         :           +- Calc(select=[w_warehouse_sk, i_item_sk, CAST(5 AS INTEGER) AS d_moy, inv_quantity_on_hand, (inv_quantity_on_hand * inv_quantity_on_hand) AS $f5])
+         :              +- HashJoin(joinType=[InnerJoin], where=[(inv_item_sk = i_item_sk)], select=[inv_item_sk, inv_quantity_on_hand, w_warehouse_sk, i_item_sk], isBroadcast=[true], build=[right])
+         :                 :- Calc(select=[inv_item_sk, inv_quantity_on_hand, w_warehouse_sk])
+         :                 :  +- HashJoin(joinType=[InnerJoin], where=[(inv_warehouse_sk = w_warehouse_sk)], select=[inv_item_sk, inv_warehouse_sk, inv_quantity_on_hand, w_warehouse_sk], isBroadcast=[true], build=[right])
+         :                 :     :- Calc(select=[inv_item_sk, inv_warehouse_sk, inv_quantity_on_hand])
+         :                 :     :  +- HashJoin(joinType=[InnerJoin], where=[(inv_date_sk = d_date_sk)], select=[inv_date_sk, inv_item_sk, inv_warehouse_sk, inv_quantity_on_hand, d_date_sk], isBroadcast=[true], build=[right])
+         :                 :     :     :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, inventory]], fields=[inv_date_sk, inv_item_sk, inv_warehouse_sk, inv_quantity_on_hand])(reuse_id=[1])
+         :                 :     :     +- Exchange(distribution=[broadcast])
+         :                 :     :        +- Calc(select=[d_date_sk], where=[((d_year = 1999) AND (d_moy = 5))])
+         :                 :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_year, d_moy]]], fields=[d_date_sk, d_year, d_moy])(reuse_id=[2])
+         :                 :     +- Exchange(distribution=[broadcast])
+         :                 :        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, warehouse, project=[w_warehouse_sk]]], fields=[w_warehouse_sk])(reuse_id=[3])
+         :                 +- Exchange(distribution=[broadcast])
+         :                    +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk]]], fields=[i_item_sk])(reuse_id=[4])
+         +- Exchange(distribution=[hash[i_item_sk, w_warehouse_sk]])
+            +- Calc(select=[w_warehouse_sk, i_item_sk, CAST(($f4 / $f5) AS INTEGER) AS mean, CASE((CAST(($f4 / $f5) AS INTEGER) = 0), null:INTEGER, (CAST(POWER((($f3 - (($f4 * $f4) / $f5)) / CASE(($f5 = 1), null:BIGINT, ($f5 - 1))), 0.5) AS INTEGER) / CAST(($f4 / $f5) AS INTEGER))) AS cov], where=[(CASE((CAST(($f4 / $f5) AS INTEGER) = 0), false, ((CAST(POWER((($f3 - (($f4 * $f4) / $f5)) / CASE(($f5 = 1), null:BIGINT, ($f5 - 1))), 0.5) AS INTEGER) / CAST(($f4 / $f5) AS INTEGER)) > 1)) AND CASE((CAST(($f4 / $f5) AS INTEGER) = 0), false, ((CAST(POWER((($f3 - (($f4 * $f4) / $f5)) / CASE(($f5 = 1), null:BIGINT, ($f5 - 1))), 0.5) AS INTEGER) / CAST(($f4 / $f5) AS INTEGER)) > 1.5)))])
+               +- HashAggregate(isMerge=[false], groupBy=[w_warehouse_sk, i_item_sk, d_moy], select=[w_warehouse_sk, i_item_sk, d_moy, SUM($f5) AS $f3, SUM(inv_quantity_on_hand) AS $f4, COUNT(inv_quantity_on_hand) AS $f5])
+                  +- Exchange(distribution=[hash[w_warehouse_sk, i_item_sk, d_moy]])
+                     +- Calc(select=[w_warehouse_sk, i_item_sk, CAST(4 AS INTEGER) AS d_moy, inv_quantity_on_hand, (inv_quantity_on_hand * inv_quantity_on_hand) AS $f5])
+                        +- HashJoin(joinType=[InnerJoin], where=[(inv_item_sk = i_item_sk)], select=[inv_item_sk, inv_quantity_on_hand, w_warehouse_sk, i_item_sk], isBroadcast=[true], build=[right])
+                           :- Calc(select=[inv_item_sk, inv_quantity_on_hand, w_warehouse_sk])
+                           :  +- HashJoin(joinType=[InnerJoin], where=[(inv_warehouse_sk = w_warehouse_sk)], select=[inv_item_sk, inv_warehouse_sk, inv_quantity_on_hand, w_warehouse_sk], isBroadcast=[true], build=[right])
+                           :     :- Calc(select=[inv_item_sk, inv_warehouse_sk, inv_quantity_on_hand])
+                           :     :  +- HashJoin(joinType=[InnerJoin], where=[(inv_date_sk = d_date_sk)], select=[inv_date_sk, inv_item_sk, inv_warehouse_sk, inv_quantity_on_hand, d_date_sk], isBroadcast=[true], build=[right])
+                           :     :     :- Reused(reference_id=[1])
+                           :     :     +- Exchange(distribution=[broadcast])
+                           :     :        +- Calc(select=[d_date_sk], where=[((d_year = 1999) AND (d_moy = 4))])
+                           :     :           +- Reused(reference_id=[2])
+                           :     +- Exchange(distribution=[broadcast])
+                           :        +- Reused(reference_id=[3])
+                           +- Exchange(distribution=[broadcast])
+                              +- Reused(reference_id=[4])
+]]>
+    </Resource>
+  </TestCase>

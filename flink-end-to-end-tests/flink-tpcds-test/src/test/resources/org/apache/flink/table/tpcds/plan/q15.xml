@@ -1,0 +1,84 @@
+  <TestCase name="getExecPlan[q15]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query15.tpl and seed 1819994127
+select  ca_zip
+       ,sum(cs_sales_price)
+ from catalog_sales
+     ,customer
+     ,customer_address
+     ,date_dim
+ where cs_bill_customer_sk = c_customer_sk
+ 	and c_current_addr_sk = ca_address_sk 
+ 	and ( substr(ca_zip,1,5) in ('85669', '86197','88274','83405','86475',
+                                   '85392', '85460', '80348', '81792')
+ 	      or ca_state in ('CA','WA','GA')
+ 	      or cs_sales_price > 500)
+ 	and cs_sold_date_sk = d_date_sk
+ 	and d_qoy = 2 and d_year = 2000
+ group by ca_zip
+ order by ca_zip
+ limit 100
+
+-- end query 1 in stream 0 using template query15.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], dir0=[ASC-nulls-first], fetch=[100])
++- LogicalAggregate(group=[{0}], EXPR$1=[SUM($1)])
+   +- LogicalProject(ca_zip=[$61], cs_sales_price=[$20])
+      +- LogicalFilter(condition=[AND(=($2, $34), =($38, $52), OR(=(SUBSTR($61, 1, 5), _UTF-16LE'85669'), =(SUBSTR($61, 1, 5), _UTF-16LE'86197'), =(SUBSTR($61, 1, 5), _UTF-16LE'88274'), =(SUBSTR($61, 1, 5), _UTF-16LE'83405'), =(SUBSTR($61, 1, 5), _UTF-16LE'86475'), =(SUBSTR($61, 1, 5), _UTF-16LE'85392'), =(SUBSTR($61, 1, 5), _UTF-16LE'85460'), =(SUBSTR($61, 1, 5), _UTF-16LE'80348'), =(SUBSTR($61, 1, 5), _UTF-16LE'81792'), =($60, _UTF-16LE'CA'), =($60, _UTF-16LE'WA'), =($60, _UTF-16LE'GA'), >($20, 500)), =($33, $65), =($75, 2), =($71, 2000))])
+         +- LogicalJoin(condition=[true], joinType=[inner])
+            :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+            :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+            :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+            +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[ca_zip ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[ca_zip ASC], offset=[0], fetch=[100], global=[false])
+      +- HashAggregate(isMerge=[true], groupBy=[ca_zip], select=[ca_zip, Final_SUM(sum$0) AS EXPR$1])
+         +- Exchange(distribution=[hash[ca_zip]])
+            +- LocalHashAggregate(groupBy=[ca_zip], select=[ca_zip, Partial_SUM(cs_sales_price) AS sum$0])
+               +- Calc(select=[ca_zip, cs_sales_price])
+                  +- HashJoin(joinType=[InnerJoin], where=[((c_current_addr_sk = ca_address_sk) AND (SEARCH(ca_state, Sarg[_UTF-16LE'CA', _UTF-16LE'GA', _UTF-16LE'WA']) OR SEARCH(cs_sales_price, Sarg[(500..+∞)]) OR SEARCH(SUBSTR(ca_zip, 1, 5), Sarg[_UTF-16LE'80348', _UTF-16LE'81792', _UTF-16LE'83405', _UTF-16LE'85392', _UTF-16LE'85460', _UTF-16LE'85669', _UTF-16LE'86197', _UTF-16LE'86475', _UTF-16LE'88274'])))], select=[cs_sales_price, c_current_addr_sk, ca_address_sk, ca_state, ca_zip], build=[right])
+                     :- Exchange(distribution=[hash[c_current_addr_sk]])
+                     :  +- Calc(select=[cs_sales_price, c_current_addr_sk])
+                     :     +- HashJoin(joinType=[InnerJoin], where=[(cs_bill_customer_sk = c_customer_sk)], select=[cs_bill_customer_sk, cs_sales_price, c_customer_sk, c_current_addr_sk], build=[right])
+                     :        :- Exchange(distribution=[hash[cs_bill_customer_sk]])
+                     :        :  +- Calc(select=[cs_bill_customer_sk, cs_sales_price])
+                     :        :     +- HashJoin(joinType=[InnerJoin], where=[(cs_sold_date_sk = d_date_sk)], select=[cs_bill_customer_sk, cs_sales_price, cs_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                     :        :        :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales, project=[cs_bill_customer_sk, cs_sales_price, cs_sold_date_sk], project=[cs_bill_customer_sk, cs_sales_price, cs_sold_date_sk]]], fields=[cs_bill_customer_sk, cs_sales_price, cs_sold_date_sk], dpp=[d_date_sk])
+                     :        :        +- Exchange(distribution=[broadcast])
+                     :        :           +- Calc(select=[d_date_sk], where=[((d_qoy = 2) AND (d_year = 2000))])
+                     :        :              +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_year, d_qoy]]], fields=[d_date_sk, d_year, d_qoy])
+                     :        +- Exchange(distribution=[hash[c_customer_sk]])
+                     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer, project=[c_customer_sk, c_current_addr_sk]]], fields=[c_customer_sk, c_current_addr_sk])
+                     +- Exchange(distribution=[hash[ca_address_sk]])
+                        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address, project=[ca_address_sk, ca_state, ca_zip]]], fields=[ca_address_sk, ca_state, ca_zip])
+]]>
+    </Resource>
+  </TestCase>

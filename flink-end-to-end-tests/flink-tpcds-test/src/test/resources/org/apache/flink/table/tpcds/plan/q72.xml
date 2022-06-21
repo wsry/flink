@@ -1,0 +1,136 @@
+  <TestCase name="getExecPlan[q72]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query72.tpl and seed 2031708268
+select  i_item_desc
+      ,w_warehouse_name
+      ,d1.d_week_seq
+      ,count(case when p_promo_sk is null then 1 else 0 end) no_promo
+      ,count(case when p_promo_sk is not null then 1 else 0 end) promo
+      ,count(*) total_cnt
+from catalog_sales
+join inventory on (cs_item_sk = inv_item_sk)
+join warehouse on (w_warehouse_sk=inv_warehouse_sk)
+join item on (i_item_sk = cs_item_sk)
+join customer_demographics on (cs_bill_cdemo_sk = cd_demo_sk)
+join household_demographics on (cs_bill_hdemo_sk = hd_demo_sk)
+join date_dim d1 on (cs_sold_date_sk = d1.d_date_sk)
+join date_dim d2 on (inv_date_sk = d2.d_date_sk)
+join date_dim d3 on (cs_ship_date_sk = d3.d_date_sk)
+left outer join promotion on (cs_promo_sk=p_promo_sk)
+left outer join catalog_returns on (cr_item_sk = cs_item_sk and cr_order_number = cs_order_number)
+where d1.d_week_seq = d2.d_week_seq
+  and inv_quantity_on_hand < cs_quantity 
+  and d3.d_date > d1.d_date + interval '5' day
+  and hd_buy_potential = '1001-5000'
+  and d1.d_year = 2001
+  and hd_buy_potential = '1001-5000'
+  and cd_marital_status = 'M'
+  and d1.d_year = 2001
+group by i_item_desc,w_warehouse_name,d1.d_week_seq
+order by total_cnt desc, i_item_desc, w_warehouse_name, d_week_seq
+limit 100
+
+-- end query 1 in stream 0 using template query72.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$5], sort1=[$0], sort2=[$1], sort3=[$2], dir0=[DESC-nulls-last], dir1=[ASC-nulls-first], dir2=[ASC-nulls-first], dir3=[ASC-nulls-first], fetch=[100])
++- LogicalProject(i_item_desc=[$0], w_warehouse_name=[$1], d_week_seq=[$2], no_promo=[$3], promo=[$3], total_cnt=[$3])
+   +- LogicalAggregate(group=[{0, 1, 2}], no_promo=[COUNT()])
+      +- LogicalProject(i_item_desc=[$56], w_warehouse_name=[$40], d_week_seq=[$92])
+         +- LogicalFilter(condition=[AND(=($92, $120), <($37, $17), >($146, +($90, 432000000:INTERVAL DAY)), =($85, _UTF-16LE'1001-5000'), =($94, 2001), =($85, _UTF-16LE'1001-5000'), =($76, _UTF-16LE'M'), =($94, 2001))])
+            +- LogicalJoin(condition=[AND(=($192, $14), =($206, $16))], joinType=[left])
+               :- LogicalJoin(condition=[=($15, $172)], joinType=[left])
+               :  :- LogicalJoin(condition=[=($1, $144)], joinType=[inner])
+               :  :  :- LogicalJoin(condition=[=($34, $116)], joinType=[inner])
+               :  :  :  :- LogicalJoin(condition=[=($33, $88)], joinType=[inner])
+               :  :  :  :  :- LogicalJoin(condition=[=($4, $83)], joinType=[inner])
+               :  :  :  :  :  :- LogicalJoin(condition=[=($3, $74)], joinType=[inner])
+               :  :  :  :  :  :  :- LogicalJoin(condition=[=($52, $14)], joinType=[inner])
+               :  :  :  :  :  :  :  :- LogicalJoin(condition=[=($38, $36)], joinType=[inner])
+               :  :  :  :  :  :  :  :  :- LogicalJoin(condition=[=($14, $35)], joinType=[inner])
+               :  :  :  :  :  :  :  :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+               :  :  :  :  :  :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, inventory]])
+               :  :  :  :  :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, warehouse]])
+               :  :  :  :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+               :  :  :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics]])
+               :  :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics]])
+               :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+               :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+               :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+               :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, promotion]])
+               +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_returns]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[total_cnt DESC, i_item_desc ASC, w_warehouse_name ASC, d_week_seq ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[total_cnt DESC, i_item_desc ASC, w_warehouse_name ASC, d_week_seq ASC], offset=[0], fetch=[100], global=[false])
+      +- Calc(select=[i_item_desc, w_warehouse_name, d_week_seq, no_promo, no_promo AS promo, no_promo AS total_cnt])
+         +- HashAggregate(isMerge=[false], groupBy=[i_item_desc, w_warehouse_name, d_week_seq], select=[i_item_desc, w_warehouse_name, d_week_seq, COUNT(*) AS no_promo])
+            +- Exchange(distribution=[hash[i_item_desc, w_warehouse_name, d_week_seq]])
+               +- Calc(select=[i_item_desc, w_warehouse_name, d_week_seq])
+                  +- HashJoin(joinType=[InnerJoin], where=[(w_warehouse_sk = inv_warehouse_sk)], select=[inv_warehouse_sk, d_week_seq, i_item_desc, w_warehouse_sk, w_warehouse_name], isBroadcast=[true], build=[right])
+                     :- Calc(select=[inv_warehouse_sk, d_week_seq, i_item_desc])
+                     :  +- HashJoin(joinType=[InnerJoin], where=[((inv_date_sk = d_date_sk1) AND (cs_item_sk = inv_item_sk) AND (inv_quantity_on_hand < cs_quantity))], select=[inv_date_sk, inv_item_sk, inv_warehouse_sk, inv_quantity_on_hand, cs_item_sk, cs_quantity, d_week_seq, i_item_desc, d_date_sk1], build=[right])
+                     :     :- Exchange(distribution=[hash[inv_date_sk, inv_item_sk]])
+                     :     :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, inventory]], fields=[inv_date_sk, inv_item_sk, inv_warehouse_sk, inv_quantity_on_hand])
+                     :     +- Exchange(distribution=[hash[d_date_sk1, cs_item_sk]])
+                     :        +- Calc(select=[cs_item_sk, cs_quantity, d_week_seq, i_item_desc, d_date_sk AS d_date_sk1])
+                     :           +- HashJoin(joinType=[InnerJoin], where=[(d_week_seq = d_week_seq0)], select=[cs_item_sk, cs_quantity, d_week_seq, i_item_desc, d_date_sk, d_week_seq0], isBroadcast=[true], build=[right])
+                     :              :- Calc(select=[cs_item_sk, cs_quantity, d_week_seq, i_item_desc])
+                     :              :  +- HashJoin(joinType=[InnerJoin], where=[(i_item_sk = cs_item_sk)], select=[cs_item_sk, cs_quantity, d_week_seq, i_item_sk, i_item_desc], build=[right])
+                     :              :     :- Exchange(distribution=[hash[cs_item_sk]])
+                     :              :     :  +- Calc(select=[cs_item_sk, cs_quantity, d_week_seq])
+                     :              :     :     +- HashJoin(joinType=[LeftOuterJoin], where=[(cs_promo_sk = p_promo_sk)], select=[cs_item_sk, cs_promo_sk, cs_quantity, d_week_seq, p_promo_sk], isBroadcast=[true], build=[right])
+                     :              :     :        :- Calc(select=[cs_item_sk, cs_promo_sk, cs_quantity, d_week_seq])
+                     :              :     :        :  +- HashJoin(joinType=[InnerJoin], where=[((cs_ship_date_sk = d_date_sk) AND (d_date0 > (d_date + 432000000:INTERVAL DAY)))], select=[cs_ship_date_sk, cs_item_sk, cs_promo_sk, cs_quantity, d_date, d_week_seq, d_date_sk, d_date0], isBroadcast=[true], build=[right])
+                     :              :     :        :     :- Calc(select=[cs_ship_date_sk, cs_item_sk, cs_promo_sk, cs_quantity, d_date, d_week_seq])
+                     :              :     :        :     :  +- HashJoin(joinType=[InnerJoin], where=[(cs_bill_hdemo_sk = hd_demo_sk)], select=[cs_ship_date_sk, cs_bill_hdemo_sk, cs_item_sk, cs_promo_sk, cs_quantity, d_date, d_week_seq, hd_demo_sk], isBroadcast=[true], build=[right])
+                     :              :     :        :     :     :- Calc(select=[cs_ship_date_sk, cs_bill_hdemo_sk, cs_item_sk, cs_promo_sk, cs_quantity, d_date, d_week_seq])
+                     :              :     :        :     :     :  +- HashJoin(joinType=[InnerJoin], where=[(cs_bill_cdemo_sk = cd_demo_sk)], select=[cs_ship_date_sk, cs_bill_cdemo_sk, cs_bill_hdemo_sk, cs_item_sk, cs_promo_sk, cs_quantity, d_date, d_week_seq, cd_demo_sk], isBroadcast=[true], build=[right])
+                     :              :     :        :     :     :     :- Calc(select=[cs_ship_date_sk, cs_bill_cdemo_sk, cs_bill_hdemo_sk, cs_item_sk, cs_promo_sk, cs_quantity, d_date, d_week_seq])
+                     :              :     :        :     :     :     :  +- HashJoin(joinType=[InnerJoin], where=[(cs_sold_date_sk = d_date_sk)], select=[cs_ship_date_sk, cs_bill_cdemo_sk, cs_bill_hdemo_sk, cs_item_sk, cs_promo_sk, cs_quantity, cs_sold_date_sk, d_date_sk, d_date, d_week_seq], isBroadcast=[true], build=[right])
+                     :              :     :        :     :     :     :     :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales, project=[cs_ship_date_sk, cs_bill_cdemo_sk, cs_bill_hdemo_sk, cs_item_sk, cs_promo_sk, cs_quantity, cs_sold_date_sk], project=[cs_ship_date_sk, cs_bill_cdemo_sk, cs_bill_hdemo_sk, cs_item_sk, cs_promo_sk, cs_quantity, cs_sold_date_sk]]], fields=[cs_ship_date_sk, cs_bill_cdemo_sk, cs_bill_hdemo_sk, cs_item_sk, cs_promo_sk, cs_quantity, cs_sold_date_sk], dpp=[d_date_sk])
+                     :              :     :        :     :     :     :     +- Exchange(distribution=[broadcast])
+                     :              :     :        :     :     :     :        +- Calc(select=[d_date_sk, d_date, d_week_seq], where=[(d_year = 2001)])
+                     :              :     :        :     :     :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_date, d_week_seq, d_year]]], fields=[d_date_sk, d_date, d_week_seq, d_year])
+                     :              :     :        :     :     :     +- Exchange(distribution=[broadcast])
+                     :              :     :        :     :     :        +- Calc(select=[cd_demo_sk], where=[(cd_marital_status = 'M')])
+                     :              :     :        :     :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics, project=[cd_demo_sk, cd_marital_status]]], fields=[cd_demo_sk, cd_marital_status])
+                     :              :     :        :     :     +- Exchange(distribution=[broadcast])
+                     :              :     :        :     :        +- Calc(select=[hd_demo_sk], where=[(hd_buy_potential = '1001-5000')])
+                     :              :     :        :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics, project=[hd_demo_sk, hd_buy_potential]]], fields=[hd_demo_sk, hd_buy_potential])
+                     :              :     :        :     +- Exchange(distribution=[broadcast])
+                     :              :     :        :        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_date]]], fields=[d_date_sk, d_date])
+                     :              :     :        +- Exchange(distribution=[broadcast])
+                     :              :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, promotion, project=[p_promo_sk]]], fields=[p_promo_sk])
+                     :              :     +- Exchange(distribution=[hash[i_item_sk]])
+                     :              :        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_item_desc]]], fields=[i_item_sk, i_item_desc])
+                     :              +- Exchange(distribution=[broadcast])
+                     :                 +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_week_seq]]], fields=[d_date_sk, d_week_seq])
+                     +- Exchange(distribution=[broadcast])
+                        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, warehouse, project=[w_warehouse_sk, w_warehouse_name]]], fields=[w_warehouse_sk, w_warehouse_name])
+]]>
+    </Resource>
+  </TestCase>

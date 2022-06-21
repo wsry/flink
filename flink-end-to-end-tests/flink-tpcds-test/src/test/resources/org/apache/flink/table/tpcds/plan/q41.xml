@@ -1,0 +1,105 @@
+  <TestCase name="getExecPlan[q41]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query41.tpl and seed 1581015815
+select  distinct(i_product_name)
+ from item i1
+ where i_manufact_id between 742 and 742+40 
+   and (select count(*) as item_cnt
+        from item
+        where (i_manufact = i1.i_manufact and
+        ((i_category = 'Women' and 
+        (i_color = 'orchid' or i_color = 'papaya') and 
+        (i_units = 'Pound' or i_units = 'Lb') and
+        (i_size = 'petite' or i_size = 'medium')
+        ) or
+        (i_category = 'Women' and
+        (i_color = 'burlywood' or i_color = 'navy') and
+        (i_units = 'Bundle' or i_units = 'Each') and
+        (i_size = 'N/A' or i_size = 'extra large')
+        ) or
+        (i_category = 'Men' and
+        (i_color = 'bisque' or i_color = 'azure') and
+        (i_units = 'N/A' or i_units = 'Tsp') and
+        (i_size = 'small' or i_size = 'large')
+        ) or
+        (i_category = 'Men' and
+        (i_color = 'chocolate' or i_color = 'cornflower') and
+        (i_units = 'Bunch' or i_units = 'Gross') and
+        (i_size = 'petite' or i_size = 'medium')
+        ))) or
+       (i_manufact = i1.i_manufact and
+        ((i_category = 'Women' and 
+        (i_color = 'salmon' or i_color = 'midnight') and 
+        (i_units = 'Oz' or i_units = 'Box') and
+        (i_size = 'petite' or i_size = 'medium')
+        ) or
+        (i_category = 'Women' and
+        (i_color = 'snow' or i_color = 'steel') and
+        (i_units = 'Carton' or i_units = 'Tbl') and
+        (i_size = 'N/A' or i_size = 'extra large')
+        ) or
+        (i_category = 'Men' and
+        (i_color = 'purple' or i_color = 'gainsboro') and
+        (i_units = 'Dram' or i_units = 'Unknown') and
+        (i_size = 'small' or i_size = 'large')
+        ) or
+        (i_category = 'Men' and
+        (i_color = 'metallic' or i_color = 'forest') and
+        (i_units = 'Gram' or i_units = 'Ounce') and
+        (i_size = 'petite' or i_size = 'medium')
+        )))) > 0
+ order by i_product_name
+ limit 100
+
+-- end query 1 in stream 0 using template query41.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], dir0=[ASC-nulls-first], fetch=[100])
++- LogicalAggregate(group=[{0}])
+   +- LogicalProject(i_product_name=[$21])
+      +- LogicalFilter(condition=[AND(>=($13, 742), <=($13, +(742, 40)), >($SCALAR_QUERY({
+LogicalAggregate(group=[{}], item_cnt=[COUNT()])
+  LogicalProject($f0=[0])
+    LogicalFilter(condition=[OR(AND(=($14, $cor0.i_manufact), OR(AND(=($12, _UTF-16LE'Women'), OR(=($17, _UTF-16LE'orchid'), =($17, _UTF-16LE'papaya')), OR(=($18, _UTF-16LE'Pound'), =($18, _UTF-16LE'Lb')), OR(=($15, _UTF-16LE'petite'), =($15, _UTF-16LE'medium'))), AND(=($12, _UTF-16LE'Women'), OR(=($17, _UTF-16LE'burlywood'), =($17, _UTF-16LE'navy')), OR(=($18, _UTF-16LE'Bundle'), =($18, _UTF-16LE'Each')), OR(=($15, _UTF-16LE'N/A'), =($15, _UTF-16LE'extra large'))), AND(=($12, _UTF-16LE'Men'), OR(=($17, _UTF-16LE'bisque'), =($17, _UTF-16LE'azure')), OR(=($18, _UTF-16LE'N/A'), =($18, _UTF-16LE'Tsp')), OR(=($15, _UTF-16LE'small'), =($15, _UTF-16LE'large'))), AND(=($12, _UTF-16LE'Men'), OR(=($17, _UTF-16LE'chocolate'), =($17, _UTF-16LE'cornflower')), OR(=($18, _UTF-16LE'Bunch'), =($18, _UTF-16LE'Gross')), OR(=($15, _UTF-16LE'petite'), =($15, _UTF-16LE'medium'))))), AND(=($14, $cor0.i_manufact), OR(AND(=($12, _UTF-16LE'Women'), OR(=($17, _UTF-16LE'salmon'), =($17, _UTF-16LE'midnight')), OR(=($18, _UTF-16LE'Oz'), =($18, _UTF-16LE'Box')), OR(=($15, _UTF-16LE'petite'), =($15, _UTF-16LE'medium'))), AND(=($12, _UTF-16LE'Women'), OR(=($17, _UTF-16LE'snow'), =($17, _UTF-16LE'steel')), OR(=($18, _UTF-16LE'Carton'), =($18, _UTF-16LE'Tbl')), OR(=($15, _UTF-16LE'N/A'), =($15, _UTF-16LE'extra large'))), AND(=($12, _UTF-16LE'Men'), OR(=($17, _UTF-16LE'purple'), =($17, _UTF-16LE'gainsboro')), OR(=($18, _UTF-16LE'Dram'), =($18, _UTF-16LE'Unknown')), OR(=($15, _UTF-16LE'small'), =($15, _UTF-16LE'large'))), AND(=($12, _UTF-16LE'Men'), OR(=($17, _UTF-16LE'metallic'), =($17, _UTF-16LE'forest')), OR(=($18, _UTF-16LE'Gram'), =($18, _UTF-16LE'Ounce')), OR(=($15, _UTF-16LE'petite'), =($15, _UTF-16LE'medium'))))))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+}), 0))], variablesSet=[[$cor0]])
+         +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[i_product_name ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[i_product_name ASC], offset=[0], fetch=[100], global=[false])
+      +- HashAggregate(isMerge=[false], groupBy=[i_product_name], select=[i_product_name])
+         +- Exchange(distribution=[hash[i_product_name]])
+            +- Calc(select=[i_product_name])
+               +- HashJoin(joinType=[LeftSemiJoin], where=[(i_manufact0 = i_manufact)], select=[i_manufact, i_product_name], isBroadcast=[true], build=[right])
+                  :- Calc(select=[i_manufact, i_product_name], where=[SEARCH(i_manufact_id, Sarg[[742..782]])])
+                  :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_manufact_id, i_manufact, i_product_name]]], fields=[i_manufact_id, i_manufact, i_product_name])
+                  +- Exchange(distribution=[broadcast])
+                     +- Calc(select=[i_manufact], where=[((SEARCH(i_category, Sarg[_UTF-16LE'Women']) AND SEARCH(i_color, Sarg[_UTF-16LE'orchid', _UTF-16LE'papaya']) AND SEARCH(i_units, Sarg[_UTF-16LE'Lb', _UTF-16LE'Pound']) AND SEARCH(i_size, Sarg[_UTF-16LE'medium', _UTF-16LE'petite'])) OR (SEARCH(i_category, Sarg[_UTF-16LE'Women']) AND SEARCH(i_color, Sarg[_UTF-16LE'burlywood', _UTF-16LE'navy']) AND SEARCH(i_units, Sarg[_UTF-16LE'Bundle', _UTF-16LE'Each']) AND SEARCH(i_size, Sarg[_UTF-16LE'N/A', _UTF-16LE'extra large'])) OR (SEARCH(i_category, Sarg[_UTF-16LE'Men']) AND SEARCH(i_color, Sarg[_UTF-16LE'azure', _UTF-16LE'bisque']) AND SEARCH(i_units, Sarg[_UTF-16LE'N/A', _UTF-16LE'Tsp']) AND SEARCH(i_size, Sarg[_UTF-16LE'large', _UTF-16LE'small'])) OR (SEARCH(i_category, Sarg[_UTF-16LE'Men']) AND SEARCH(i_color, Sarg[_UTF-16LE'chocolate', _UTF-16LE'cornflower']) AND SEARCH(i_units, Sarg[_UTF-16LE'Bunch', _UTF-16LE'Gross']) AND SEARCH(i_size, Sarg[_UTF-16LE'medium', _UTF-16LE'petite'])) OR (SEARCH(i_category, Sarg[_UTF-16LE'Women']) AND SEARCH(i_color, Sarg[_UTF-16LE'midnight', _UTF-16LE'salmon']) AND SEARCH(i_units, Sarg[_UTF-16LE'Box', _UTF-16LE'Oz']) AND SEARCH(i_size, Sarg[_UTF-16LE'medium', _UTF-16LE'petite'])) OR (SEARCH(i_category, Sarg[_UTF-16LE'Women']) AND SEARCH(i_color, Sarg[_UTF-16LE'snow', _UTF-16LE'steel']) AND SEARCH(i_units, Sarg[_UTF-16LE'Carton', _UTF-16LE'Tbl']) AND SEARCH(i_size, Sarg[_UTF-16LE'N/A', _UTF-16LE'extra large'])) OR (SEARCH(i_category, Sarg[_UTF-16LE'Men']) AND SEARCH(i_color, Sarg[_UTF-16LE'gainsboro', _UTF-16LE'purple']) AND SEARCH(i_units, Sarg[_UTF-16LE'Dram', _UTF-16LE'Unknown']) AND SEARCH(i_size, Sarg[_UTF-16LE'large', _UTF-16LE'small'])) OR (SEARCH(i_category, Sarg[_UTF-16LE'Men']) AND SEARCH(i_color, Sarg[_UTF-16LE'forest', _UTF-16LE'metallic']) AND SEARCH(i_units, Sarg[_UTF-16LE'Gram', _UTF-16LE'Ounce']) AND SEARCH(i_size, Sarg[_UTF-16LE'medium', _UTF-16LE'petite'])))])
+                        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_category, i_manufact, i_size, i_color, i_units]]], fields=[i_category, i_manufact, i_size, i_color, i_units])
+]]>
+    </Resource>
+  </TestCase>

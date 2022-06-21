@@ -1,0 +1,121 @@
+  <TestCase name="getExecPlan[q76]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query76.tpl and seed 2031708268
+select  channel, col_name, d_year, d_qoy, i_category, COUNT(*) sales_cnt, SUM(ext_sales_price) sales_amt FROM (
+        SELECT 'store' as channel, 'ss_addr_sk' col_name, d_year, d_qoy, i_category, ss_ext_sales_price ext_sales_price
+         FROM store_sales, item, date_dim
+         WHERE ss_addr_sk IS NULL
+           AND ss_sold_date_sk=d_date_sk
+           AND ss_item_sk=i_item_sk
+        UNION ALL
+        SELECT 'web' as channel, 'ws_web_page_sk' col_name, d_year, d_qoy, i_category, ws_ext_sales_price ext_sales_price
+         FROM web_sales, item, date_dim
+         WHERE ws_web_page_sk IS NULL
+           AND ws_sold_date_sk=d_date_sk
+           AND ws_item_sk=i_item_sk
+        UNION ALL
+        SELECT 'catalog' as channel, 'cs_warehouse_sk' col_name, d_year, d_qoy, i_category, cs_ext_sales_price ext_sales_price
+         FROM catalog_sales, item, date_dim
+         WHERE cs_warehouse_sk IS NULL
+           AND cs_sold_date_sk=d_date_sk
+           AND cs_item_sk=i_item_sk) foo
+GROUP BY channel, col_name, d_year, d_qoy, i_category
+ORDER BY channel, col_name, d_year, d_qoy, i_category
+limit 100
+
+-- end query 1 in stream 0 using template query76.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC-nulls-first], dir1=[ASC-nulls-first], dir2=[ASC-nulls-first], dir3=[ASC-nulls-first], dir4=[ASC-nulls-first], fetch=[100])
++- LogicalAggregate(group=[{0, 1, 2, 3, 4}], sales_cnt=[COUNT()], sales_amt=[SUM($5)])
+   +- LogicalUnion(all=[true])
+      :- LogicalUnion(all=[true])
+      :  :- LogicalProject(channel=[_UTF-16LE'store'], col_name=[_UTF-16LE'ss_addr_sk'], d_year=[$51], d_qoy=[$55], i_category=[$35], ext_sales_price=[$14])
+      :  :  +- LogicalFilter(condition=[AND(IS NULL($5), =($22, $45), =($1, $23))])
+      :  :     +- LogicalJoin(condition=[true], joinType=[inner])
+      :  :        :- LogicalJoin(condition=[true], joinType=[inner])
+      :  :        :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+      :  :        :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+      :  :        +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+      :  +- LogicalProject(channel=[_UTF-16LE'web'], col_name=[_UTF-16LE'ws_web_page_sk'], d_year=[$62], d_qoy=[$66], i_category=[$46], ext_sales_price=[$22])
+      :     +- LogicalFilter(condition=[AND(IS NULL($11), =($33, $56), =($2, $34))])
+      :        +- LogicalJoin(condition=[true], joinType=[inner])
+      :           :- LogicalJoin(condition=[true], joinType=[inner])
+      :           :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+      :           :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+      :           +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+      +- LogicalProject(channel=[_UTF-16LE'catalog'], col_name=[_UTF-16LE'cs_warehouse_sk'], d_year=[$62], d_qoy=[$66], i_category=[$46], ext_sales_price=[$22])
+         +- LogicalFilter(condition=[AND(IS NULL($13), =($33, $56), =($14, $34))])
+            +- LogicalJoin(condition=[true], joinType=[inner])
+               :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+               :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+               +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC], offset=[0], fetch=[100], global=[false])
+      +- HashAggregate(isMerge=[true], groupBy=[channel, col_name, d_year, d_qoy, i_category], select=[channel, col_name, d_year, d_qoy, i_category, Final_COUNT(count1$0) AS sales_cnt, Final_SUM(sum$1) AS sales_amt])
+         +- Exchange(distribution=[hash[channel, col_name, d_year, d_qoy, i_category]])
+            +- LocalHashAggregate(groupBy=[channel, col_name, d_year, d_qoy, i_category], select=[channel, col_name, d_year, d_qoy, i_category, Partial_COUNT(*) AS count1$0, Partial_SUM(ext_sales_price) AS sum$1])
+               +- Union(all=[true], union=[channel, col_name, d_year, d_qoy, i_category, ext_sales_price])
+                  :- Union(all=[true], union=[channel, col_name, d_year, d_qoy, i_category, ext_sales_price])
+                  :  :- Calc(select=['store' AS channel, 'ss_addr_sk' AS col_name, d_year, d_qoy, i_category, ss_ext_sales_price AS ext_sales_price])
+                  :  :  +- HashJoin(joinType=[InnerJoin], where=[(ss_sold_date_sk = d_date_sk)], select=[ss_ext_sales_price, ss_sold_date_sk, i_category, d_date_sk, d_year, d_qoy], isBroadcast=[true], build=[right])
+                  :  :     :- Calc(select=[ss_ext_sales_price, ss_sold_date_sk, i_category])
+                  :  :     :  +- HashJoin(joinType=[InnerJoin], where=[(ss_item_sk = i_item_sk)], select=[ss_item_sk, ss_ext_sales_price, ss_sold_date_sk, i_item_sk, i_category], build=[right])
+                  :  :     :     :- Exchange(distribution=[hash[ss_item_sk]])
+                  :  :     :     :  +- Calc(select=[ss_item_sk, ss_ext_sales_price, ss_sold_date_sk], where=[ss_addr_sk IS NULL])
+                  :  :     :     :     +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_item_sk, ss_addr_sk, ss_ext_sales_price, ss_sold_date_sk]]], fields=[ss_item_sk, ss_addr_sk, ss_ext_sales_price, ss_sold_date_sk])
+                  :  :     :     +- Exchange(distribution=[hash[i_item_sk]])
+                  :  :     :        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_category]]], fields=[i_item_sk, i_category])(reuse_id=[1])
+                  :  :     +- Exchange(distribution=[broadcast])
+                  :  :        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_year, d_qoy]]], fields=[d_date_sk, d_year, d_qoy])(reuse_id=[2])
+                  :  +- Calc(select=['web' AS channel, 'ws_web_page_sk' AS col_name, d_year, d_qoy, i_category, ws_ext_sales_price AS ext_sales_price])
+                  :     +- HashJoin(joinType=[InnerJoin], where=[(ws_sold_date_sk = d_date_sk)], select=[ws_ext_sales_price, ws_sold_date_sk, i_category, d_date_sk, d_year, d_qoy], isBroadcast=[true], build=[right])
+                  :        :- Calc(select=[ws_ext_sales_price, ws_sold_date_sk, i_category])
+                  :        :  +- HashJoin(joinType=[InnerJoin], where=[(ws_item_sk = i_item_sk)], select=[ws_item_sk, ws_ext_sales_price, ws_sold_date_sk, i_item_sk, i_category], build=[right])
+                  :        :     :- Exchange(distribution=[hash[ws_item_sk]])
+                  :        :     :  +- Calc(select=[ws_item_sk, ws_ext_sales_price, ws_sold_date_sk], where=[ws_web_page_sk IS NULL])
+                  :        :     :     +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales, project=[ws_item_sk, ws_web_page_sk, ws_ext_sales_price, ws_sold_date_sk]]], fields=[ws_item_sk, ws_web_page_sk, ws_ext_sales_price, ws_sold_date_sk])
+                  :        :     +- Exchange(distribution=[hash[i_item_sk]])
+                  :        :        +- Reused(reference_id=[1])
+                  :        +- Exchange(distribution=[broadcast])
+                  :           +- Reused(reference_id=[2])
+                  +- Calc(select=['catalog' AS channel, 'cs_warehouse_sk' AS col_name, d_year, d_qoy, i_category, cs_ext_sales_price AS ext_sales_price])
+                     +- HashJoin(joinType=[InnerJoin], where=[(cs_sold_date_sk = d_date_sk)], select=[cs_ext_sales_price, cs_sold_date_sk, i_category, d_date_sk, d_year, d_qoy], isBroadcast=[true], build=[right])
+                        :- Calc(select=[cs_ext_sales_price, cs_sold_date_sk, i_category])
+                        :  +- HashJoin(joinType=[InnerJoin], where=[(cs_item_sk = i_item_sk)], select=[cs_item_sk, cs_ext_sales_price, cs_sold_date_sk, i_item_sk, i_category], build=[right])
+                        :     :- Exchange(distribution=[hash[cs_item_sk]])
+                        :     :  +- Calc(select=[cs_item_sk, cs_ext_sales_price, cs_sold_date_sk], where=[cs_warehouse_sk IS NULL])
+                        :     :     +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales, project=[cs_warehouse_sk, cs_item_sk, cs_ext_sales_price, cs_sold_date_sk]]], fields=[cs_warehouse_sk, cs_item_sk, cs_ext_sales_price, cs_sold_date_sk])
+                        :     +- Exchange(distribution=[hash[i_item_sk]])
+                        :        +- Reused(reference_id=[1])
+                        +- Exchange(distribution=[broadcast])
+                           +- Reused(reference_id=[2])
+]]>
+    </Resource>
+  </TestCase>

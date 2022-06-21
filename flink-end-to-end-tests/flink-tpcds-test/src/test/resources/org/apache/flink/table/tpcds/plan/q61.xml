@@ -1,0 +1,166 @@
+  <TestCase name="getExecPlan[q61]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query61.tpl and seed 1930872976
+select  promotions,total,cast(promotions as decimal(15,4))/cast(total as decimal(15,4))*100
+from
+  (select sum(ss_ext_sales_price) promotions
+   from  store_sales
+        ,store
+        ,promotion
+        ,date_dim
+        ,customer
+        ,customer_address 
+        ,item
+   where ss_sold_date_sk = d_date_sk
+   and   ss_store_sk = s_store_sk
+   and   ss_promo_sk = p_promo_sk
+   and   ss_customer_sk= c_customer_sk
+   and   ca_address_sk = c_current_addr_sk
+   and   ss_item_sk = i_item_sk 
+   and   ca_gmt_offset = -7
+   and   i_category = 'Electronics'
+   and   (p_channel_dmail = 'Y' or p_channel_email = 'Y' or p_channel_tv = 'Y')
+   and   s_gmt_offset = -7
+   and   d_year = 1999
+   and   d_moy  = 11) promotional_sales,
+  (select sum(ss_ext_sales_price) total
+   from  store_sales
+        ,store
+        ,date_dim
+        ,customer
+        ,customer_address
+        ,item
+   where ss_sold_date_sk = d_date_sk
+   and   ss_store_sk = s_store_sk
+   and   ss_customer_sk= c_customer_sk
+   and   ca_address_sk = c_current_addr_sk
+   and   ss_item_sk = i_item_sk
+   and   ca_gmt_offset = -7
+   and   i_category = 'Electronics'
+   and   s_gmt_offset = -7
+   and   d_year = 1999
+   and   d_moy  = 11) all_sales
+order by promotions, total
+limit 100
+
+-- end query 1 in stream 0 using template query61.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], sort1=[$1], dir0=[ASC-nulls-first], dir1=[ASC-nulls-first], fetch=[100])
++- LogicalProject(promotions=[$0], total=[$1], EXPR$2=[*(/(CAST($0):DECIMAL(15, 4), CAST($1):DECIMAL(15, 4)), 100)])
+   +- LogicalJoin(condition=[true], joinType=[inner])
+      :- LogicalAggregate(group=[{}], promotions=[SUM($0)])
+      :  +- LogicalProject(ss_ext_sales_price=[$14])
+      :     +- LogicalFilter(condition=[AND(=($22, $71), =($6, $23), =($7, $52), =($2, $99), =($117, $103), =($1, $130), =($128, -7), =($142, _UTF-16LE'Electronics'), OR(=($60, _UTF-16LE'Y'), =($61, _UTF-16LE'Y'), =($63, _UTF-16LE'Y')), =($50, -7), =($77, 1999), =($79, 11))])
+      :        +- LogicalJoin(condition=[true], joinType=[inner])
+      :           :- LogicalJoin(condition=[true], joinType=[inner])
+      :           :  :- LogicalJoin(condition=[true], joinType=[inner])
+      :           :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+      :           :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+      :           :  :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+      :           :  :  :  :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+      :           :  :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store]])
+      :           :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, promotion]])
+      :           :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+      :           :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+      :           :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+      :           +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+      +- LogicalAggregate(group=[{}], total=[SUM($0)])
+         +- LogicalProject(ss_ext_sales_price=[$14])
+            +- LogicalFilter(condition=[AND(=($22, $52), =($6, $23), =($2, $80), =($98, $84), =($1, $111), =($109, -7), =($123, _UTF-16LE'Electronics'), =($50, -7), =($58, 1999), =($60, 11))])
+               +- LogicalJoin(condition=[true], joinType=[inner])
+                  :- LogicalJoin(condition=[true], joinType=[inner])
+                  :  :- LogicalJoin(condition=[true], joinType=[inner])
+                  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+                  :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+                  :  :  :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+                  :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store]])
+                  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+                  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+                  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+                  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[promotions ASC, total ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[promotions ASC, total ASC], offset=[0], fetch=[100], global=[false])
+      +- Calc(select=[promotions, total, ((CAST(promotions AS DECIMAL(15, 4)) / CAST(total AS DECIMAL(15, 4))) * 100) AS EXPR$2])
+         +- NestedLoopJoin(joinType=[InnerJoin], where=[true], select=[promotions, total], build=[left], singleRowJoin=[true])
+            :- Exchange(distribution=[broadcast])
+            :  +- HashAggregate(isMerge=[true], select=[Final_SUM(sum$0) AS promotions])
+            :     +- Exchange(distribution=[single])
+            :        +- LocalHashAggregate(select=[Partial_SUM(ss_ext_sales_price) AS sum$0])
+            :           +- Calc(select=[ss_ext_sales_price])
+            :              +- HashJoin(joinType=[InnerJoin], where=[(ss_customer_sk = c_customer_sk)], select=[c_customer_sk, ss_customer_sk, ss_ext_sales_price], build=[left])
+            :                 :- Exchange(distribution=[hash[c_customer_sk]])(reuse_id=[1])
+            :                 :  +- Calc(select=[c_customer_sk])
+            :                 :     +- HashJoin(joinType=[InnerJoin], where=[(ca_address_sk = c_current_addr_sk)], select=[c_customer_sk, c_current_addr_sk, ca_address_sk], build=[right])
+            :                 :        :- Exchange(distribution=[hash[c_current_addr_sk]])
+            :                 :        :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer, project=[c_customer_sk, c_current_addr_sk]]], fields=[c_customer_sk, c_current_addr_sk])
+            :                 :        +- Exchange(distribution=[hash[ca_address_sk]])
+            :                 :           +- Calc(select=[ca_address_sk], where=[(ca_gmt_offset = -7)])
+            :                 :              +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address, project=[ca_address_sk, ca_gmt_offset]]], fields=[ca_address_sk, ca_gmt_offset])
+            :                 +- Exchange(distribution=[hash[ss_customer_sk]])
+            :                    +- Calc(select=[ss_customer_sk, ss_ext_sales_price])
+            :                       +- HashJoin(joinType=[InnerJoin], where=[(ss_store_sk = s_store_sk)], select=[ss_customer_sk, ss_store_sk, ss_ext_sales_price, s_store_sk], isBroadcast=[true], build=[right])
+            :                          :- Calc(select=[ss_customer_sk, ss_store_sk, ss_ext_sales_price])
+            :                          :  +- HashJoin(joinType=[InnerJoin], where=[(ss_promo_sk = p_promo_sk)], select=[ss_customer_sk, ss_store_sk, ss_promo_sk, ss_ext_sales_price, p_promo_sk], isBroadcast=[true], build=[right])
+            :                          :     :- Calc(select=[ss_customer_sk, ss_store_sk, ss_promo_sk, ss_ext_sales_price])
+            :                          :     :  +- HashJoin(joinType=[InnerJoin], where=[(ss_item_sk = i_item_sk)], select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_promo_sk, ss_ext_sales_price, i_item_sk], isBroadcast=[true], build=[right])
+            :                          :     :     :- Calc(select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_promo_sk, ss_ext_sales_price])
+            :                          :     :     :  +- HashJoin(joinType=[InnerJoin], where=[(ss_sold_date_sk = d_date_sk)], select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_promo_sk, ss_ext_sales_price, ss_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+            :                          :     :     :     :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_promo_sk, ss_ext_sales_price, ss_sold_date_sk], project=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_promo_sk, ss_ext_sales_price, ss_sold_date_sk]]], fields=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_promo_sk, ss_ext_sales_price, ss_sold_date_sk], dpp=[d_date_sk])
+            :                          :     :     :     +- Exchange(distribution=[broadcast])(reuse_id=[2])
+            :                          :     :     :        +- Calc(select=[d_date_sk], where=[((d_year = 1999) AND (d_moy = 11))])
+            :                          :     :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_year, d_moy]]], fields=[d_date_sk, d_year, d_moy])
+            :                          :     :     +- Exchange(distribution=[broadcast])(reuse_id=[3])
+            :                          :     :        +- Calc(select=[i_item_sk], where=[(i_category = 'Electronics')])
+            :                          :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_category]]], fields=[i_item_sk, i_category])
+            :                          :     +- Exchange(distribution=[broadcast])
+            :                          :        +- Calc(select=[p_promo_sk], where=[((p_channel_dmail = 'Y') OR (p_channel_email = 'Y') OR (p_channel_tv = 'Y'))])
+            :                          :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, promotion, project=[p_promo_sk, p_channel_dmail, p_channel_email, p_channel_tv]]], fields=[p_promo_sk, p_channel_dmail, p_channel_email, p_channel_tv])
+            :                          +- Exchange(distribution=[broadcast])(reuse_id=[4])
+            :                             +- Calc(select=[s_store_sk], where=[(s_gmt_offset = -7)])
+            :                                +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store, project=[s_store_sk, s_gmt_offset]]], fields=[s_store_sk, s_gmt_offset])
+            +- HashAggregate(isMerge=[true], select=[Final_SUM(sum$0) AS total])
+               +- Exchange(distribution=[single])
+                  +- LocalHashAggregate(select=[Partial_SUM(ss_ext_sales_price) AS sum$0])
+                     +- Calc(select=[ss_ext_sales_price])
+                        +- HashJoin(joinType=[InnerJoin], where=[(ss_customer_sk = c_customer_sk)], select=[c_customer_sk, ss_customer_sk, ss_ext_sales_price], build=[left])
+                           :- Reused(reference_id=[1])
+                           +- Exchange(distribution=[hash[ss_customer_sk]])
+                              +- Calc(select=[ss_customer_sk, ss_ext_sales_price])
+                                 +- HashJoin(joinType=[InnerJoin], where=[(ss_store_sk = s_store_sk)], select=[ss_customer_sk, ss_store_sk, ss_ext_sales_price, s_store_sk], isBroadcast=[true], build=[right])
+                                    :- Calc(select=[ss_customer_sk, ss_store_sk, ss_ext_sales_price])
+                                    :  +- HashJoin(joinType=[InnerJoin], where=[(ss_item_sk = i_item_sk)], select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ext_sales_price, i_item_sk], isBroadcast=[true], build=[right])
+                                    :     :- Calc(select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ext_sales_price])
+                                    :     :  +- HashJoin(joinType=[InnerJoin], where=[(ss_sold_date_sk = d_date_sk)], select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ext_sales_price, ss_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                                    :     :     :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ext_sales_price, ss_sold_date_sk], project=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ext_sales_price, ss_sold_date_sk]]], fields=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ext_sales_price, ss_sold_date_sk], dpp=[d_date_sk])
+                                    :     :     +- Reused(reference_id=[2])
+                                    :     +- Reused(reference_id=[3])
+                                    +- Reused(reference_id=[4])
+]]>
+    </Resource>
+  </TestCase>

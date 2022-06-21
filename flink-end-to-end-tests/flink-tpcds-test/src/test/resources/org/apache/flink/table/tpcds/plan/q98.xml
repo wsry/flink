@@ -1,0 +1,98 @@
+  <TestCase name="getExecPlan[q98]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query98.tpl and seed 345591136
+select i_item_desc 
+      ,i_category 
+      ,i_class 
+      ,i_current_price
+      ,sum(ss_ext_sales_price) as itemrevenue 
+      ,sum(ss_ext_sales_price)*100/sum(sum(ss_ext_sales_price)) over
+          (partition by i_class) as revenueratio
+from	
+	store_sales
+    	,item 
+    	,date_dim
+where 
+	ss_item_sk = i_item_sk 
+  	and i_category in ('Jewelry', 'Sports', 'Books')
+  	and ss_sold_date_sk = d_date_sk
+	and d_date between cast('2001-01-12' as date) 
+				and (cast('2001-01-12' as date) + interval '30' day)
+group by 
+	i_item_id
+        ,i_item_desc 
+        ,i_category
+        ,i_class
+        ,i_current_price
+order by 
+	i_category
+        ,i_class
+        ,i_item_id
+        ,i_item_desc
+        ,revenueratio
+
+-- end query 1 in stream 0 using template query98.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalProject(i_item_desc=[$0], i_category=[$1], i_class=[$2], i_current_price=[$3], itemrevenue=[$4], revenueratio=[$5])
++- LogicalSort(sort0=[$1], sort1=[$2], sort2=[$6], sort3=[$0], sort4=[$5], dir0=[ASC-nulls-first], dir1=[ASC-nulls-first], dir2=[ASC-nulls-first], dir3=[ASC-nulls-first], dir4=[ASC-nulls-first])
+   +- LogicalProject(i_item_desc=[$1], i_category=[$2], i_class=[$3], i_current_price=[$4], itemrevenue=[$5], revenueratio=[/(*($5, 100), CASE(>(COUNT($5) OVER (PARTITION BY $3), 0), $SUM0($5) OVER (PARTITION BY $3), null:DOUBLE))], i_item_id=[$0])
+      +- LogicalAggregate(group=[{0, 1, 2, 3, 4}], itemrevenue=[SUM($5)])
+         +- LogicalProject(i_item_id=[$24], i_item_desc=[$27], i_category=[$35], i_class=[$33], i_current_price=[$28], ss_ext_sales_price=[$14])
+            +- LogicalFilter(condition=[AND(=($1, $23), OR(=($35, _UTF-16LE'Jewelry'), =($35, _UTF-16LE'Sports'), =($35, _UTF-16LE'Books')), =($22, $45), >=($47, CAST(_UTF-16LE'2001-01-12'):DATE NOT NULL), <=($47, +(CAST(_UTF-16LE'2001-01-12'):DATE NOT NULL, 2592000000:INTERVAL DAY)))])
+               +- LogicalJoin(condition=[true], joinType=[inner])
+                  :- LogicalJoin(condition=[true], joinType=[inner])
+                  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+                  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+                  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Calc(select=[i_item_desc, i_category, i_class, i_current_price, itemrevenue, revenueratio])
++- Sort(orderBy=[i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, revenueratio ASC])
+   +- Exchange(distribution=[single])
+      +- Calc(select=[i_item_desc, i_category, i_class, i_current_price, itemrevenue, ($6 / CASE((w0$o0 > 0), w0$o1, null:DOUBLE)) AS revenueratio, i_item_id])
+         +- OverAggregate(partitionBy=[i_class], window#0=[COUNT(itemrevenue) AS w0$o0, $SUM0(itemrevenue) AS w0$o1 RANG BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING], select=[i_item_id, i_item_desc, i_category, i_class, i_current_price, itemrevenue, $6, w0$o0, w0$o1])
+            +- Calc(select=[i_item_id, i_item_desc, i_category, i_class, i_current_price, itemrevenue, (itemrevenue * 100) AS $6])
+               +- Sort(orderBy=[i_class ASC])
+                  +- Exchange(distribution=[hash[i_class]])
+                     +- HashAggregate(isMerge=[true], groupBy=[i_item_id, i_item_desc, i_current_price, i_class, i_category], select=[i_item_id, i_item_desc, i_current_price, i_class, i_category, Final_SUM(sum$0) AS itemrevenue])
+                        +- Exchange(distribution=[hash[i_item_id, i_item_desc, i_current_price, i_class, i_category]])
+                           +- LocalHashAggregate(groupBy=[i_item_id, i_item_desc, i_current_price, i_class, i_category], select=[i_item_id, i_item_desc, i_current_price, i_class, i_category, Partial_SUM(itemrevenue) AS sum$0])
+                              +- SortMergeJoin(joinType=[InnerJoin], where=[(ss_item_sk = i_item_sk)], select=[ss_item_sk, itemrevenue, i_item_sk, i_item_id, i_item_desc, i_current_price, i_class, i_category])
+                                 :- HashAggregate(isMerge=[true], groupBy=[ss_item_sk], select=[ss_item_sk, Final_SUM(sum$0) AS itemrevenue])
+                                 :  +- Exchange(distribution=[hash[ss_item_sk]])
+                                 :     +- LocalHashAggregate(groupBy=[ss_item_sk], select=[ss_item_sk, Partial_SUM(ss_ext_sales_price) AS sum$0])
+                                 :        +- Calc(select=[ss_item_sk, ss_ext_sales_price])
+                                 :           +- HashJoin(joinType=[InnerJoin], where=[(ss_sold_date_sk = d_date_sk)], select=[ss_item_sk, ss_ext_sales_price, ss_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                                 :              :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_item_sk, ss_ext_sales_price, ss_sold_date_sk], project=[ss_item_sk, ss_ext_sales_price, ss_sold_date_sk]]], fields=[ss_item_sk, ss_ext_sales_price, ss_sold_date_sk], dpp=[d_date_sk])
+                                 :              +- Exchange(distribution=[broadcast])
+                                 :                 +- Calc(select=[d_date_sk], where=[SEARCH(d_date, Sarg[[2001-01-12..2001-02-11]])])
+                                 :                    +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_date]]], fields=[d_date_sk, d_date])
+                                 +- Exchange(distribution=[hash[i_item_sk]])
+                                    +- Calc(select=[i_item_sk, i_item_id, i_item_desc, i_current_price, i_class, i_category], where=[SEARCH(i_category, Sarg[_UTF-16LE'Books', _UTF-16LE'Jewelry', _UTF-16LE'Sports'])])
+                                       +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_item_id, i_item_desc, i_current_price, i_class, i_category]]], fields=[i_item_sk, i_item_id, i_item_desc, i_current_price, i_class, i_category])
+]]>
+    </Resource>
+  </TestCase>

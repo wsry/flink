@@ -1,0 +1,85 @@
+  <TestCase name="getExecPlan[q82]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query82.tpl and seed 55585014
+select  i_item_id
+       ,i_item_desc
+       ,i_current_price
+ from item, inventory, date_dim, store_sales
+ where i_current_price between 30 and 30+30
+ and inv_item_sk = i_item_sk
+ and d_date_sk=inv_date_sk
+ and d_date between cast('2002-05-30' as date) and (cast('2002-05-30' as date) +  interval '60' day)
+ and i_manufact_id in (437,129,727,663)
+ and inv_quantity_on_hand between 100 and 500
+ and ss_item_sk = i_item_sk
+ group by i_item_id,i_item_desc,i_current_price
+ order by i_item_id
+ limit 100
+
+-- end query 1 in stream 0 using template query82.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], dir0=[ASC-nulls-first], fetch=[100])
++- LogicalAggregate(group=[{0, 1, 2}])
+   +- LogicalProject(i_item_id=[$1], i_item_desc=[$4], i_current_price=[$5])
+      +- LogicalFilter(condition=[AND(>=($5, 30), <=($5, +(30, 30)), =($23, $0), =($26, $22), >=($28, CAST(_UTF-16LE'2002-05-30'):DATE NOT NULL), <=($28, +(CAST(_UTF-16LE'2002-05-30'):DATE NOT NULL, 5184000000:INTERVAL DAY)), OR(=($13, 437), =($13, 129), =($13, 727), =($13, 663)), >=($25, 100), <=($25, 500), =($55, $0))])
+         +- LogicalJoin(condition=[true], joinType=[inner])
+            :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+            :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, inventory]])
+            :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+            +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[i_item_id ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[i_item_id ASC], offset=[0], fetch=[100], global=[false])
+      +- HashAggregate(isMerge=[true], groupBy=[i_item_id, i_item_desc, i_current_price], select=[i_item_id, i_item_desc, i_current_price])
+         +- Exchange(distribution=[hash[i_item_id, i_item_desc, i_current_price]])
+            +- LocalHashAggregate(groupBy=[i_item_id, i_item_desc, i_current_price], select=[i_item_id, i_item_desc, i_current_price])
+               +- SortMergeJoin(joinType=[InnerJoin], where=[(inv_item_sk = ss_item_sk)], select=[inv_item_sk, ss_item_sk, i_item_id, i_item_desc, i_current_price])
+                  :- HashAggregate(isMerge=[true], groupBy=[inv_item_sk], select=[inv_item_sk])
+                  :  +- Exchange(distribution=[hash[inv_item_sk]])
+                  :     +- LocalHashAggregate(groupBy=[inv_item_sk], select=[inv_item_sk])
+                  :        +- Calc(select=[inv_item_sk])
+                  :           +- HashJoin(joinType=[InnerJoin], where=[(d_date_sk = inv_date_sk)], select=[inv_date_sk, inv_item_sk, d_date_sk], isBroadcast=[true], build=[right])
+                  :              :- Calc(select=[inv_date_sk, inv_item_sk], where=[SEARCH(inv_quantity_on_hand, Sarg[[100..500]])])
+                  :              :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, inventory, project=[inv_date_sk, inv_item_sk, inv_quantity_on_hand]]], fields=[inv_date_sk, inv_item_sk, inv_quantity_on_hand])
+                  :              +- Exchange(distribution=[broadcast])
+                  :                 +- Calc(select=[d_date_sk], where=[SEARCH(d_date, Sarg[[2002-05-30..2002-07-29]])])
+                  :                    +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_date]]], fields=[d_date_sk, d_date])
+                  +- HashAggregate(isMerge=[true], groupBy=[ss_item_sk], auxGrouping=[i_item_id, i_item_desc, i_current_price], select=[ss_item_sk, i_item_id, i_item_desc, i_current_price])
+                     +- Exchange(distribution=[hash[ss_item_sk]])
+                        +- LocalHashAggregate(groupBy=[ss_item_sk], auxGrouping=[i_item_id, i_item_desc, i_current_price], select=[ss_item_sk, i_item_id, i_item_desc, i_current_price])
+                           +- Calc(select=[ss_item_sk, i_item_id, i_item_desc, i_current_price])
+                              +- HashJoin(joinType=[InnerJoin], where=[(ss_item_sk = i_item_sk)], select=[ss_item_sk, i_item_sk, i_item_id, i_item_desc, i_current_price], isBroadcast=[true], build=[right])
+                                 :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_item_sk]]], fields=[ss_item_sk])
+                                 +- Exchange(distribution=[broadcast])
+                                    +- Calc(select=[i_item_sk, i_item_id, i_item_desc, i_current_price], where=[(SEARCH(i_current_price, Sarg[[30..60]]) AND SEARCH(i_manufact_id, Sarg[129, 437, 663, 727]))])
+                                       +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_item_id, i_item_desc, i_current_price, i_manufact_id]]], fields=[i_item_sk, i_item_id, i_item_desc, i_current_price, i_manufact_id])
+]]>
+    </Resource>
+  </TestCase>

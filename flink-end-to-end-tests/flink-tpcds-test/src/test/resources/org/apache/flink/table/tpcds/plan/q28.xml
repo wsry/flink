@@ -1,0 +1,195 @@
+  <TestCase name="getExecPlan[q28]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query28.tpl and seed 444293455
+select  *
+from (select avg(ss_list_price) B1_LP
+            ,count(ss_list_price) B1_CNT
+            ,count(distinct ss_list_price) B1_CNTD
+      from store_sales
+      where ss_quantity between 0 and 5
+        and (ss_list_price between 11 and 11+10 
+             or ss_coupon_amt between 460 and 460+1000
+             or ss_wholesale_cost between 14 and 14+20)) B1,
+     (select avg(ss_list_price) B2_LP
+            ,count(ss_list_price) B2_CNT
+            ,count(distinct ss_list_price) B2_CNTD
+      from store_sales
+      where ss_quantity between 6 and 10
+        and (ss_list_price between 91 and 91+10
+          or ss_coupon_amt between 1430 and 1430+1000
+          or ss_wholesale_cost between 32 and 32+20)) B2,
+     (select avg(ss_list_price) B3_LP
+            ,count(ss_list_price) B3_CNT
+            ,count(distinct ss_list_price) B3_CNTD
+      from store_sales
+      where ss_quantity between 11 and 15
+        and (ss_list_price between 66 and 66+10
+          or ss_coupon_amt between 920 and 920+1000
+          or ss_wholesale_cost between 4 and 4+20)) B3,
+     (select avg(ss_list_price) B4_LP
+            ,count(ss_list_price) B4_CNT
+            ,count(distinct ss_list_price) B4_CNTD
+      from store_sales
+      where ss_quantity between 16 and 20
+        and (ss_list_price between 142 and 142+10
+          or ss_coupon_amt between 3054 and 3054+1000
+          or ss_wholesale_cost between 80 and 80+20)) B4,
+     (select avg(ss_list_price) B5_LP
+            ,count(ss_list_price) B5_CNT
+            ,count(distinct ss_list_price) B5_CNTD
+      from store_sales
+      where ss_quantity between 21 and 25
+        and (ss_list_price between 135 and 135+10
+          or ss_coupon_amt between 14180 and 14180+1000
+          or ss_wholesale_cost between 38 and 38+20)) B5,
+     (select avg(ss_list_price) B6_LP
+            ,count(ss_list_price) B6_CNT
+            ,count(distinct ss_list_price) B6_CNTD
+      from store_sales
+      where ss_quantity between 26 and 30
+        and (ss_list_price between 28 and 28+10
+          or ss_coupon_amt between 2513 and 2513+1000
+          or ss_wholesale_cost between 42 and 42+20)) B6
+limit 100
+
+-- end query 1 in stream 0 using template query28.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(fetch=[100])
++- LogicalProject(B1_LP=[$0], B1_CNT=[$1], B1_CNTD=[$2], B2_LP=[$3], B2_CNT=[$4], B2_CNTD=[$5], B3_LP=[$6], B3_CNT=[$7], B3_CNTD=[$8], B4_LP=[$9], B4_CNT=[$10], B4_CNTD=[$11], B5_LP=[$12], B5_CNT=[$13], B5_CNTD=[$14], B6_LP=[$15], B6_CNT=[$16], B6_CNTD=[$17])
+   +- LogicalJoin(condition=[true], joinType=[inner])
+      :- LogicalJoin(condition=[true], joinType=[inner])
+      :  :- LogicalJoin(condition=[true], joinType=[inner])
+      :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+      :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+      :  :  :  :  :- LogicalAggregate(group=[{}], B1_LP=[AVG($0)], B1_CNT=[COUNT($0)], B1_CNTD=[COUNT(DISTINCT $0)])
+      :  :  :  :  :  +- LogicalProject(ss_list_price=[$11])
+      :  :  :  :  :     +- LogicalFilter(condition=[AND(>=($9, 0), <=($9, 5), OR(AND(>=($11, 11), <=($11, +(11, 10))), AND(>=($18, 460), <=($18, +(460, 1000))), AND(>=($10, 14), <=($10, +(14, 20)))))])
+      :  :  :  :  :        +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+      :  :  :  :  +- LogicalAggregate(group=[{}], B2_LP=[AVG($0)], B2_CNT=[COUNT($0)], B2_CNTD=[COUNT(DISTINCT $0)])
+      :  :  :  :     +- LogicalProject(ss_list_price=[$11])
+      :  :  :  :        +- LogicalFilter(condition=[AND(>=($9, 6), <=($9, 10), OR(AND(>=($11, 91), <=($11, +(91, 10))), AND(>=($18, 1430), <=($18, +(1430, 1000))), AND(>=($10, 32), <=($10, +(32, 20)))))])
+      :  :  :  :           +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+      :  :  :  +- LogicalAggregate(group=[{}], B3_LP=[AVG($0)], B3_CNT=[COUNT($0)], B3_CNTD=[COUNT(DISTINCT $0)])
+      :  :  :     +- LogicalProject(ss_list_price=[$11])
+      :  :  :        +- LogicalFilter(condition=[AND(>=($9, 11), <=($9, 15), OR(AND(>=($11, 66), <=($11, +(66, 10))), AND(>=($18, 920), <=($18, +(920, 1000))), AND(>=($10, 4), <=($10, +(4, 20)))))])
+      :  :  :           +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+      :  :  +- LogicalAggregate(group=[{}], B4_LP=[AVG($0)], B4_CNT=[COUNT($0)], B4_CNTD=[COUNT(DISTINCT $0)])
+      :  :     +- LogicalProject(ss_list_price=[$11])
+      :  :        +- LogicalFilter(condition=[AND(>=($9, 16), <=($9, 20), OR(AND(>=($11, 142), <=($11, +(142, 10))), AND(>=($18, 3054), <=($18, +(3054, 1000))), AND(>=($10, 80), <=($10, +(80, 20)))))])
+      :  :           +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+      :  +- LogicalAggregate(group=[{}], B5_LP=[AVG($0)], B5_CNT=[COUNT($0)], B5_CNTD=[COUNT(DISTINCT $0)])
+      :     +- LogicalProject(ss_list_price=[$11])
+      :        +- LogicalFilter(condition=[AND(>=($9, 21), <=($9, 25), OR(AND(>=($11, 135), <=($11, +(135, 10))), AND(>=($18, 14180), <=($18, +(14180, 1000))), AND(>=($10, 38), <=($10, +(38, 20)))))])
+      :           +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+      +- LogicalAggregate(group=[{}], B6_LP=[AVG($0)], B6_CNT=[COUNT($0)], B6_CNTD=[COUNT(DISTINCT $0)])
+         +- LogicalProject(ss_list_price=[$11])
+            +- LogicalFilter(condition=[AND(>=($9, 26), <=($9, 30), OR(AND(>=($11, 28), <=($11, +(28, 10))), AND(>=($18, 2513), <=($18, +(2513, 1000))), AND(>=($10, 42), <=($10, +(42, 20)))))])
+               +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Limit(offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- Limit(offset=[0], fetch=[100], global=[false])
+      +- Calc(select=[B1_LP, B1_CNT, B1_CNTD, B2_LP, B2_CNT, B2_CNTD, B3_LP, B3_CNT, B3_CNTD, B4_LP, B4_CNT, B4_CNTD, B5_LP, B5_CNT, B5_CNTD, B6_LP, B6_CNT, B6_CNTD])
+         +- NestedLoopJoin(joinType=[InnerJoin], where=[true], select=[B1_LP, B1_CNT, B1_CNTD, B6_LP, B6_CNT, B6_CNTD, B5_LP, B5_CNT, B5_CNTD, B4_LP, B4_CNT, B4_CNTD, B3_LP, B3_CNT, B3_CNTD, B2_LP, B2_CNT, B2_CNTD], build=[right], singleRowJoin=[true])
+            :- NestedLoopJoin(joinType=[InnerJoin], where=[true], select=[B1_LP, B1_CNT, B1_CNTD, B6_LP, B6_CNT, B6_CNTD, B5_LP, B5_CNT, B5_CNTD, B4_LP, B4_CNT, B4_CNTD, B3_LP, B3_CNT, B3_CNTD], build=[right], singleRowJoin=[true])
+            :  :- NestedLoopJoin(joinType=[InnerJoin], where=[true], select=[B1_LP, B1_CNT, B1_CNTD, B6_LP, B6_CNT, B6_CNTD, B5_LP, B5_CNT, B5_CNTD, B4_LP, B4_CNT, B4_CNTD], build=[right], singleRowJoin=[true])
+            :  :  :- NestedLoopJoin(joinType=[InnerJoin], where=[true], select=[B1_LP, B1_CNT, B1_CNTD, B6_LP, B6_CNT, B6_CNTD, B5_LP, B5_CNT, B5_CNTD], build=[right], singleRowJoin=[true])
+            :  :  :  :- NestedLoopJoin(joinType=[InnerJoin], where=[true], select=[B1_LP, B1_CNT, B1_CNTD, B6_LP, B6_CNT, B6_CNTD], build=[left], singleRowJoin=[true])
+            :  :  :  :  :- Exchange(distribution=[broadcast])
+            :  :  :  :  :  +- Calc(select=[B1_LP, CASE(B1_CNT IS NOT NULL, B1_CNT, 0) AS B1_CNT, B1_CNTD])
+            :  :  :  :  :     +- HashAggregate(isMerge=[true], select=[Final_MIN(min$0) AS B1_LP, Final_MIN(min$1) AS B1_CNT, Final_COUNT(count$2) AS B1_CNTD])
+            :  :  :  :  :        +- Exchange(distribution=[single])
+            :  :  :  :  :           +- LocalHashAggregate(select=[Partial_MIN(B1_LP) FILTER $g_1 AS min$0, Partial_MIN(B1_CNT) FILTER $g_1 AS min$1, Partial_COUNT(ss_list_price) FILTER $g_0 AS count$2])
+            :  :  :  :  :              +- Calc(select=[ss_list_price, B1_LP, B1_CNT, (CASE(($e = 0), 0, 1) = 0) AS $g_0, (CASE(($e = 0), 0, 1) = 1) AS $g_1])
+            :  :  :  :  :                 +- HashAggregate(isMerge=[true], groupBy=[ss_list_price, $e], select=[ss_list_price, $e, Final_AVG(sum$0, count$1) AS B1_LP, Final_COUNT(count$2) AS B1_CNT])
+            :  :  :  :  :                    +- Exchange(distribution=[hash[ss_list_price, $e]])
+            :  :  :  :  :                       +- LocalHashAggregate(groupBy=[ss_list_price, $e], select=[ss_list_price, $e, Partial_AVG(ss_list_price_0) AS (sum$0, count$1), Partial_COUNT(ss_list_price_0) AS count$2])
+            :  :  :  :  :                          +- Expand(projects=[{ss_list_price, 0 AS $e, ss_list_price AS ss_list_price_0}, {null AS ss_list_price, 1 AS $e, ss_list_price AS ss_list_price_0}])
+            :  :  :  :  :                             +- Calc(select=[ss_list_price], where=[(SEARCH(ss_quantity, Sarg[[0..5]]) AND (SEARCH(ss_list_price, Sarg[[11..21]]) OR SEARCH(ss_coupon_amt, Sarg[[460..1460]]) OR SEARCH(ss_wholesale_cost, Sarg[[14..34]])))])
+            :  :  :  :  :                                +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_quantity, ss_wholesale_cost, ss_list_price, ss_coupon_amt]]], fields=[ss_quantity, ss_wholesale_cost, ss_list_price, ss_coupon_amt])(reuse_id=[1])
+            :  :  :  :  +- Calc(select=[B6_LP, CASE(B6_CNT IS NOT NULL, B6_CNT, 0) AS B6_CNT, B6_CNTD])
+            :  :  :  :     +- HashAggregate(isMerge=[true], select=[Final_MIN(min$0) AS B6_LP, Final_MIN(min$1) AS B6_CNT, Final_COUNT(count$2) AS B6_CNTD])
+            :  :  :  :        +- Exchange(distribution=[single])
+            :  :  :  :           +- LocalHashAggregate(select=[Partial_MIN(B6_LP) FILTER $g_1 AS min$0, Partial_MIN(B6_CNT) FILTER $g_1 AS min$1, Partial_COUNT(ss_list_price) FILTER $g_0 AS count$2])
+            :  :  :  :              +- Calc(select=[ss_list_price, B6_LP, B6_CNT, (CASE(($e = 0), 0, 1) = 0) AS $g_0, (CASE(($e = 0), 0, 1) = 1) AS $g_1])
+            :  :  :  :                 +- HashAggregate(isMerge=[true], groupBy=[ss_list_price, $e], select=[ss_list_price, $e, Final_AVG(sum$0, count$1) AS B6_LP, Final_COUNT(count$2) AS B6_CNT])
+            :  :  :  :                    +- Exchange(distribution=[hash[ss_list_price, $e]])
+            :  :  :  :                       +- LocalHashAggregate(groupBy=[ss_list_price, $e], select=[ss_list_price, $e, Partial_AVG(ss_list_price_0) AS (sum$0, count$1), Partial_COUNT(ss_list_price_0) AS count$2])
+            :  :  :  :                          +- Expand(projects=[{ss_list_price, 0 AS $e, ss_list_price AS ss_list_price_0}, {null AS ss_list_price, 1 AS $e, ss_list_price AS ss_list_price_0}])
+            :  :  :  :                             +- Calc(select=[ss_list_price], where=[(SEARCH(ss_quantity, Sarg[[26..30]]) AND (SEARCH(ss_list_price, Sarg[[28..38]]) OR SEARCH(ss_coupon_amt, Sarg[[2513..3513]]) OR SEARCH(ss_wholesale_cost, Sarg[[42..62]])))])
+            :  :  :  :                                +- Reused(reference_id=[1])
+            :  :  :  +- Exchange(distribution=[broadcast])
+            :  :  :     +- Calc(select=[B5_LP, CASE(B5_CNT IS NOT NULL, B5_CNT, 0) AS B5_CNT, B5_CNTD])
+            :  :  :        +- HashAggregate(isMerge=[true], select=[Final_MIN(min$0) AS B5_LP, Final_MIN(min$1) AS B5_CNT, Final_COUNT(count$2) AS B5_CNTD])
+            :  :  :           +- Exchange(distribution=[single])
+            :  :  :              +- LocalHashAggregate(select=[Partial_MIN(B5_LP) FILTER $g_1 AS min$0, Partial_MIN(B5_CNT) FILTER $g_1 AS min$1, Partial_COUNT(ss_list_price) FILTER $g_0 AS count$2])
+            :  :  :                 +- Calc(select=[ss_list_price, B5_LP, B5_CNT, (CASE(($e = 0), 0, 1) = 0) AS $g_0, (CASE(($e = 0), 0, 1) = 1) AS $g_1])
+            :  :  :                    +- HashAggregate(isMerge=[true], groupBy=[ss_list_price, $e], select=[ss_list_price, $e, Final_AVG(sum$0, count$1) AS B5_LP, Final_COUNT(count$2) AS B5_CNT])
+            :  :  :                       +- Exchange(distribution=[hash[ss_list_price, $e]])
+            :  :  :                          +- LocalHashAggregate(groupBy=[ss_list_price, $e], select=[ss_list_price, $e, Partial_AVG(ss_list_price_0) AS (sum$0, count$1), Partial_COUNT(ss_list_price_0) AS count$2])
+            :  :  :                             +- Expand(projects=[{ss_list_price, 0 AS $e, ss_list_price AS ss_list_price_0}, {null AS ss_list_price, 1 AS $e, ss_list_price AS ss_list_price_0}])
+            :  :  :                                +- Calc(select=[ss_list_price], where=[(SEARCH(ss_quantity, Sarg[[21..25]]) AND (SEARCH(ss_list_price, Sarg[[135..145]]) OR SEARCH(ss_coupon_amt, Sarg[[14180..15180]]) OR SEARCH(ss_wholesale_cost, Sarg[[38..58]])))])
+            :  :  :                                   +- Reused(reference_id=[1])
+            :  :  +- Exchange(distribution=[broadcast])
+            :  :     +- Calc(select=[B4_LP, CASE(B4_CNT IS NOT NULL, B4_CNT, 0) AS B4_CNT, B4_CNTD])
+            :  :        +- HashAggregate(isMerge=[true], select=[Final_MIN(min$0) AS B4_LP, Final_MIN(min$1) AS B4_CNT, Final_COUNT(count$2) AS B4_CNTD])
+            :  :           +- Exchange(distribution=[single])
+            :  :              +- LocalHashAggregate(select=[Partial_MIN(B4_LP) FILTER $g_1 AS min$0, Partial_MIN(B4_CNT) FILTER $g_1 AS min$1, Partial_COUNT(ss_list_price) FILTER $g_0 AS count$2])
+            :  :                 +- Calc(select=[ss_list_price, B4_LP, B4_CNT, (CASE(($e = 0), 0, 1) = 0) AS $g_0, (CASE(($e = 0), 0, 1) = 1) AS $g_1])
+            :  :                    +- HashAggregate(isMerge=[true], groupBy=[ss_list_price, $e], select=[ss_list_price, $e, Final_AVG(sum$0, count$1) AS B4_LP, Final_COUNT(count$2) AS B4_CNT])
+            :  :                       +- Exchange(distribution=[hash[ss_list_price, $e]])
+            :  :                          +- LocalHashAggregate(groupBy=[ss_list_price, $e], select=[ss_list_price, $e, Partial_AVG(ss_list_price_0) AS (sum$0, count$1), Partial_COUNT(ss_list_price_0) AS count$2])
+            :  :                             +- Expand(projects=[{ss_list_price, 0 AS $e, ss_list_price AS ss_list_price_0}, {null AS ss_list_price, 1 AS $e, ss_list_price AS ss_list_price_0}])
+            :  :                                +- Calc(select=[ss_list_price], where=[(SEARCH(ss_quantity, Sarg[[16..20]]) AND (SEARCH(ss_list_price, Sarg[[142..152]]) OR SEARCH(ss_coupon_amt, Sarg[[3054..4054]]) OR SEARCH(ss_wholesale_cost, Sarg[[80..100]])))])
+            :  :                                   +- Reused(reference_id=[1])
+            :  +- Exchange(distribution=[broadcast])
+            :     +- Calc(select=[B3_LP, CASE(B3_CNT IS NOT NULL, B3_CNT, 0) AS B3_CNT, B3_CNTD])
+            :        +- HashAggregate(isMerge=[true], select=[Final_MIN(min$0) AS B3_LP, Final_MIN(min$1) AS B3_CNT, Final_COUNT(count$2) AS B3_CNTD])
+            :           +- Exchange(distribution=[single])
+            :              +- LocalHashAggregate(select=[Partial_MIN(B3_LP) FILTER $g_1 AS min$0, Partial_MIN(B3_CNT) FILTER $g_1 AS min$1, Partial_COUNT(ss_list_price) FILTER $g_0 AS count$2])
+            :                 +- Calc(select=[ss_list_price, B3_LP, B3_CNT, (CASE(($e = 0), 0, 1) = 0) AS $g_0, (CASE(($e = 0), 0, 1) = 1) AS $g_1])
+            :                    +- HashAggregate(isMerge=[true], groupBy=[ss_list_price, $e], select=[ss_list_price, $e, Final_AVG(sum$0, count$1) AS B3_LP, Final_COUNT(count$2) AS B3_CNT])
+            :                       +- Exchange(distribution=[hash[ss_list_price, $e]])
+            :                          +- LocalHashAggregate(groupBy=[ss_list_price, $e], select=[ss_list_price, $e, Partial_AVG(ss_list_price_0) AS (sum$0, count$1), Partial_COUNT(ss_list_price_0) AS count$2])
+            :                             +- Expand(projects=[{ss_list_price, 0 AS $e, ss_list_price AS ss_list_price_0}, {null AS ss_list_price, 1 AS $e, ss_list_price AS ss_list_price_0}])
+            :                                +- Calc(select=[ss_list_price], where=[(SEARCH(ss_quantity, Sarg[[11..15]]) AND (SEARCH(ss_list_price, Sarg[[66..76]]) OR SEARCH(ss_coupon_amt, Sarg[[920..1920]]) OR SEARCH(ss_wholesale_cost, Sarg[[4..24]])))])
+            :                                   +- Reused(reference_id=[1])
+            +- Exchange(distribution=[broadcast])
+               +- Calc(select=[B2_LP, CASE(B2_CNT IS NOT NULL, B2_CNT, 0) AS B2_CNT, B2_CNTD])
+                  +- HashAggregate(isMerge=[true], select=[Final_MIN(min$0) AS B2_LP, Final_MIN(min$1) AS B2_CNT, Final_COUNT(count$2) AS B2_CNTD])
+                     +- Exchange(distribution=[single])
+                        +- LocalHashAggregate(select=[Partial_MIN(B2_LP) FILTER $g_1 AS min$0, Partial_MIN(B2_CNT) FILTER $g_1 AS min$1, Partial_COUNT(ss_list_price) FILTER $g_0 AS count$2])
+                           +- Calc(select=[ss_list_price, B2_LP, B2_CNT, (CASE(($e = 0), 0, 1) = 0) AS $g_0, (CASE(($e = 0), 0, 1) = 1) AS $g_1])
+                              +- HashAggregate(isMerge=[true], groupBy=[ss_list_price, $e], select=[ss_list_price, $e, Final_AVG(sum$0, count$1) AS B2_LP, Final_COUNT(count$2) AS B2_CNT])
+                                 +- Exchange(distribution=[hash[ss_list_price, $e]])
+                                    +- LocalHashAggregate(groupBy=[ss_list_price, $e], select=[ss_list_price, $e, Partial_AVG(ss_list_price_0) AS (sum$0, count$1), Partial_COUNT(ss_list_price_0) AS count$2])
+                                       +- Expand(projects=[{ss_list_price, 0 AS $e, ss_list_price AS ss_list_price_0}, {null AS ss_list_price, 1 AS $e, ss_list_price AS ss_list_price_0}])
+                                          +- Calc(select=[ss_list_price], where=[(SEARCH(ss_quantity, Sarg[[6..10]]) AND (SEARCH(ss_list_price, Sarg[[91..101]]) OR SEARCH(ss_coupon_amt, Sarg[[1430..2430]]) OR SEARCH(ss_wholesale_cost, Sarg[[32..52]])))])
+                                             +- Reused(reference_id=[1])
+]]>
+    </Resource>
+  </TestCase>

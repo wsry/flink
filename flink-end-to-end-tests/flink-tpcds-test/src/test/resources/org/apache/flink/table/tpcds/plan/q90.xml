@@ -1,0 +1,113 @@
+  <TestCase name="getExecPlan[q90]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query90.tpl and seed 2031708268
+select  cast(amc as decimal(15,4))/cast(pmc as decimal(15,4)) am_pm_ratio
+ from ( select count(*) amc
+       from web_sales, household_demographics , time_dim, web_page
+       where ws_sold_time_sk = time_dim.t_time_sk
+         and ws_ship_hdemo_sk = household_demographics.hd_demo_sk
+         and ws_web_page_sk = web_page.wp_web_page_sk
+         and time_dim.t_hour between 6 and 6+1
+         and household_demographics.hd_dep_count = 8
+         and web_page.wp_char_count between 5000 and 5200) `at`,
+      ( select count(*) pmc
+       from web_sales, household_demographics , time_dim, web_page
+       where ws_sold_time_sk = time_dim.t_time_sk
+         and ws_ship_hdemo_sk = household_demographics.hd_demo_sk
+         and ws_web_page_sk = web_page.wp_web_page_sk
+         and time_dim.t_hour between 14 and 14+1
+         and household_demographics.hd_dep_count = 8
+         and web_page.wp_char_count between 5000 and 5200) pt
+ order by am_pm_ratio
+ limit 100
+
+-- end query 1 in stream 0 using template query90.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], dir0=[ASC-nulls-first], fetch=[100])
++- LogicalProject(am_pm_ratio=[/(CAST($0):DECIMAL(15, 4) NOT NULL, CAST($1):DECIMAL(15, 4) NOT NULL)])
+   +- LogicalJoin(condition=[true], joinType=[inner])
+      :- LogicalAggregate(group=[{}], amc=[COUNT()])
+      :  +- LogicalProject($f0=[0])
+      :     +- LogicalFilter(condition=[AND(=($0, $39), =($9, $34), =($11, $49), >=($42, 6), <=($42, +(6, 1)), =($37, 8), >=($59, 5000), <=($59, 5200))])
+      :        +- LogicalJoin(condition=[true], joinType=[inner])
+      :           :- LogicalJoin(condition=[true], joinType=[inner])
+      :           :  :- LogicalJoin(condition=[true], joinType=[inner])
+      :           :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+      :           :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics]])
+      :           :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, time_dim]])
+      :           +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_page]])
+      +- LogicalAggregate(group=[{}], pmc=[COUNT()])
+         +- LogicalProject($f0=[0])
+            +- LogicalFilter(condition=[AND(=($0, $39), =($9, $34), =($11, $49), >=($42, 14), <=($42, +(14, 1)), =($37, 8), >=($59, 5000), <=($59, 5200))])
+               +- LogicalJoin(condition=[true], joinType=[inner])
+                  :- LogicalJoin(condition=[true], joinType=[inner])
+                  :  :- LogicalJoin(condition=[true], joinType=[inner])
+                  :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+                  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics]])
+                  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, time_dim]])
+                  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_page]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[am_pm_ratio ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[am_pm_ratio ASC], offset=[0], fetch=[100], global=[false])
+      +- Calc(select=[(CAST(amc AS DECIMAL(15, 4)) / CAST(pmc AS DECIMAL(15, 4))) AS am_pm_ratio])
+         +- NestedLoopJoin(joinType=[InnerJoin], where=[true], select=[amc, pmc], build=[left], singleRowJoin=[true])
+            :- Exchange(distribution=[broadcast])
+            :  +- HashAggregate(isMerge=[true], select=[Final_COUNT(count1$0) AS amc])
+            :     +- Exchange(distribution=[single])
+            :        +- LocalHashAggregate(select=[Partial_COUNT(*) AS count1$0])
+            :           +- Calc(select=[0 AS $f0])
+            :              +- HashJoin(joinType=[InnerJoin], where=[(ws_ship_hdemo_sk = hd_demo_sk)], select=[ws_ship_hdemo_sk, hd_demo_sk], isBroadcast=[true], build=[right])
+            :                 :- Calc(select=[ws_ship_hdemo_sk])
+            :                 :  +- HashJoin(joinType=[InnerJoin], where=[(ws_sold_time_sk = t_time_sk)], select=[ws_sold_time_sk, ws_ship_hdemo_sk, t_time_sk], isBroadcast=[true], build=[right])
+            :                 :     :- Calc(select=[ws_sold_time_sk, ws_ship_hdemo_sk])(reuse_id=[1])
+            :                 :     :  +- HashJoin(joinType=[InnerJoin], where=[(ws_web_page_sk = wp_web_page_sk)], select=[ws_sold_time_sk, ws_ship_hdemo_sk, ws_web_page_sk, wp_web_page_sk], isBroadcast=[true], build=[right])
+            :                 :     :     :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales, project=[ws_sold_time_sk, ws_ship_hdemo_sk, ws_web_page_sk]]], fields=[ws_sold_time_sk, ws_ship_hdemo_sk, ws_web_page_sk])
+            :                 :     :     +- Exchange(distribution=[broadcast])
+            :                 :     :        +- Calc(select=[wp_web_page_sk], where=[SEARCH(wp_char_count, Sarg[[5000..5200]])])
+            :                 :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_page, project=[wp_web_page_sk, wp_char_count]]], fields=[wp_web_page_sk, wp_char_count])
+            :                 :     +- Exchange(distribution=[broadcast])
+            :                 :        +- Calc(select=[t_time_sk], where=[SEARCH(t_hour, Sarg[[6..7]])])
+            :                 :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, time_dim, project=[t_time_sk, t_hour]]], fields=[t_time_sk, t_hour])(reuse_id=[2])
+            :                 +- Exchange(distribution=[broadcast])(reuse_id=[3])
+            :                    +- Calc(select=[hd_demo_sk], where=[SEARCH(hd_dep_count, Sarg[8])])
+            :                       +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics, project=[hd_demo_sk, hd_dep_count]]], fields=[hd_demo_sk, hd_dep_count])
+            +- HashAggregate(isMerge=[true], select=[Final_COUNT(count1$0) AS pmc])
+               +- Exchange(distribution=[single])
+                  +- LocalHashAggregate(select=[Partial_COUNT(*) AS count1$0])
+                     +- Calc(select=[0 AS $f0])
+                        +- HashJoin(joinType=[InnerJoin], where=[(ws_ship_hdemo_sk = hd_demo_sk)], select=[ws_ship_hdemo_sk, hd_demo_sk], isBroadcast=[true], build=[right])
+                           :- Calc(select=[ws_ship_hdemo_sk])
+                           :  +- HashJoin(joinType=[InnerJoin], where=[(ws_sold_time_sk = t_time_sk)], select=[ws_sold_time_sk, ws_ship_hdemo_sk, t_time_sk], isBroadcast=[true], build=[right])
+                           :     :- Reused(reference_id=[1])
+                           :     +- Exchange(distribution=[broadcast])
+                           :        +- Calc(select=[t_time_sk], where=[SEARCH(t_hour, Sarg[[14..15]])])
+                           :           +- Reused(reference_id=[2])
+                           +- Reused(reference_id=[3])
+]]>
+    </Resource>
+  </TestCase>

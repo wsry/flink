@@ -1,0 +1,417 @@
+  <TestCase name="getExecPlan[q4]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query4.tpl and seed 1819994127
+with year_total as (
+ select c_customer_id customer_id
+       ,c_first_name customer_first_name
+       ,c_last_name customer_last_name
+       ,c_preferred_cust_flag customer_preferred_cust_flag
+       ,c_birth_country customer_birth_country
+       ,c_login customer_login
+       ,c_email_address customer_email_address
+       ,d_year dyear
+       ,sum(((ss_ext_list_price-ss_ext_wholesale_cost-ss_ext_discount_amt)+ss_ext_sales_price)/2) year_total
+       ,'s' sale_type
+ from customer
+     ,store_sales
+     ,date_dim
+ where c_customer_sk = ss_customer_sk
+   and ss_sold_date_sk = d_date_sk
+ group by c_customer_id
+         ,c_first_name
+         ,c_last_name
+         ,c_preferred_cust_flag
+         ,c_birth_country
+         ,c_login
+         ,c_email_address
+         ,d_year
+ union all
+ select c_customer_id customer_id
+       ,c_first_name customer_first_name
+       ,c_last_name customer_last_name
+       ,c_preferred_cust_flag customer_preferred_cust_flag
+       ,c_birth_country customer_birth_country
+       ,c_login customer_login
+       ,c_email_address customer_email_address
+       ,d_year dyear
+       ,sum((((cs_ext_list_price-cs_ext_wholesale_cost-cs_ext_discount_amt)+cs_ext_sales_price)/2) ) year_total
+       ,'c' sale_type
+ from customer
+     ,catalog_sales
+     ,date_dim
+ where c_customer_sk = cs_bill_customer_sk
+   and cs_sold_date_sk = d_date_sk
+ group by c_customer_id
+         ,c_first_name
+         ,c_last_name
+         ,c_preferred_cust_flag
+         ,c_birth_country
+         ,c_login
+         ,c_email_address
+         ,d_year
+union all
+ select c_customer_id customer_id
+       ,c_first_name customer_first_name
+       ,c_last_name customer_last_name
+       ,c_preferred_cust_flag customer_preferred_cust_flag
+       ,c_birth_country customer_birth_country
+       ,c_login customer_login
+       ,c_email_address customer_email_address
+       ,d_year dyear
+       ,sum((((ws_ext_list_price-ws_ext_wholesale_cost-ws_ext_discount_amt)+ws_ext_sales_price)/2) ) year_total
+       ,'w' sale_type
+ from customer
+     ,web_sales
+     ,date_dim
+ where c_customer_sk = ws_bill_customer_sk
+   and ws_sold_date_sk = d_date_sk
+ group by c_customer_id
+         ,c_first_name
+         ,c_last_name
+         ,c_preferred_cust_flag
+         ,c_birth_country
+         ,c_login
+         ,c_email_address
+         ,d_year
+         )
+  select  t_s_secyear.customer_preferred_cust_flag
+ from year_total t_s_firstyear
+     ,year_total t_s_secyear
+     ,year_total t_c_firstyear
+     ,year_total t_c_secyear
+     ,year_total t_w_firstyear
+     ,year_total t_w_secyear
+ where t_s_secyear.customer_id = t_s_firstyear.customer_id
+   and t_s_firstyear.customer_id = t_c_secyear.customer_id
+   and t_s_firstyear.customer_id = t_c_firstyear.customer_id
+   and t_s_firstyear.customer_id = t_w_firstyear.customer_id
+   and t_s_firstyear.customer_id = t_w_secyear.customer_id
+   and t_s_firstyear.sale_type = 's'
+   and t_c_firstyear.sale_type = 'c'
+   and t_w_firstyear.sale_type = 'w'
+   and t_s_secyear.sale_type = 's'
+   and t_c_secyear.sale_type = 'c'
+   and t_w_secyear.sale_type = 'w'
+   and t_s_firstyear.dyear =  2001
+   and t_s_secyear.dyear = 2001+1
+   and t_c_firstyear.dyear =  2001
+   and t_c_secyear.dyear =  2001+1
+   and t_w_firstyear.dyear = 2001
+   and t_w_secyear.dyear = 2001+1
+   and t_s_firstyear.year_total > 0
+   and t_c_firstyear.year_total > 0
+   and t_w_firstyear.year_total > 0
+   and case when t_c_firstyear.year_total > 0 then t_c_secyear.year_total / t_c_firstyear.year_total else null end
+           > case when t_s_firstyear.year_total > 0 then t_s_secyear.year_total / t_s_firstyear.year_total else null end
+   and case when t_c_firstyear.year_total > 0 then t_c_secyear.year_total / t_c_firstyear.year_total else null end
+           > case when t_w_firstyear.year_total > 0 then t_w_secyear.year_total / t_w_firstyear.year_total else null end
+ order by t_s_secyear.customer_preferred_cust_flag
+limit 100
+
+-- end query 1 in stream 0 using template query4.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], dir0=[ASC-nulls-first], fetch=[100])
++- LogicalProject(customer_preferred_cust_flag=[$13])
+   +- LogicalFilter(condition=[AND(=($10, $0), =($0, $30), =($0, $20), =($0, $40), =($0, $50), =($9, _UTF-16LE's'), =($29, _UTF-16LE'c'), =($49, _UTF-16LE'w'), =($19, _UTF-16LE's'), =($39, _UTF-16LE'c'), =($59, _UTF-16LE'w'), =($7, 2001), =($17, +(2001, 1)), =($27, 2001), =($37, +(2001, 1)), =($47, 2001), =($57, +(2001, 1)), >($8, 0), >($28, 0), >($48, 0), >(CASE(>($28, 0), /($38, $28), null:DOUBLE), CASE(>($8, 0), /($18, $8), null:DOUBLE)), >(CASE(>($28, 0), /($38, $28), null:DOUBLE), CASE(>($48, 0), /($58, $48), null:DOUBLE)))])
+      +- LogicalJoin(condition=[true], joinType=[inner])
+         :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :  :- LogicalUnion(all=[true])
+         :  :  :  :  :  :- LogicalUnion(all=[true])
+         :  :  :  :  :  :  :- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE's'])
+         :  :  :  :  :  :  :  +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :  :  :  :  :  :  :     +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$47], $f8=[/(+(-(-($34, $33), $31), $32), 2)])
+         :  :  :  :  :  :  :        +- LogicalFilter(condition=[AND(=($0, $20), =($40, $41))])
+         :  :  :  :  :  :  :           +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :  :  :  :              :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :  :  :  :              :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :  :  :  :  :  :              :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+         :  :  :  :  :  :  :              +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  :  :  :  :  :  +- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE'c'])
+         :  :  :  :  :  :     +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :  :  :  :  :  :        +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$58], $f8=[/(+(-(-($42, $41), $39), $40), 2)])
+         :  :  :  :  :  :           +- LogicalFilter(condition=[AND(=($0, $20), =($51, $52))])
+         :  :  :  :  :  :              +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :  :  :                 :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :  :  :                 :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :  :  :  :  :                 :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+         :  :  :  :  :  :                 +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  :  :  :  :  +- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE'w'])
+         :  :  :  :  :     +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :  :  :  :  :        +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$58], $f8=[/(+(-(-($42, $41), $39), $40), 2)])
+         :  :  :  :  :           +- LogicalFilter(condition=[AND(=($0, $21), =($51, $52))])
+         :  :  :  :  :              +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :  :                 :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :  :                 :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :  :  :  :                 :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+         :  :  :  :  :                 +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  :  :  :  +- LogicalUnion(all=[true])
+         :  :  :  :     :- LogicalUnion(all=[true])
+         :  :  :  :     :  :- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE's'])
+         :  :  :  :     :  :  +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :  :  :  :     :  :     +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$47], $f8=[/(+(-(-($34, $33), $31), $32), 2)])
+         :  :  :  :     :  :        +- LogicalFilter(condition=[AND(=($0, $20), =($40, $41))])
+         :  :  :  :     :  :           +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :     :  :              :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :     :  :              :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :  :  :     :  :              :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+         :  :  :  :     :  :              +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  :  :  :     :  +- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE'c'])
+         :  :  :  :     :     +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :  :  :  :     :        +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$58], $f8=[/(+(-(-($42, $41), $39), $40), 2)])
+         :  :  :  :     :           +- LogicalFilter(condition=[AND(=($0, $20), =($51, $52))])
+         :  :  :  :     :              +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :     :                 :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :     :                 :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :  :  :     :                 :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+         :  :  :  :     :                 +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  :  :  :     +- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE'w'])
+         :  :  :  :        +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :  :  :  :           +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$58], $f8=[/(+(-(-($42, $41), $39), $40), 2)])
+         :  :  :  :              +- LogicalFilter(condition=[AND(=($0, $21), =($51, $52))])
+         :  :  :  :                 +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :                    :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :                    :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :  :  :                    :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+         :  :  :  :                    +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  :  :  +- LogicalUnion(all=[true])
+         :  :  :     :- LogicalUnion(all=[true])
+         :  :  :     :  :- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE's'])
+         :  :  :     :  :  +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :  :  :     :  :     +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$47], $f8=[/(+(-(-($34, $33), $31), $32), 2)])
+         :  :  :     :  :        +- LogicalFilter(condition=[AND(=($0, $20), =($40, $41))])
+         :  :  :     :  :           +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :     :  :              :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :     :  :              :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :  :     :  :              :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+         :  :  :     :  :              +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  :  :     :  +- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE'c'])
+         :  :  :     :     +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :  :  :     :        +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$58], $f8=[/(+(-(-($42, $41), $39), $40), 2)])
+         :  :  :     :           +- LogicalFilter(condition=[AND(=($0, $20), =($51, $52))])
+         :  :  :     :              +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :     :                 :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :     :                 :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :  :     :                 :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+         :  :  :     :                 +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  :  :     +- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE'w'])
+         :  :  :        +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :  :  :           +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$58], $f8=[/(+(-(-($42, $41), $39), $40), 2)])
+         :  :  :              +- LogicalFilter(condition=[AND(=($0, $21), =($51, $52))])
+         :  :  :                 +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :                    :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :                    :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :  :                    :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+         :  :  :                    +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  :  +- LogicalUnion(all=[true])
+         :  :     :- LogicalUnion(all=[true])
+         :  :     :  :- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE's'])
+         :  :     :  :  +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :  :     :  :     +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$47], $f8=[/(+(-(-($34, $33), $31), $32), 2)])
+         :  :     :  :        +- LogicalFilter(condition=[AND(=($0, $20), =($40, $41))])
+         :  :     :  :           +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :     :  :              :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :     :  :              :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :     :  :              :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+         :  :     :  :              +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  :     :  +- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE'c'])
+         :  :     :     +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :  :     :        +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$58], $f8=[/(+(-(-($42, $41), $39), $40), 2)])
+         :  :     :           +- LogicalFilter(condition=[AND(=($0, $20), =($51, $52))])
+         :  :     :              +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :     :                 :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :     :                 :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :     :                 :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+         :  :     :                 +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  :     +- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE'w'])
+         :  :        +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :  :           +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$58], $f8=[/(+(-(-($42, $41), $39), $40), 2)])
+         :  :              +- LogicalFilter(condition=[AND(=($0, $21), =($51, $52))])
+         :  :                 +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :                    :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :                    :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :                    :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+         :  :                    +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  +- LogicalUnion(all=[true])
+         :     :- LogicalUnion(all=[true])
+         :     :  :- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE's'])
+         :     :  :  +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :     :  :     +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$47], $f8=[/(+(-(-($34, $33), $31), $32), 2)])
+         :     :  :        +- LogicalFilter(condition=[AND(=($0, $20), =($40, $41))])
+         :     :  :           +- LogicalJoin(condition=[true], joinType=[inner])
+         :     :  :              :- LogicalJoin(condition=[true], joinType=[inner])
+         :     :  :              :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :     :  :              :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+         :     :  :              +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :     :  +- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE'c'])
+         :     :     +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :     :        +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$58], $f8=[/(+(-(-($42, $41), $39), $40), 2)])
+         :     :           +- LogicalFilter(condition=[AND(=($0, $20), =($51, $52))])
+         :     :              +- LogicalJoin(condition=[true], joinType=[inner])
+         :     :                 :- LogicalJoin(condition=[true], joinType=[inner])
+         :     :                 :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :     :                 :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+         :     :                 +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :     +- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE'w'])
+         :        +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+         :           +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$58], $f8=[/(+(-(-($42, $41), $39), $40), 2)])
+         :              +- LogicalFilter(condition=[AND(=($0, $21), =($51, $52))])
+         :                 +- LogicalJoin(condition=[true], joinType=[inner])
+         :                    :- LogicalJoin(condition=[true], joinType=[inner])
+         :                    :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :                    :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+         :                    +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         +- LogicalUnion(all=[true])
+            :- LogicalUnion(all=[true])
+            :  :- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE's'])
+            :  :  +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+            :  :     +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$47], $f8=[/(+(-(-($34, $33), $31), $32), 2)])
+            :  :        +- LogicalFilter(condition=[AND(=($0, $20), =($40, $41))])
+            :  :           +- LogicalJoin(condition=[true], joinType=[inner])
+            :  :              :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :              :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+            :  :              :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+            :  :              +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+            :  +- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE'c'])
+            :     +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+            :        +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$58], $f8=[/(+(-(-($42, $41), $39), $40), 2)])
+            :           +- LogicalFilter(condition=[AND(=($0, $20), =($51, $52))])
+            :              +- LogicalJoin(condition=[true], joinType=[inner])
+            :                 :- LogicalJoin(condition=[true], joinType=[inner])
+            :                 :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+            :                 :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+            :                 +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+            +- LogicalProject(customer_id=[$0], customer_first_name=[$1], customer_last_name=[$2], customer_preferred_cust_flag=[$3], customer_birth_country=[$4], customer_login=[$5], customer_email_address=[$6], dyear=[$7], year_total=[$8], sale_type=[_UTF-16LE'w'])
+               +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7}], year_total=[SUM($8)])
+                  +- LogicalProject(customer_id=[$1], customer_first_name=[$8], customer_last_name=[$9], customer_preferred_cust_flag=[$10], customer_birth_country=[$14], customer_login=[$15], customer_email_address=[$16], dyear=[$58], $f8=[/(+(-(-($42, $41), $39), $40), 2)])
+                     +- LogicalFilter(condition=[AND(=($0, $21), =($51, $52))])
+                        +- LogicalJoin(condition=[true], joinType=[inner])
+                           :- LogicalJoin(condition=[true], joinType=[inner])
+                           :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+                           :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+                           +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Calc(select=[customer_preferred_cust_flag000 AS customer_preferred_cust_flag])
++- SortLimit(orderBy=[customer_preferred_cust_flag000 ASC], offset=[0], fetch=[100], global=[true])
+   +- Exchange(distribution=[single])
+      +- SortLimit(orderBy=[customer_preferred_cust_flag000 ASC], offset=[0], fetch=[100], global=[false])
+         +- HashJoin(joinType=[InnerJoin], where=[(CASE((year_total > 0), CASE((year_total0000 > 0), ((year_total00 / year_total0000) > (year_total0 / year_total)), false), false) AND (customer_id = customer_id00))], select=[customer_id, year_total, year_total0, customer_id00, year_total00, customer_preferred_cust_flag000, year_total0000], build=[right])
+            :- Exchange(distribution=[hash[customer_id]])
+            :  +- Calc(select=[customer_id, year_total], where=[(year_total > 0)])
+            :     +- HashAggregate(isMerge=[false], groupBy=[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear], select=[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear, SUM($f8) AS year_total])
+            :        +- Exchange(distribution=[hash[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear]])
+            :           +- Calc(select=[c_customer_id AS customer_id, c_first_name AS customer_first_name, c_last_name AS customer_last_name, c_preferred_cust_flag AS customer_preferred_cust_flag, c_birth_country AS customer_birth_country, c_login AS customer_login, c_email_address AS customer_email_address, CAST(2001 AS INTEGER) AS dyear, ((((ws_ext_list_price - ws_ext_wholesale_cost) - ws_ext_discount_amt) + ws_ext_sales_price) / 2) AS $f8])
+            :              +- HashJoin(joinType=[InnerJoin], where=[(c_customer_sk = ws_bill_customer_sk)], select=[ws_bill_customer_sk, ws_ext_discount_amt, ws_ext_sales_price, ws_ext_wholesale_cost, ws_ext_list_price, c_customer_sk, c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address], build=[right])
+            :                 :- Exchange(distribution=[hash[ws_bill_customer_sk]])
+            :                 :  +- Calc(select=[ws_bill_customer_sk, ws_ext_discount_amt, ws_ext_sales_price, ws_ext_wholesale_cost, ws_ext_list_price])
+            :                 :     +- HashJoin(joinType=[InnerJoin], where=[(ws_sold_date_sk = d_date_sk)], select=[ws_bill_customer_sk, ws_ext_discount_amt, ws_ext_sales_price, ws_ext_wholesale_cost, ws_ext_list_price, ws_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+            :                 :        :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales, project=[ws_bill_customer_sk, ws_ext_discount_amt, ws_ext_sales_price, ws_ext_wholesale_cost, ws_ext_list_price, ws_sold_date_sk], project=[ws_bill_customer_sk, ws_ext_discount_amt, ws_ext_sales_price, ws_ext_wholesale_cost, ws_ext_list_price, ws_sold_date_sk]]], fields=[ws_bill_customer_sk, ws_ext_discount_amt, ws_ext_sales_price, ws_ext_wholesale_cost, ws_ext_list_price, ws_sold_date_sk], dpp=[d_date_sk])(reuse_id=[3])
+            :                 :        +- Exchange(distribution=[broadcast])(reuse_id=[1])
+            :                 :           +- Calc(select=[d_date_sk], where=[(d_year = 2001)])
+            :                 :              +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_year]]], fields=[d_date_sk, d_year])(reuse_id=[4])
+            :                 +- Exchange(distribution=[hash[c_customer_sk]])
+            :                    +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer, project=[c_customer_sk, c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address]]], fields=[c_customer_sk, c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address])(reuse_id=[2])
+            +- Exchange(distribution=[hash[customer_id00]])
+               +- Calc(select=[year_total0, customer_id0 AS customer_id00, year_total00, customer_preferred_cust_flag00 AS customer_preferred_cust_flag000, year_total0000])
+                  +- HashJoin(joinType=[InnerJoin], where=[(CASE((year_total > 0), CASE((year_total0000 > 0), ((year_total00 / year_total0000) > (year_total000 / year_total)), false), false) AND (customer_id = customer_id00))], select=[customer_id, year_total, year_total0, customer_id0, year_total00, customer_id00, customer_preferred_cust_flag00, year_total000, year_total0000], build=[left])
+                     :- Exchange(distribution=[hash[customer_id]])
+                     :  +- Calc(select=[customer_id, year_total], where=[(year_total > 0)])
+                     :     +- HashAggregate(isMerge=[false], groupBy=[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear], select=[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear, SUM($f8) AS year_total])
+                     :        +- Exchange(distribution=[hash[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear]])
+                     :           +- Calc(select=[c_customer_id AS customer_id, c_first_name AS customer_first_name, c_last_name AS customer_last_name, c_preferred_cust_flag AS customer_preferred_cust_flag, c_birth_country AS customer_birth_country, c_login AS customer_login, c_email_address AS customer_email_address, CAST(2001 AS INTEGER) AS dyear, ((((ss_ext_list_price - ss_ext_wholesale_cost) - ss_ext_discount_amt) + ss_ext_sales_price) / 2) AS $f8])
+                     :              +- HashJoin(joinType=[InnerJoin], where=[(c_customer_sk = ss_customer_sk)], select=[ss_customer_sk, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, c_customer_sk, c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address], build=[right])
+                     :                 :- Exchange(distribution=[hash[ss_customer_sk]])
+                     :                 :  +- Calc(select=[ss_customer_sk, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price])
+                     :                 :     +- HashJoin(joinType=[InnerJoin], where=[(ss_sold_date_sk = d_date_sk)], select=[ss_customer_sk, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                     :                 :        :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_customer_sk, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_sold_date_sk], project=[ss_customer_sk, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_sold_date_sk]]], fields=[ss_customer_sk, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_sold_date_sk], dpp=[d_date_sk])(reuse_id=[6])
+                     :                 :        +- Reused(reference_id=[1])
+                     :                 +- Exchange(distribution=[hash[c_customer_sk]])
+                     :                    +- Reused(reference_id=[2])
+                     +- Exchange(distribution=[hash[customer_id00]])
+                        +- Calc(select=[year_total, customer_id0, year_total0, customer_id00, customer_preferred_cust_flag AS customer_preferred_cust_flag00, year_total00, year_total000])
+                           +- HashJoin(joinType=[InnerJoin], where=[(customer_id = customer_id000)], select=[customer_id, year_total, customer_id0, year_total0, customer_id00, customer_preferred_cust_flag, year_total00, customer_id000, year_total000], build=[left])
+                              :- Exchange(distribution=[hash[customer_id]])
+                              :  +- Calc(select=[customer_id, year_total])
+                              :     +- HashAggregate(isMerge=[false], groupBy=[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear], select=[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear, SUM($f8) AS year_total])
+                              :        +- Exchange(distribution=[hash[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear]])
+                              :           +- Calc(select=[c_customer_id AS customer_id, c_first_name AS customer_first_name, c_last_name AS customer_last_name, c_preferred_cust_flag AS customer_preferred_cust_flag, c_birth_country AS customer_birth_country, c_login AS customer_login, c_email_address AS customer_email_address, CAST(2002 AS INTEGER) AS dyear, ((((ws_ext_list_price - ws_ext_wholesale_cost) - ws_ext_discount_amt) + ws_ext_sales_price) / 2) AS $f8])
+                              :              +- HashJoin(joinType=[InnerJoin], where=[(c_customer_sk = ws_bill_customer_sk)], select=[ws_bill_customer_sk, ws_ext_discount_amt, ws_ext_sales_price, ws_ext_wholesale_cost, ws_ext_list_price, c_customer_sk, c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address], build=[right])
+                              :                 :- Exchange(distribution=[hash[ws_bill_customer_sk]])
+                              :                 :  +- Calc(select=[ws_bill_customer_sk, ws_ext_discount_amt, ws_ext_sales_price, ws_ext_wholesale_cost, ws_ext_list_price])
+                              :                 :     +- HashJoin(joinType=[InnerJoin], where=[(ws_sold_date_sk = d_date_sk)], select=[ws_bill_customer_sk, ws_ext_discount_amt, ws_ext_sales_price, ws_ext_wholesale_cost, ws_ext_list_price, ws_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                              :                 :        :- Reused(reference_id=[3])
+                              :                 :        +- Exchange(distribution=[broadcast])(reuse_id=[5])
+                              :                 :           +- Calc(select=[d_date_sk], where=[(d_year = 2002)])
+                              :                 :              +- Reused(reference_id=[4])
+                              :                 +- Exchange(distribution=[hash[c_customer_sk]])
+                              :                    +- Reused(reference_id=[2])
+                              +- HashJoin(joinType=[InnerJoin], where=[(customer_id = customer_id00)], select=[customer_id, year_total, customer_id0, customer_preferred_cust_flag, year_total0, customer_id00, year_total00], build=[left])
+                                 :- Exchange(distribution=[hash[customer_id]])
+                                 :  +- Calc(select=[customer_id, year_total])
+                                 :     +- HashAggregate(isMerge=[false], groupBy=[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear], select=[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear, SUM($f8) AS year_total])
+                                 :        +- Exchange(distribution=[hash[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear]])
+                                 :           +- Calc(select=[c_customer_id AS customer_id, c_first_name AS customer_first_name, c_last_name AS customer_last_name, c_preferred_cust_flag AS customer_preferred_cust_flag, c_birth_country AS customer_birth_country, c_login AS customer_login, c_email_address AS customer_email_address, CAST(2002 AS INTEGER) AS dyear, ((((cs_ext_list_price - cs_ext_wholesale_cost) - cs_ext_discount_amt) + cs_ext_sales_price) / 2) AS $f8])
+                                 :              +- HashJoin(joinType=[InnerJoin], where=[(c_customer_sk = cs_bill_customer_sk)], select=[cs_bill_customer_sk, cs_ext_discount_amt, cs_ext_sales_price, cs_ext_wholesale_cost, cs_ext_list_price, c_customer_sk, c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address], build=[right])
+                                 :                 :- Exchange(distribution=[hash[cs_bill_customer_sk]])
+                                 :                 :  +- Calc(select=[cs_bill_customer_sk, cs_ext_discount_amt, cs_ext_sales_price, cs_ext_wholesale_cost, cs_ext_list_price])
+                                 :                 :     +- HashJoin(joinType=[InnerJoin], where=[(cs_sold_date_sk = d_date_sk)], select=[cs_bill_customer_sk, cs_ext_discount_amt, cs_ext_sales_price, cs_ext_wholesale_cost, cs_ext_list_price, cs_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                                 :                 :        :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales, project=[cs_bill_customer_sk, cs_ext_discount_amt, cs_ext_sales_price, cs_ext_wholesale_cost, cs_ext_list_price, cs_sold_date_sk], project=[cs_bill_customer_sk, cs_ext_discount_amt, cs_ext_sales_price, cs_ext_wholesale_cost, cs_ext_list_price, cs_sold_date_sk]]], fields=[cs_bill_customer_sk, cs_ext_discount_amt, cs_ext_sales_price, cs_ext_wholesale_cost, cs_ext_list_price, cs_sold_date_sk], dpp=[d_date_sk])(reuse_id=[7])
+                                 :                 :        +- Reused(reference_id=[5])
+                                 :                 +- Exchange(distribution=[hash[c_customer_sk]])
+                                 :                    +- Reused(reference_id=[2])
+                                 +- HashJoin(joinType=[InnerJoin], where=[(customer_id0 = customer_id)], select=[customer_id, customer_preferred_cust_flag, year_total, customer_id0, year_total0], build=[right])
+                                    :- Exchange(distribution=[hash[customer_id]])
+                                    :  +- Calc(select=[customer_id, customer_preferred_cust_flag, year_total])
+                                    :     +- HashAggregate(isMerge=[false], groupBy=[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear], select=[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear, SUM($f8) AS year_total])
+                                    :        +- Exchange(distribution=[hash[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear]])
+                                    :           +- Calc(select=[c_customer_id AS customer_id, c_first_name AS customer_first_name, c_last_name AS customer_last_name, c_preferred_cust_flag AS customer_preferred_cust_flag, c_birth_country AS customer_birth_country, c_login AS customer_login, c_email_address AS customer_email_address, CAST(2002 AS INTEGER) AS dyear, ((((ss_ext_list_price - ss_ext_wholesale_cost) - ss_ext_discount_amt) + ss_ext_sales_price) / 2) AS $f8])
+                                    :              +- HashJoin(joinType=[InnerJoin], where=[(c_customer_sk = ss_customer_sk)], select=[ss_customer_sk, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, c_customer_sk, c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address], build=[right])
+                                    :                 :- Exchange(distribution=[hash[ss_customer_sk]])
+                                    :                 :  +- Calc(select=[ss_customer_sk, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price])
+                                    :                 :     +- HashJoin(joinType=[InnerJoin], where=[(ss_sold_date_sk = d_date_sk)], select=[ss_customer_sk, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                                    :                 :        :- Reused(reference_id=[6])
+                                    :                 :        +- Reused(reference_id=[5])
+                                    :                 +- Exchange(distribution=[hash[c_customer_sk]])
+                                    :                    +- Reused(reference_id=[2])
+                                    +- Exchange(distribution=[hash[customer_id]])
+                                       +- Calc(select=[customer_id, year_total], where=[(year_total > 0)])
+                                          +- HashAggregate(isMerge=[false], groupBy=[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear], select=[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear, SUM($f8) AS year_total])
+                                             +- Exchange(distribution=[hash[customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag, customer_birth_country, customer_login, customer_email_address, dyear]])
+                                                +- Calc(select=[c_customer_id AS customer_id, c_first_name AS customer_first_name, c_last_name AS customer_last_name, c_preferred_cust_flag AS customer_preferred_cust_flag, c_birth_country AS customer_birth_country, c_login AS customer_login, c_email_address AS customer_email_address, CAST(2001 AS INTEGER) AS dyear, ((((cs_ext_list_price - cs_ext_wholesale_cost) - cs_ext_discount_amt) + cs_ext_sales_price) / 2) AS $f8])
+                                                   +- HashJoin(joinType=[InnerJoin], where=[(c_customer_sk = cs_bill_customer_sk)], select=[cs_bill_customer_sk, cs_ext_discount_amt, cs_ext_sales_price, cs_ext_wholesale_cost, cs_ext_list_price, c_customer_sk, c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address], build=[right])
+                                                      :- Exchange(distribution=[hash[cs_bill_customer_sk]])
+                                                      :  +- Calc(select=[cs_bill_customer_sk, cs_ext_discount_amt, cs_ext_sales_price, cs_ext_wholesale_cost, cs_ext_list_price])
+                                                      :     +- HashJoin(joinType=[InnerJoin], where=[(cs_sold_date_sk = d_date_sk)], select=[cs_bill_customer_sk, cs_ext_discount_amt, cs_ext_sales_price, cs_ext_wholesale_cost, cs_ext_list_price, cs_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                                                      :        :- Reused(reference_id=[7])
+                                                      :        +- Reused(reference_id=[1])
+                                                      +- Exchange(distribution=[hash[c_customer_sk]])
+                                                         +- Reused(reference_id=[2])
+]]>
+    </Resource>
+  </TestCase>

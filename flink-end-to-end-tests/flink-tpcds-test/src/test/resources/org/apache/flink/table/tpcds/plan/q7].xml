@@ -1,0 +1,93 @@
+  <TestCase name="getExecPlan[q7]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query7.tpl and seed 1930872976
+select  i_item_id, 
+        avg(ss_quantity) agg1,
+        avg(ss_list_price) agg2,
+        avg(ss_coupon_amt) agg3,
+        avg(ss_sales_price) agg4 
+ from store_sales, customer_demographics, date_dim, item, promotion
+ where ss_sold_date_sk = d_date_sk and
+       ss_item_sk = i_item_sk and
+       ss_cdemo_sk = cd_demo_sk and
+       ss_promo_sk = p_promo_sk and
+       cd_gender = 'F' and 
+       cd_marital_status = 'W' and
+       cd_education_status = 'Primary' and
+       (p_channel_email = 'N' or p_channel_event = 'N') and
+       d_year = 1998 
+ group by i_item_id
+ order by i_item_id
+ limit 100
+
+-- end query 1 in stream 0 using template query7.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], dir0=[ASC-nulls-first], fetch=[100])
++- LogicalAggregate(group=[{0}], agg1=[AVG($1)], agg2=[AVG($2)], agg3=[AVG($3)], agg4=[AVG($4)])
+   +- LogicalProject(i_item_id=[$61], ss_quantity=[$9], ss_list_price=[$11], ss_coupon_amt=[$18], ss_sales_price=[$12])
+      +- LogicalFilter(condition=[AND(=($22, $32), =($1, $60), =($3, $23), =($7, $82), =($24, _UTF-16LE'F'), =($25, _UTF-16LE'W'), =($26, _UTF-16LE'Primary'), OR(=($91, _UTF-16LE'N'), =($96, _UTF-16LE'N')), =($38, 1998))])
+         +- LogicalJoin(condition=[true], joinType=[inner])
+            :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+            :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics]])
+            :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+            :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+            +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, promotion]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[i_item_id ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[i_item_id ASC], offset=[0], fetch=[100], global=[false])
+      +- HashAggregate(isMerge=[true], groupBy=[i_item_id], select=[i_item_id, Final_AVG(sum$0, count$1) AS agg1, Final_AVG(sum$2, count$3) AS agg2, Final_AVG(sum$4, count$5) AS agg3, Final_AVG(sum$6, count$7) AS agg4])
+         +- Exchange(distribution=[hash[i_item_id]])
+            +- LocalHashAggregate(groupBy=[i_item_id], select=[i_item_id, Partial_AVG(ss_quantity) AS (sum$0, count$1), Partial_AVG(ss_list_price) AS (sum$2, count$3), Partial_AVG(ss_coupon_amt) AS (sum$4, count$5), Partial_AVG(ss_sales_price) AS (sum$6, count$7)])
+               +- Calc(select=[i_item_id, ss_quantity, ss_list_price, ss_coupon_amt, ss_sales_price])
+                  +- HashJoin(joinType=[InnerJoin], where=[(ss_item_sk = i_item_sk)], select=[ss_item_sk, ss_quantity, ss_list_price, ss_sales_price, ss_coupon_amt, i_item_sk, i_item_id], build=[right])
+                     :- Exchange(distribution=[hash[ss_item_sk]])
+                     :  +- Calc(select=[ss_item_sk, ss_quantity, ss_list_price, ss_sales_price, ss_coupon_amt])
+                     :     +- HashJoin(joinType=[InnerJoin], where=[(ss_promo_sk = p_promo_sk)], select=[ss_item_sk, ss_promo_sk, ss_quantity, ss_list_price, ss_sales_price, ss_coupon_amt, p_promo_sk], isBroadcast=[true], build=[right])
+                     :        :- Calc(select=[ss_item_sk, ss_promo_sk, ss_quantity, ss_list_price, ss_sales_price, ss_coupon_amt])
+                     :        :  +- HashJoin(joinType=[InnerJoin], where=[(ss_sold_date_sk = d_date_sk)], select=[ss_item_sk, ss_promo_sk, ss_quantity, ss_list_price, ss_sales_price, ss_coupon_amt, ss_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                     :        :     :- Calc(select=[ss_item_sk, ss_promo_sk, ss_quantity, ss_list_price, ss_sales_price, ss_coupon_amt, ss_sold_date_sk])
+                     :        :     :  +- HashJoin(joinType=[InnerJoin], where=[(ss_cdemo_sk = cd_demo_sk)], select=[ss_item_sk, ss_cdemo_sk, ss_promo_sk, ss_quantity, ss_list_price, ss_sales_price, ss_coupon_amt, ss_sold_date_sk, cd_demo_sk], isBroadcast=[true], build=[right])
+                     :        :     :     :- Calc(select=[ss_item_sk, ss_cdemo_sk, ss_promo_sk, ss_quantity, ss_list_price, ss_sales_price, ss_coupon_amt, ss_sold_date_sk], where=[ss_cdemo_sk IS NOT NULL])
+                     :        :     :     :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_item_sk, ss_cdemo_sk, ss_promo_sk, ss_quantity, ss_list_price, ss_sales_price, ss_coupon_amt, ss_sold_date_sk]]], fields=[ss_item_sk, ss_cdemo_sk, ss_promo_sk, ss_quantity, ss_list_price, ss_sales_price, ss_coupon_amt, ss_sold_date_sk])
+                     :        :     :     +- Exchange(distribution=[broadcast])
+                     :        :     :        +- Calc(select=[cd_demo_sk], where=[((cd_gender = 'F') AND (cd_marital_status = 'W') AND (cd_education_status = 'Primary'))])
+                     :        :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics, project=[cd_demo_sk, cd_gender, cd_marital_status, cd_education_status]]], fields=[cd_demo_sk, cd_gender, cd_marital_status, cd_education_status])
+                     :        :     +- Exchange(distribution=[broadcast])
+                     :        :        +- Calc(select=[d_date_sk], where=[(d_year = 1998)])
+                     :        :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_year]]], fields=[d_date_sk, d_year])
+                     :        +- Exchange(distribution=[broadcast])
+                     :           +- Calc(select=[p_promo_sk], where=[((p_channel_email = 'N') OR (p_channel_event = 'N'))])
+                     :              +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, promotion, project=[p_promo_sk, p_channel_email, p_channel_event]]], fields=[p_promo_sk, p_channel_email, p_channel_event])
+                     +- Exchange(distribution=[hash[i_item_sk]])
+                        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_item_id]]], fields=[i_item_sk, i_item_id])
+]]>
+    </Resource>
+  </TestCase>

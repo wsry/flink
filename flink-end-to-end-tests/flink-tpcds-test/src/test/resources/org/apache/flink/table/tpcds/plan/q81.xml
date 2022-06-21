@@ -1,0 +1,132 @@
+  <TestCase name="getExecPlan[q81]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query81.tpl and seed 1819994127
+with customer_total_return as
+ (select cr_returning_customer_sk as ctr_customer_sk
+        ,ca_state as ctr_state, 
+ 	sum(cr_return_amt_inc_tax) as ctr_total_return
+ from catalog_returns
+     ,date_dim
+     ,customer_address
+ where cr_returned_date_sk = d_date_sk 
+   and d_year =1998
+   and cr_returning_addr_sk = ca_address_sk 
+ group by cr_returning_customer_sk
+         ,ca_state )
+  select  c_customer_id,c_salutation,c_first_name,c_last_name,ca_street_number,ca_street_name
+                   ,ca_street_type,ca_suite_number,ca_city,ca_county,ca_state,ca_zip,ca_country,ca_gmt_offset
+                  ,ca_location_type,ctr_total_return
+ from customer_total_return ctr1
+     ,customer_address
+     ,customer
+ where ctr1.ctr_total_return > (select avg(ctr_total_return)*1.2
+ 			  from customer_total_return ctr2 
+                  	  where ctr1.ctr_state = ctr2.ctr_state)
+       and ca_address_sk = c_current_addr_sk
+       and ca_state = 'IL'
+       and ctr1.ctr_customer_sk = c_customer_sk
+ order by c_customer_id,c_salutation,c_first_name,c_last_name,ca_street_number,ca_street_name
+                   ,ca_street_type,ca_suite_number,ca_city,ca_county,ca_state,ca_zip,ca_country,ca_gmt_offset
+                  ,ca_location_type,ctr_total_return
+ limit 100
+
+-- end query 1 in stream 0 using template query81.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], sort5=[$5], sort6=[$6], sort7=[$7], sort8=[$8], sort9=[$9], sort10=[$10], sort11=[$11], sort12=[$12], sort13=[$13], sort14=[$14], sort15=[$15], dir0=[ASC-nulls-first], dir1=[ASC-nulls-first], dir2=[ASC-nulls-first], dir3=[ASC-nulls-first], dir4=[ASC-nulls-first], dir5=[ASC-nulls-first], dir6=[ASC-nulls-first], dir7=[ASC-nulls-first], dir8=[ASC-nulls-first], dir9=[ASC-nulls-first], dir10=[ASC-nulls-first], dir11=[ASC-nulls-first], dir12=[ASC-nulls-first], dir13=[ASC-nulls-first], dir14=[ASC-nulls-first], dir15=[ASC-nulls-first], fetch=[100])
++- LogicalProject(c_customer_id=[$17], c_salutation=[$23], c_first_name=[$24], c_last_name=[$25], ca_street_number=[$5], ca_street_name=[$6], ca_street_type=[$7], ca_suite_number=[$8], ca_city=[$9], ca_county=[$10], ca_state=[$11], ca_zip=[$12], ca_country=[$13], ca_gmt_offset=[$14], ca_location_type=[$15], ctr_total_return=[$2])
+   +- LogicalFilter(condition=[AND(>($2, $SCALAR_QUERY({
+LogicalProject(EXPR$0=[*($0, 1.2:DECIMAL(2, 1))])
+  LogicalAggregate(group=[{}], agg#0=[AVG($0)])
+    LogicalProject(ctr_total_return=[$2])
+      LogicalFilter(condition=[=($cor0.ctr_state, $1)])
+        LogicalAggregate(group=[{0, 1}], ctr_total_return=[SUM($2)])
+          LogicalProject(ctr_customer_sk=[$6], ctr_state=[$63], cr_return_amt_inc_tax=[$19])
+            LogicalFilter(condition=[AND(=($26, $27), =($33, 1998), =($9, $55))])
+              LogicalJoin(condition=[true], joinType=[inner])
+                LogicalJoin(condition=[true], joinType=[inner])
+                  LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_returns]])
+                  LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+                LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+})), =($3, $20), =($11, _UTF-16LE'IL'), =($0, $16))], variablesSet=[[$cor0]])
+      +- LogicalJoin(condition=[true], joinType=[inner])
+         :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :- LogicalAggregate(group=[{0, 1}], ctr_total_return=[SUM($2)])
+         :  :  +- LogicalProject(ctr_customer_sk=[$6], ctr_state=[$63], cr_return_amt_inc_tax=[$19])
+         :  :     +- LogicalFilter(condition=[AND(=($26, $27), =($33, 1998), =($9, $55))])
+         :  :        +- LogicalJoin(condition=[true], joinType=[inner])
+         :  :           :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :           :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_returns]])
+         :  :           :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+         :  :           +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+         :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+         +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, ca_street_number ASC, ca_street_name ASC, ca_street_type ASC, ca_suite_number ASC, ca_city ASC, ca_county ASC, ca_state ASC, ca_zip ASC, ca_country ASC, ca_gmt_offset ASC, ca_location_type ASC, ctr_total_return ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, ca_street_number ASC, ca_street_name ASC, ca_street_type ASC, ca_suite_number ASC, ca_city ASC, ca_county ASC, ca_state ASC, ca_zip ASC, ca_country ASC, ca_gmt_offset ASC, ca_location_type ASC, ctr_total_return ASC], offset=[0], fetch=[100], global=[false])
+      +- Calc(select=[c_customer_id, c_salutation, c_first_name, c_last_name, ca_street_number, ca_street_name, ca_street_type, ca_suite_number, ca_city, ca_county, CAST('IL' AS VARCHAR(2147483647)) AS ca_state, ca_zip, ca_country, ca_gmt_offset, ca_location_type, ctr_total_return])
+         +- HashJoin(joinType=[InnerJoin], where=[(ca_address_sk = c_current_addr_sk)], select=[c_customer_id, c_current_addr_sk, c_salutation, c_first_name, c_last_name, ctr_total_return, ca_address_sk, ca_street_number, ca_street_name, ca_street_type, ca_suite_number, ca_city, ca_county, ca_zip, ca_country, ca_gmt_offset, ca_location_type], build=[right])
+            :- Exchange(distribution=[hash[c_current_addr_sk]])
+            :  +- Calc(select=[c_customer_id, c_current_addr_sk, c_salutation, c_first_name, c_last_name, ctr_total_return])
+            :     +- HashJoin(joinType=[InnerJoin], where=[(ctr_customer_sk = c_customer_sk)], select=[c_customer_sk, c_customer_id, c_current_addr_sk, c_salutation, c_first_name, c_last_name, ctr_customer_sk, ctr_total_return], build=[right])
+            :        :- Exchange(distribution=[hash[c_customer_sk]])
+            :        :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer, project=[c_customer_sk, c_customer_id, c_current_addr_sk, c_salutation, c_first_name, c_last_name]]], fields=[c_customer_sk, c_customer_id, c_current_addr_sk, c_salutation, c_first_name, c_last_name])
+            :        +- Exchange(distribution=[hash[ctr_customer_sk]])
+            :           +- Calc(select=[ctr_customer_sk, ctr_total_return])
+            :              +- HashJoin(joinType=[InnerJoin], where=[((ctr_state = ctr_state0) AND (ctr_total_return > ($f1 * 1.2)))], select=[ctr_customer_sk, ctr_state, ctr_total_return, ctr_state0, $f1], isBroadcast=[true], build=[right])
+            :                 :- HashAggregate(isMerge=[false], groupBy=[ctr_customer_sk, ctr_state], select=[ctr_customer_sk, ctr_state, SUM(cr_return_amt_inc_tax) AS ctr_total_return])
+            :                 :  +- Exchange(distribution=[hash[ctr_customer_sk, ctr_state]])
+            :                 :     +- Calc(select=[cr_returning_customer_sk AS ctr_customer_sk, ca_state AS ctr_state, cr_return_amt_inc_tax])
+            :                 :        +- HashJoin(joinType=[InnerJoin], where=[(cr_returning_addr_sk = ca_address_sk)], select=[ca_address_sk, ca_state, cr_returning_customer_sk, cr_returning_addr_sk, cr_return_amt_inc_tax], build=[left])
+            :                 :           :- Exchange(distribution=[hash[ca_address_sk]])
+            :                 :           :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address, project=[ca_address_sk, ca_state]]], fields=[ca_address_sk, ca_state])(reuse_id=[1])
+            :                 :           +- Exchange(distribution=[hash[cr_returning_addr_sk]])(reuse_id=[2])
+            :                 :              +- Calc(select=[cr_returning_customer_sk, cr_returning_addr_sk, cr_return_amt_inc_tax])
+            :                 :                 +- HashJoin(joinType=[InnerJoin], where=[(cr_returned_date_sk = d_date_sk)], select=[cr_returning_customer_sk, cr_returning_addr_sk, cr_return_amt_inc_tax, cr_returned_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+            :                 :                    :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_returns, project=[cr_returning_customer_sk, cr_returning_addr_sk, cr_return_amt_inc_tax, cr_returned_date_sk], project=[cr_returning_customer_sk, cr_returning_addr_sk, cr_return_amt_inc_tax, cr_returned_date_sk]]], fields=[cr_returning_customer_sk, cr_returning_addr_sk, cr_return_amt_inc_tax, cr_returned_date_sk], dpp=[d_date_sk])
+            :                 :                    +- Exchange(distribution=[broadcast])
+            :                 :                       +- Calc(select=[d_date_sk], where=[(d_year = 1998)])
+            :                 :                          +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_year]]], fields=[d_date_sk, d_year])
+            :                 +- Exchange(distribution=[broadcast])
+            :                    +- HashAggregate(isMerge=[true], groupBy=[ctr_state], select=[ctr_state, Final_AVG(sum$0, count$1) AS $f1])
+            :                       +- Exchange(distribution=[hash[ctr_state]])
+            :                          +- LocalHashAggregate(groupBy=[ctr_state], select=[ctr_state, Partial_AVG(ctr_total_return) AS (sum$0, count$1)])
+            :                             +- Calc(select=[ctr_state, ctr_total_return])
+            :                                +- HashAggregate(isMerge=[false], groupBy=[ctr_customer_sk, ctr_state], select=[ctr_customer_sk, ctr_state, SUM(cr_return_amt_inc_tax) AS ctr_total_return])
+            :                                   +- Exchange(distribution=[hash[ctr_customer_sk, ctr_state]])
+            :                                      +- Calc(select=[cr_returning_customer_sk AS ctr_customer_sk, ca_state AS ctr_state, cr_return_amt_inc_tax])
+            :                                         +- HashJoin(joinType=[InnerJoin], where=[(cr_returning_addr_sk = ca_address_sk)], select=[ca_address_sk, ca_state, cr_returning_customer_sk, cr_returning_addr_sk, cr_return_amt_inc_tax], build=[left])
+            :                                            :- Exchange(distribution=[hash[ca_address_sk]])
+            :                                            :  +- Calc(select=[ca_address_sk, ca_state], where=[ca_state IS NOT NULL])
+            :                                            :     +- Reused(reference_id=[1])
+            :                                            +- Reused(reference_id=[2])
+            +- Exchange(distribution=[hash[ca_address_sk]])
+               +- Calc(select=[ca_address_sk, ca_street_number, ca_street_name, ca_street_type, ca_suite_number, ca_city, ca_county, ca_zip, ca_country, ca_gmt_offset, ca_location_type], where=[(ca_state = 'IL')])
+                  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address, project=[ca_address_sk, ca_street_number, ca_street_name, ca_street_type, ca_suite_number, ca_city, ca_county, ca_state, ca_zip, ca_country, ca_gmt_offset, ca_location_type]]], fields=[ca_address_sk, ca_street_number, ca_street_name, ca_street_type, ca_suite_number, ca_city, ca_county, ca_state, ca_zip, ca_country, ca_gmt_offset, ca_location_type])
+]]>
+    </Resource>
+  </TestCase>

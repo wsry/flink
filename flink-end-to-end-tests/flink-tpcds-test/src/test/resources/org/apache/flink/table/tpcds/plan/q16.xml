@@ -1,0 +1,116 @@
+  <TestCase name="getExecPlan[q16]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query16.tpl and seed 171719422
+select  
+   count(distinct cs_order_number) as `order count`
+  ,sum(cs_ext_ship_cost) as `total shipping cost`
+  ,sum(cs_net_profit) as `total net profit`
+from
+   catalog_sales cs1
+  ,date_dim
+  ,customer_address
+  ,call_center
+where
+    d_date between '2001-4-01' and 
+           (cast('2001-4-01' as date) + interval '60' day)
+and cs1.cs_ship_date_sk = d_date_sk
+and cs1.cs_ship_addr_sk = ca_address_sk
+and ca_state = 'NY'
+and cs1.cs_call_center_sk = cc_call_center_sk
+and cc_county in ('Ziebach County','Levy County','Huron County','Franklin Parish',
+                  'Daviess County'
+)
+and exists (select *
+            from catalog_sales cs2
+            where cs1.cs_order_number = cs2.cs_order_number
+              and cs1.cs_warehouse_sk <> cs2.cs_warehouse_sk)
+and not exists(select *
+               from catalog_returns cr1
+               where cs1.cs_order_number = cr1.cr_order_number)
+order by count(distinct cs_order_number)
+limit 100
+
+-- end query 1 in stream 0 using template query16.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], dir0=[ASC-nulls-first], fetch=[100])
++- LogicalAggregate(group=[{}], order count=[COUNT(DISTINCT $0)], total shipping cost=[SUM($1)], total net profit=[SUM($2)])
+   +- LogicalProject(cs_order_number=[$16], cs_ext_ship_cost=[$27], cs_net_profit=[$32])
+      +- LogicalFilter(condition=[AND(>=($36, CAST(_UTF-16LE'2001-4-01'):DATE NOT NULL), <=($36, +(CAST(_UTF-16LE'2001-4-01'):DATE NOT NULL, 5184000000:INTERVAL DAY)), =($1, $34), =($9, $62), =($70, _UTF-16LE'NY'), =($10, $75), OR(=($100, _UTF-16LE'Ziebach County'), =($100, _UTF-16LE'Levy County'), =($100, _UTF-16LE'Huron County'), =($100, _UTF-16LE'Franklin Parish'), =($100, _UTF-16LE'Daviess County')), EXISTS({
+LogicalFilter(condition=[AND(=($cor0.cs_order_number, $16), <>($cor0.cs_warehouse_sk, $13))])
+  LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+}), NOT(EXISTS({
+LogicalFilter(condition=[=($cor0.cs_order_number, $15)])
+  LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_returns]])
+})))], variablesSet=[[$cor0]])
+         +- LogicalJoin(condition=[true], joinType=[inner])
+            :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+            :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+            :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+            +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, call_center]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[order count ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[order count ASC], offset=[0], fetch=[100], global=[false])
+      +- HashAggregate(isMerge=[true], select=[Final_COUNT(count$0) AS order count, Final_MIN(min$1) AS total shipping cost, Final_MIN(min$2) AS total net profit])
+         +- Exchange(distribution=[single])
+            +- LocalHashAggregate(select=[Partial_COUNT(cs_order_number) FILTER $g_0 AS count$0, Partial_MIN(total shipping cost) FILTER $g_1 AS min$1, Partial_MIN(total net profit) FILTER $g_1 AS min$2])
+               +- Calc(select=[cs_order_number, total shipping cost, total net profit, (CASE(($e = 0), 0, 1) = 0) AS $g_0, (CASE(($e = 0), 0, 1) = 1) AS $g_1])
+                  +- HashAggregate(isMerge=[true], groupBy=[cs_order_number, $e], select=[cs_order_number, $e, Final_SUM(sum$0) AS total shipping cost, Final_SUM(sum$1) AS total net profit])
+                     +- Exchange(distribution=[hash[cs_order_number, $e]])
+                        +- LocalHashAggregate(groupBy=[cs_order_number, $e], select=[cs_order_number, $e, Partial_SUM(cs_ext_ship_cost) AS sum$0, Partial_SUM(cs_net_profit) AS sum$1])
+                           +- Expand(projects=[{cs_warehouse_sk, cs_order_number, cs_ext_ship_cost, cs_net_profit, 0 AS $e}, {cs_warehouse_sk, null AS cs_order_number, cs_ext_ship_cost, cs_net_profit, 1 AS $e}])
+                              +- HashJoin(joinType=[LeftAntiJoin], where=[(cs_order_number = cr_order_number)], select=[cs_warehouse_sk, cs_order_number, cs_ext_ship_cost, cs_net_profit], build=[left], tryDistinctBuildRow=[true])
+                                 :- HashJoin(joinType=[LeftSemiJoin], where=[((cs_order_number = cs_order_number0) AND (cs_warehouse_sk <> cs_warehouse_sk0))], select=[cs_warehouse_sk, cs_order_number, cs_ext_ship_cost, cs_net_profit], build=[left], tryDistinctBuildRow=[true])
+                                 :  :- Exchange(distribution=[hash[cs_order_number]])
+                                 :  :  +- Calc(select=[cs_warehouse_sk, cs_order_number, cs_ext_ship_cost, cs_net_profit])
+                                 :  :     +- HashJoin(joinType=[InnerJoin], where=[(cs_call_center_sk = cc_call_center_sk)], select=[cs_call_center_sk, cs_warehouse_sk, cs_order_number, cs_ext_ship_cost, cs_net_profit, cc_call_center_sk], isBroadcast=[true], build=[right])
+                                 :  :        :- Calc(select=[cs_call_center_sk, cs_warehouse_sk, cs_order_number, cs_ext_ship_cost, cs_net_profit])
+                                 :  :        :  +- HashJoin(joinType=[InnerJoin], where=[(cs_ship_date_sk = d_date_sk)], select=[cs_ship_date_sk, cs_call_center_sk, cs_warehouse_sk, cs_order_number, cs_ext_ship_cost, cs_net_profit, d_date_sk], isBroadcast=[true], build=[right])
+                                 :  :        :     :- Calc(select=[cs_ship_date_sk, cs_call_center_sk, cs_warehouse_sk, cs_order_number, cs_ext_ship_cost, cs_net_profit])
+                                 :  :        :     :  +- HashJoin(joinType=[InnerJoin], where=[(cs_ship_addr_sk = ca_address_sk)], select=[cs_ship_date_sk, cs_ship_addr_sk, cs_call_center_sk, cs_warehouse_sk, cs_order_number, cs_ext_ship_cost, cs_net_profit, ca_address_sk], isBroadcast=[true], build=[right])
+                                 :  :        :     :     :- Calc(select=[cs_ship_date_sk, cs_ship_addr_sk, cs_call_center_sk, cs_warehouse_sk, cs_order_number, cs_ext_ship_cost, cs_net_profit], where=[cs_ship_date_sk IS NOT NULL])
+                                 :  :        :     :     :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales, project=[cs_ship_date_sk, cs_ship_addr_sk, cs_call_center_sk, cs_warehouse_sk, cs_order_number, cs_ext_ship_cost, cs_net_profit]]], fields=[cs_ship_date_sk, cs_ship_addr_sk, cs_call_center_sk, cs_warehouse_sk, cs_order_number, cs_ext_ship_cost, cs_net_profit])
+                                 :  :        :     :     +- Exchange(distribution=[broadcast])
+                                 :  :        :     :        +- Calc(select=[ca_address_sk], where=[SEARCH(ca_state, Sarg[_UTF-16LE'NY'])])
+                                 :  :        :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address, project=[ca_address_sk, ca_state]]], fields=[ca_address_sk, ca_state])
+                                 :  :        :     +- Exchange(distribution=[broadcast])
+                                 :  :        :        +- Calc(select=[d_date_sk], where=[SEARCH(d_date, Sarg[[2001-04-01..2001-05-31]])])
+                                 :  :        :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_date]]], fields=[d_date_sk, d_date])
+                                 :  :        +- Exchange(distribution=[broadcast])
+                                 :  :           +- Calc(select=[cc_call_center_sk], where=[SEARCH(cc_county, Sarg[_UTF-16LE'Daviess County', _UTF-16LE'Franklin Parish', _UTF-16LE'Huron County', _UTF-16LE'Levy County', _UTF-16LE'Ziebach County'])])
+                                 :  :              +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, call_center, project=[cc_call_center_sk, cc_county]]], fields=[cc_call_center_sk, cc_county])
+                                 :  +- Exchange(distribution=[hash[cs_order_number]])
+                                 :     +- LocalHashAggregate(groupBy=[cs_warehouse_sk, cs_order_number], select=[cs_warehouse_sk, cs_order_number])
+                                 :        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales, project=[cs_warehouse_sk, cs_order_number]]], fields=[cs_warehouse_sk, cs_order_number])
+                                 +- Exchange(distribution=[hash[cr_order_number]])
+                                    +- LocalHashAggregate(groupBy=[cr_order_number], select=[cr_order_number])
+                                       +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_returns, project=[cr_order_number]]], fields=[cr_order_number])
+]]>
+    </Resource>
+  </TestCase>

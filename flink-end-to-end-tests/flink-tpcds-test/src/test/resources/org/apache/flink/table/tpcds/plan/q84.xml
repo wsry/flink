@@ -1,0 +1,95 @@
+  <TestCase name="getExecPlan[q84]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query84.tpl and seed 1819994127
+select  c_customer_id as customer_id
+       ,c_last_name || ', ' || c_first_name as customername
+ from customer
+     ,customer_address
+     ,customer_demographics
+     ,household_demographics
+     ,income_band
+     ,store_returns
+ where ca_city	        =  'Hopewell'
+   and c_current_addr_sk = ca_address_sk
+   and ib_lower_bound   >=  32287
+   and ib_upper_bound   <=  32287 + 50000
+   and ib_income_band_sk = hd_income_band_sk
+   and cd_demo_sk = c_current_cdemo_sk
+   and hd_demo_sk = c_current_hdemo_sk
+   and sr_cdemo_sk = cd_demo_sk
+ order by c_customer_id
+ limit 100
+
+-- end query 1 in stream 0 using template query84.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], dir0=[ASC-nulls-first], fetch=[100])
++- LogicalProject(customer_id=[$1], customername=[||(||($9, _UTF-16LE', '), $8)])
+   +- LogicalFilter(condition=[AND(=($24, _UTF-16LE'Hopewell'), =($4, $18), >=($46, 32287), <=($47, +(32287, 50000)), =($45, $41), =($31, $2), =($40, $3), =($51, $31))])
+      +- LogicalJoin(condition=[true], joinType=[inner])
+         :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+         :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+         :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics]])
+         :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics]])
+         :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, income_band]])
+         +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_returns]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Calc(select=[c_customer_id AS customer_id, ||(||(c_last_name, ', '), c_first_name) AS customername])
++- SortLimit(orderBy=[c_customer_id ASC], offset=[0], fetch=[100], global=[true])
+   +- Exchange(distribution=[single])
+      +- SortLimit(orderBy=[c_customer_id ASC], offset=[0], fetch=[100], global=[false])
+         +- HashJoin(joinType=[InnerJoin], where=[(cd_demo_sk = c_current_cdemo_sk)], select=[cd_demo_sk, c_customer_id, c_current_cdemo_sk, c_first_name, c_last_name], build=[right])
+            :- Calc(select=[cd_demo_sk])
+            :  +- HashJoin(joinType=[InnerJoin], where=[(sr_cdemo_sk = cd_demo_sk)], select=[sr_cdemo_sk, cd_demo_sk], build=[right])
+            :     :- Exchange(distribution=[hash[sr_cdemo_sk]])
+            :     :  +- Calc(select=[sr_cdemo_sk], where=[sr_cdemo_sk IS NOT NULL])
+            :     :     +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_returns, project=[sr_cdemo_sk]]], fields=[sr_cdemo_sk])
+            :     +- Exchange(distribution=[hash[cd_demo_sk]])
+            :        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics, project=[cd_demo_sk]]], fields=[cd_demo_sk])
+            +- Exchange(distribution=[hash[c_current_cdemo_sk]])
+               +- Calc(select=[c_customer_id, c_current_cdemo_sk, c_first_name, c_last_name])
+                  +- HashJoin(joinType=[InnerJoin], where=[(hd_demo_sk = c_current_hdemo_sk)], select=[c_customer_id, c_current_cdemo_sk, c_current_hdemo_sk, c_first_name, c_last_name, hd_demo_sk], isBroadcast=[true], build=[right])
+                     :- Calc(select=[c_customer_id, c_current_cdemo_sk, c_current_hdemo_sk, c_first_name, c_last_name])
+                     :  +- HashJoin(joinType=[InnerJoin], where=[(c_current_addr_sk = ca_address_sk)], select=[c_customer_id, c_current_cdemo_sk, c_current_hdemo_sk, c_current_addr_sk, c_first_name, c_last_name, ca_address_sk], build=[right])
+                     :     :- Exchange(distribution=[hash[c_current_addr_sk]])
+                     :     :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer, project=[c_customer_id, c_current_cdemo_sk, c_current_hdemo_sk, c_current_addr_sk, c_first_name, c_last_name]]], fields=[c_customer_id, c_current_cdemo_sk, c_current_hdemo_sk, c_current_addr_sk, c_first_name, c_last_name])
+                     :     +- Exchange(distribution=[hash[ca_address_sk]])
+                     :        +- Calc(select=[ca_address_sk], where=[(ca_city = 'Hopewell')])
+                     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address, project=[ca_address_sk, ca_city]]], fields=[ca_address_sk, ca_city])
+                     +- Exchange(distribution=[broadcast])
+                        +- Calc(select=[hd_demo_sk])
+                           +- NestedLoopJoin(joinType=[InnerJoin], where=[(ib_income_band_sk = hd_income_band_sk)], select=[hd_demo_sk, hd_income_band_sk, ib_income_band_sk], build=[right])
+                              :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics, project=[hd_demo_sk, hd_income_band_sk]]], fields=[hd_demo_sk, hd_income_band_sk])
+                              +- Exchange(distribution=[broadcast])
+                                 +- Calc(select=[ib_income_band_sk], where=[((ib_lower_bound >= 32287) AND (ib_upper_bound <= 82287))])
+                                    +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, income_band]], fields=[ib_income_band_sk, ib_lower_bound, ib_upper_bound])
+]]>
+    </Resource>
+  </TestCase>

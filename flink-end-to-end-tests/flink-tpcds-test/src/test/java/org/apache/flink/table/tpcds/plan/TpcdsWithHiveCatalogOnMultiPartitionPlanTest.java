@@ -52,6 +52,23 @@ public class TpcdsWithHiveCatalogOnMultiPartitionPlanTest extends TpcdsPlanTest 
     }
 
     @Test
+    public void getExplain() {
+        HiveCatalogWrapper catalogWrapper =
+                new HiveCatalogWrapper(
+                        "hive", multiPartition_database, HIVE_CONF_DIR, HIVE_VERSION);
+        tEnv.registerCatalog("hive", catalogWrapper);
+        tEnv.useCatalog("hive");
+        //        HiveCatalog catalog =
+        //                new HiveCatalog("hive", multiPartition_database, HIVE_CONF_DIR,
+        // HIVE_VERSION);
+        //        tEnv.registerCatalog("hive", catalog);
+        //        tEnv.useCatalog("hive");
+
+        String sql = getSqlFile(caseName);
+        util.verifyExplain(sql);
+    }
+
+    @Test
     public void testConnectToHive() {
         HiveCatalog catalog =
                 new HiveCatalog("hive", multiPartition_database, HIVE_CONF_DIR, HIVE_VERSION);

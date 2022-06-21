@@ -1,0 +1,91 @@
+  <TestCase name="getExecPlan[q86]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query86.tpl and seed 1819994127
+select   
+    sum(ws_net_paid) as total_sum
+   ,i_category
+   ,i_class
+   ,grouping(i_category)+grouping(i_class) as lochierarchy
+   ,rank() over (
+ 	partition by grouping(i_category)+grouping(i_class),
+ 	case when grouping(i_class) = 0 then i_category end 
+ 	order by sum(ws_net_paid) desc) as rank_within_parent
+ from
+    web_sales
+   ,date_dim       d1
+   ,item
+ where
+    d1.d_month_seq between 1212 and 1212+11
+ and d1.d_date_sk = ws_sold_date_sk
+ and i_item_sk  = ws_item_sk
+ group by rollup(i_category,i_class)
+ order by
+   lochierarchy desc,
+   case when lochierarchy = 0 then i_category end,
+   rank_within_parent
+ limit 100
+
+-- end query 1 in stream 0 using template query86.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalProject(total_sum=[$0], i_category=[$1], i_class=[$2], lochierarchy=[$3], rank_within_parent=[$4])
++- LogicalSort(sort0=[$3], sort1=[$5], sort2=[$4], dir0=[DESC-nulls-last], dir1=[ASC-nulls-first], dir2=[ASC-nulls-first], fetch=[100])
+   +- LogicalProject(total_sum=[$2], i_category=[$0], i_class=[$1], lochierarchy=[+($3, $4)], rank_within_parent=[RANK() OVER (PARTITION BY +($3, $4), CASE(=($4, 0), $0, null:VARCHAR(2147483647) CHARACTER SET "UTF-16LE") ORDER BY $2 DESC NULLS LAST)], EXPR$5=[CASE(=(+($3, $4), 0), $0, null:VARCHAR(2147483647) CHARACTER SET "UTF-16LE")])
+      +- LogicalAggregate(group=[{0, 1}], groups=[[{0, 1}, {0}, {}]], total_sum=[SUM($2)], agg#1=[GROUPING($0)], agg#2=[GROUPING($1)])
+         +- LogicalProject(i_category=[$74], i_class=[$72], ws_net_paid=[$28])
+            +- LogicalFilter(condition=[AND(>=($37, 1212), <=($37, +(1212, 11)), =($34, $33), =($62, $2))])
+               +- LogicalJoin(condition=[true], joinType=[inner])
+                  :- LogicalJoin(condition=[true], joinType=[inner])
+                  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+                  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+                  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Calc(select=[total_sum, i_category, i_class, $3 AS lochierarchy, w0$o0 AS rank_within_parent])
++- SortLimit(orderBy=[$3 DESC, $5 ASC, w0$o0 ASC], offset=[0], fetch=[100], global=[true])
+   +- Exchange(distribution=[single])
+      +- SortLimit(orderBy=[$3 DESC, $5 ASC, w0$o0 ASC], offset=[0], fetch=[100], global=[false])
+         +- OverAggregate(partitionBy=[$3, $4], orderBy=[total_sum DESC], window#0=[RANK(*) AS w0$o0 RANG BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW], select=[i_category, i_class, total_sum, $3, $4, $5, w0$o0])
+            +- Sort(orderBy=[$3 ASC, $4 ASC, total_sum DESC])
+               +- Exchange(distribution=[hash[$3, $4]])
+                  +- Calc(select=[i_category, i_class, total_sum, (CASE(SEARCH($e, Sarg[0, 1]), 0, 1) + CASE(($e = 0), 0, 1)) AS $3, CASE((CASE(($e = 0), 0, 1) = 0), i_category, null:VARCHAR(2147483647)) AS $4, CASE(((CASE(SEARCH($e, Sarg[0, 1]), 0, 1) + CASE(($e = 0), 0, 1)) = 0), i_category, null:VARCHAR(2147483647)) AS $5])
+                     +- HashAggregate(isMerge=[true], groupBy=[i_category, i_class, $e], select=[i_category, i_class, $e, Final_SUM(sum$0) AS total_sum])
+                        +- Exchange(distribution=[hash[i_category, i_class, $e]])
+                           +- LocalHashAggregate(groupBy=[i_category, i_class, $e], select=[i_category, i_class, $e, Partial_SUM(ws_net_paid) AS sum$0])
+                              +- Expand(projects=[{i_category, i_class, ws_net_paid, 0 AS $e}, {i_category, null AS i_class, ws_net_paid, 1 AS $e}, {null AS i_category, null AS i_class, ws_net_paid, 3 AS $e}])
+                                 +- Calc(select=[i_category, i_class, ws_net_paid])
+                                    +- HashJoin(joinType=[InnerJoin], where=[(i_item_sk = ws_item_sk)], select=[ws_item_sk, ws_net_paid, i_item_sk, i_class, i_category], build=[right])
+                                       :- Exchange(distribution=[hash[ws_item_sk]])
+                                       :  +- Calc(select=[ws_item_sk, ws_net_paid])
+                                       :     +- HashJoin(joinType=[InnerJoin], where=[(d_date_sk = ws_sold_date_sk)], select=[ws_item_sk, ws_net_paid, ws_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                                       :        :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales, project=[ws_item_sk, ws_net_paid, ws_sold_date_sk], project=[ws_item_sk, ws_net_paid, ws_sold_date_sk]]], fields=[ws_item_sk, ws_net_paid, ws_sold_date_sk], dpp=[d_date_sk])
+                                       :        +- Exchange(distribution=[broadcast])
+                                       :           +- Calc(select=[d_date_sk], where=[SEARCH(d_month_seq, Sarg[[1212..1223]])])
+                                       :              +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_month_seq]]], fields=[d_date_sk, d_month_seq])
+                                       +- Exchange(distribution=[hash[i_item_sk]])
+                                          +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_class, i_category]]], fields=[i_item_sk, i_class, i_category])
+]]>
+    </Resource>
+  </TestCase>

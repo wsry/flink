@@ -1,0 +1,161 @@
+  <TestCase name="getExecPlan[q47]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query47.tpl and seed 2031708268
+with v1 as(
+ select i_category, i_brand,
+        s_store_name, s_company_name,
+        d_year, d_moy,
+        sum(ss_sales_price) sum_sales,
+        avg(sum(ss_sales_price)) over
+          (partition by i_category, i_brand,
+                     s_store_name, s_company_name, d_year)
+          avg_monthly_sales,
+        rank() over
+          (partition by i_category, i_brand,
+                     s_store_name, s_company_name
+           order by d_year, d_moy) rn
+ from item, store_sales, date_dim, store
+ where ss_item_sk = i_item_sk and
+       ss_sold_date_sk = d_date_sk and
+       ss_store_sk = s_store_sk and
+       (
+         d_year = 2000 or
+         ( d_year = 2000-1 and d_moy =12) or
+         ( d_year = 2000+1 and d_moy =1)
+       )
+ group by i_category, i_brand,
+          s_store_name, s_company_name,
+          d_year, d_moy),
+ v2 as(
+ select v1.i_category
+        ,v1.d_year, v1.d_moy
+        ,v1.avg_monthly_sales
+        ,v1.sum_sales, v1_lag.sum_sales psum, v1_lead.sum_sales nsum
+ from v1, v1 v1_lag, v1 v1_lead
+ where v1.i_category = v1_lag.i_category and
+       v1.i_category = v1_lead.i_category and
+       v1.i_brand = v1_lag.i_brand and
+       v1.i_brand = v1_lead.i_brand and
+       v1.s_store_name = v1_lag.s_store_name and
+       v1.s_store_name = v1_lead.s_store_name and
+       v1.s_company_name = v1_lag.s_company_name and
+       v1.s_company_name = v1_lead.s_company_name and
+       v1.rn = v1_lag.rn + 1 and
+       v1.rn = v1_lead.rn - 1)
+  select  *
+ from v2
+ where  d_year = 2000 and    
+        avg_monthly_sales > 0 and
+        case when avg_monthly_sales > 0 then abs(sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
+ order by sum_sales - avg_monthly_sales, 3
+ limit 100
+
+-- end query 1 in stream 0 using template query47.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalProject(i_category=[$0], d_year=[$1], d_moy=[$2], avg_monthly_sales=[$3], sum_sales=[$4], psum=[$5], nsum=[$6])
++- LogicalSort(sort0=[$7], sort1=[$2], dir0=[ASC-nulls-first], dir1=[ASC-nulls-first], fetch=[100])
+   +- LogicalProject(i_category=[$0], d_year=[$1], d_moy=[$2], avg_monthly_sales=[$3], sum_sales=[$4], psum=[$5], nsum=[$6], EXPR$7=[-($4, $3)])
+      +- LogicalFilter(condition=[AND(=($1, 2000), >($3, 0), >(CASE(>($3, 0), /(ABS(-($4, $3)), $3), null:DOUBLE), 0.1:DECIMAL(2, 1)))])
+         +- LogicalProject(i_category=[$0], d_year=[$4], d_moy=[$5], avg_monthly_sales=[$7], sum_sales=[$6], psum=[$15], nsum=[$24])
+            +- LogicalFilter(condition=[AND(=($0, $9), =($0, $18), =($1, $10), =($1, $19), =($2, $11), =($2, $20), =($3, $12), =($3, $21), =($8, +($17, 1)), =($8, -($26, 1)))])
+               +- LogicalJoin(condition=[true], joinType=[inner])
+                  :- LogicalJoin(condition=[true], joinType=[inner])
+                  :  :- LogicalProject(i_category=[$0], i_brand=[$1], s_store_name=[$2], s_company_name=[$3], d_year=[$4], d_moy=[$5], sum_sales=[$6], avg_monthly_sales=[/(CASE(>(COUNT($6) OVER (PARTITION BY $0, $1, $2, $3, $4), 0), $SUM0($6) OVER (PARTITION BY $0, $1, $2, $3, $4), null:DOUBLE), COUNT($6) OVER (PARTITION BY $0, $1, $2, $3, $4))], rn=[RANK() OVER (PARTITION BY $0, $1, $2, $3 ORDER BY $4 NULLS FIRST, $5 NULLS FIRST)])
+                  :  :  +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5}], sum_sales=[SUM($6)])
+                  :  :     +- LogicalProject(i_category=[$12], i_brand=[$8], s_store_name=[$78], s_company_name=[$90], d_year=[$51], d_moy=[$53], ss_sales_price=[$34])
+                  :  :        +- LogicalFilter(condition=[AND(=($23, $0), =($44, $45), =($28, $73), OR(=($51, 2000), AND(=($51, -(2000, 1)), =($53, 12)), AND(=($51, +(2000, 1)), =($53, 1))))])
+                  :  :           +- LogicalJoin(condition=[true], joinType=[inner])
+                  :  :              :- LogicalJoin(condition=[true], joinType=[inner])
+                  :  :              :  :- LogicalJoin(condition=[true], joinType=[inner])
+                  :  :              :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+                  :  :              :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+                  :  :              :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+                  :  :              +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store]])
+                  :  +- LogicalProject(i_category=[$0], i_brand=[$1], s_store_name=[$2], s_company_name=[$3], d_year=[$4], d_moy=[$5], sum_sales=[$6], avg_monthly_sales=[/(CASE(>(COUNT($6) OVER (PARTITION BY $0, $1, $2, $3, $4), 0), $SUM0($6) OVER (PARTITION BY $0, $1, $2, $3, $4), null:DOUBLE), COUNT($6) OVER (PARTITION BY $0, $1, $2, $3, $4))], rn=[RANK() OVER (PARTITION BY $0, $1, $2, $3 ORDER BY $4 NULLS FIRST, $5 NULLS FIRST)])
+                  :     +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5}], sum_sales=[SUM($6)])
+                  :        +- LogicalProject(i_category=[$12], i_brand=[$8], s_store_name=[$78], s_company_name=[$90], d_year=[$51], d_moy=[$53], ss_sales_price=[$34])
+                  :           +- LogicalFilter(condition=[AND(=($23, $0), =($44, $45), =($28, $73), OR(=($51, 2000), AND(=($51, -(2000, 1)), =($53, 12)), AND(=($51, +(2000, 1)), =($53, 1))))])
+                  :              +- LogicalJoin(condition=[true], joinType=[inner])
+                  :                 :- LogicalJoin(condition=[true], joinType=[inner])
+                  :                 :  :- LogicalJoin(condition=[true], joinType=[inner])
+                  :                 :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+                  :                 :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+                  :                 :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+                  :                 +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store]])
+                  +- LogicalProject(i_category=[$0], i_brand=[$1], s_store_name=[$2], s_company_name=[$3], d_year=[$4], d_moy=[$5], sum_sales=[$6], avg_monthly_sales=[/(CASE(>(COUNT($6) OVER (PARTITION BY $0, $1, $2, $3, $4), 0), $SUM0($6) OVER (PARTITION BY $0, $1, $2, $3, $4), null:DOUBLE), COUNT($6) OVER (PARTITION BY $0, $1, $2, $3, $4))], rn=[RANK() OVER (PARTITION BY $0, $1, $2, $3 ORDER BY $4 NULLS FIRST, $5 NULLS FIRST)])
+                     +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5}], sum_sales=[SUM($6)])
+                        +- LogicalProject(i_category=[$12], i_brand=[$8], s_store_name=[$78], s_company_name=[$90], d_year=[$51], d_moy=[$53], ss_sales_price=[$34])
+                           +- LogicalFilter(condition=[AND(=($23, $0), =($44, $45), =($28, $73), OR(=($51, 2000), AND(=($51, -(2000, 1)), =($53, 12)), AND(=($51, +(2000, 1)), =($53, 1))))])
+                              +- LogicalJoin(condition=[true], joinType=[inner])
+                                 :- LogicalJoin(condition=[true], joinType=[inner])
+                                 :  :- LogicalJoin(condition=[true], joinType=[inner])
+                                 :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+                                 :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+                                 :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+                                 +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Calc(select=[i_category, d_year, d_moy, avg_monthly_sales, sum_sales, psum, nsum])
++- SortLimit(orderBy=[EXPR$7 ASC, d_moy ASC], offset=[0], fetch=[100], global=[true])
+   +- Exchange(distribution=[single])
+      +- SortLimit(orderBy=[EXPR$7 ASC, d_moy ASC], offset=[0], fetch=[100], global=[false])
+         +- Calc(select=[i_category0 AS i_category, d_year, d_moy, avg_monthly_sales, sum_sales0 AS sum_sales, sum_sales00 AS psum, sum_sales AS nsum, (sum_sales0 - avg_monthly_sales) AS EXPR$7])
+            +- HashJoin(joinType=[InnerJoin], where=[((i_category0 = i_category) AND (i_brand0 = i_brand) AND (s_store_name0 = s_store_name) AND (s_company_name0 = s_company_name) AND (rn = $f9))], select=[i_category, i_brand, s_store_name, s_company_name, sum_sales, $f9, i_category0, i_brand0, s_store_name0, s_company_name0, d_year, d_moy, sum_sales0, avg_monthly_sales, rn, sum_sales00], isBroadcast=[true], build=[right])
+               :- Exchange(distribution=[any], shuffle_mode=[BATCH])
+               :  +- Calc(select=[i_category, i_brand, s_store_name, s_company_name, sum_sales, (w1$o0 - 1) AS $f9])
+               :     +- OverAggregate(partitionBy=[i_category, i_brand, s_store_name, s_company_name, d_year], window#0=[COUNT(sum_sales) AS w1$o0, $SUM0(sum_sales) AS w0$o0 RANG BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING], select=[i_category, i_brand, s_store_name, s_company_name, d_year, d_moy, sum_sales, w0$o1, w1$o0, w0$o0])(reuse_id=[1])
+               :        +- OverAggregate(partitionBy=[i_category, i_brand, s_store_name, s_company_name], orderBy=[d_year ASC, d_moy ASC], window#0=[RANK(*) AS w0$o1 RANG BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW], select=[i_category, i_brand, s_store_name, s_company_name, d_year, d_moy, sum_sales, w0$o1])
+               :           +- Sort(orderBy=[i_category ASC, i_brand ASC, s_store_name ASC, s_company_name ASC, d_year ASC, d_moy ASC])
+               :              +- Exchange(distribution=[hash[i_category, i_brand, s_store_name, s_company_name]])
+               :                 +- HashAggregate(isMerge=[false], groupBy=[i_category, i_brand, s_store_name, s_company_name, d_year, d_moy], select=[i_category, i_brand, s_store_name, s_company_name, d_year, d_moy, SUM(ss_sales_price) AS sum_sales])
+               :                    +- Exchange(distribution=[hash[i_category, i_brand, s_store_name, s_company_name, d_year, d_moy]])
+               :                       +- Calc(select=[i_category, i_brand, s_store_name, s_company_name, d_year, d_moy, ss_sales_price])
+               :                          +- HashJoin(joinType=[InnerJoin], where=[(ss_store_sk = s_store_sk)], select=[ss_store_sk, ss_sales_price, d_year, d_moy, i_brand, i_category, s_store_sk, s_store_name, s_company_name], isBroadcast=[true], build=[right])
+               :                             :- Calc(select=[ss_store_sk, ss_sales_price, d_year, d_moy, i_brand, i_category])
+               :                             :  +- HashJoin(joinType=[InnerJoin], where=[(ss_item_sk = i_item_sk)], select=[ss_item_sk, ss_store_sk, ss_sales_price, d_year, d_moy, i_item_sk, i_brand, i_category], build=[right])
+               :                             :     :- Exchange(distribution=[hash[ss_item_sk]])
+               :                             :     :  +- Calc(select=[ss_item_sk, ss_store_sk, ss_sales_price, d_year, d_moy])
+               :                             :     :     +- HashJoin(joinType=[InnerJoin], where=[(ss_sold_date_sk = d_date_sk)], select=[ss_item_sk, ss_store_sk, ss_sales_price, ss_sold_date_sk, d_date_sk, d_year, d_moy], isBroadcast=[true], build=[right])
+               :                             :     :        :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_item_sk, ss_store_sk, ss_sales_price, ss_sold_date_sk], project=[ss_item_sk, ss_store_sk, ss_sales_price, ss_sold_date_sk]]], fields=[ss_item_sk, ss_store_sk, ss_sales_price, ss_sold_date_sk], dpp=[d_date_sk])
+               :                             :     :        +- Exchange(distribution=[broadcast])
+               :                             :     :           +- Calc(select=[d_date_sk, d_year, d_moy], where=[((d_year = 2000) OR ((d_year = 1999) AND (d_moy = 12)) OR ((d_year = 2001) AND (d_moy = 1)))])
+               :                             :     :              +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_year, d_moy]]], fields=[d_date_sk, d_year, d_moy])
+               :                             :     +- Exchange(distribution=[hash[i_item_sk]])
+               :                             :        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_brand, i_category]]], fields=[i_item_sk, i_brand, i_category])
+               :                             +- Exchange(distribution=[broadcast])
+               :                                +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store, project=[s_store_sk, s_store_name, s_company_name]]], fields=[s_store_sk, s_store_name, s_company_name])
+               +- Exchange(distribution=[broadcast])
+                  +- Calc(select=[i_category0 AS i_category, i_brand0 AS i_brand, s_store_name0 AS s_store_name, s_company_name0 AS s_company_name, d_year, d_moy, sum_sales0 AS sum_sales, avg_monthly_sales, rn, sum_sales AS sum_sales0])
+                     +- HashJoin(joinType=[InnerJoin], where=[((i_category0 = i_category) AND (i_brand0 = i_brand) AND (s_store_name0 = s_store_name) AND (s_company_name0 = s_company_name) AND (rn = $f9))], select=[i_category, i_brand, s_store_name, s_company_name, sum_sales, $f9, i_category0, i_brand0, s_store_name0, s_company_name0, d_year, d_moy, sum_sales0, avg_monthly_sales, rn], isBroadcast=[true], build=[right])
+                        :- Exchange(distribution=[any], shuffle_mode=[BATCH])
+                        :  +- Calc(select=[i_category, i_brand, s_store_name, s_company_name, sum_sales, (w1$o0 + 1) AS $f9])
+                        :     +- Reused(reference_id=[1])
+                        +- Exchange(distribution=[broadcast])
+                           +- Calc(select=[i_category, i_brand, s_store_name, s_company_name, CAST(2000 AS INTEGER) AS d_year, d_moy, sum_sales, (CASE((w0$o0 > 0), w0$o1, null:DOUBLE) / w0$o0) AS avg_monthly_sales, w1$o0 AS rn], where=[((d_year = 2000) AND ((CASE((w0$o0 > 0), w0$o1, null:DOUBLE) / w0$o0) > 0) AND CASE(((CASE((w0$o0 > 0), w0$o1, null:DOUBLE) / w0$o0) > 0), ((ABS((sum_sales - (CASE((w0$o0 > 0), w0$o1, null:DOUBLE) / w0$o0))) / (CASE((w0$o0 > 0), w0$o1, null:DOUBLE) / w0$o0)) > 0.1), false))])
+                              +- Reused(reference_id=[1])
+]]>
+    </Resource>
+  </TestCase>

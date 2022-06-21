@@ -1,0 +1,269 @@
+  <TestCase name="getExecPlan[q9]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query9.tpl and seed 1490436826
+select case when (select count(*) 
+                  from store_sales 
+                  where ss_quantity between 1 and 20) > 409437
+            then (select avg(ss_ext_list_price) 
+                  from store_sales 
+                  where ss_quantity between 1 and 20) 
+            else (select avg(ss_net_paid_inc_tax)
+                  from store_sales
+                  where ss_quantity between 1 and 20) end bucket1 ,
+       case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 21 and 40) > 4595804
+            then (select avg(ss_ext_list_price)
+                  from store_sales
+                  where ss_quantity between 21 and 40) 
+            else (select avg(ss_net_paid_inc_tax)
+                  from store_sales
+                  where ss_quantity between 21 and 40) end bucket2,
+       case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 41 and 60) > 7887297
+            then (select avg(ss_ext_list_price)
+                  from store_sales
+                  where ss_quantity between 41 and 60)
+            else (select avg(ss_net_paid_inc_tax)
+                  from store_sales
+                  where ss_quantity between 41 and 60) end bucket3,
+       case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 61 and 80) > 10872978
+            then (select avg(ss_ext_list_price)
+                  from store_sales
+                  where ss_quantity between 61 and 80)
+            else (select avg(ss_net_paid_inc_tax)
+                  from store_sales
+                  where ss_quantity between 61 and 80) end bucket4,
+       case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 81 and 100) > 43571537
+            then (select avg(ss_ext_list_price)
+                  from store_sales
+                  where ss_quantity between 81 and 100)
+            else (select avg(ss_net_paid_inc_tax)
+                  from store_sales
+                  where ss_quantity between 81 and 100) end bucket5
+from reason
+where r_reason_sk = 1
+
+
+-- end query 1 in stream 0 using template query9.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalProject(bucket1=[CASE(>($SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[COUNT()])
+  LogicalProject($f0=[0])
+    LogicalFilter(condition=[AND(>=($9, 1), <=($9, 20))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}), 409437), $SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[AVG($0)])
+  LogicalProject(ss_ext_list_price=[$16])
+    LogicalFilter(condition=[AND(>=($9, 1), <=($9, 20))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}), $SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[AVG($0)])
+  LogicalProject(ss_net_paid_inc_tax=[$20])
+    LogicalFilter(condition=[AND(>=($9, 1), <=($9, 20))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}))], bucket2=[CASE(>($SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[COUNT()])
+  LogicalProject($f0=[0])
+    LogicalFilter(condition=[AND(>=($9, 21), <=($9, 40))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}), 4595804), $SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[AVG($0)])
+  LogicalProject(ss_ext_list_price=[$16])
+    LogicalFilter(condition=[AND(>=($9, 21), <=($9, 40))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}), $SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[AVG($0)])
+  LogicalProject(ss_net_paid_inc_tax=[$20])
+    LogicalFilter(condition=[AND(>=($9, 21), <=($9, 40))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}))], bucket3=[CASE(>($SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[COUNT()])
+  LogicalProject($f0=[0])
+    LogicalFilter(condition=[AND(>=($9, 41), <=($9, 60))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}), 7887297), $SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[AVG($0)])
+  LogicalProject(ss_ext_list_price=[$16])
+    LogicalFilter(condition=[AND(>=($9, 41), <=($9, 60))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}), $SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[AVG($0)])
+  LogicalProject(ss_net_paid_inc_tax=[$20])
+    LogicalFilter(condition=[AND(>=($9, 41), <=($9, 60))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}))], bucket4=[CASE(>($SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[COUNT()])
+  LogicalProject($f0=[0])
+    LogicalFilter(condition=[AND(>=($9, 61), <=($9, 80))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}), 10872978), $SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[AVG($0)])
+  LogicalProject(ss_ext_list_price=[$16])
+    LogicalFilter(condition=[AND(>=($9, 61), <=($9, 80))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}), $SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[AVG($0)])
+  LogicalProject(ss_net_paid_inc_tax=[$20])
+    LogicalFilter(condition=[AND(>=($9, 61), <=($9, 80))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}))], bucket5=[CASE(>($SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[COUNT()])
+  LogicalProject($f0=[0])
+    LogicalFilter(condition=[AND(>=($9, 81), <=($9, 100))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}), 43571537), $SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[AVG($0)])
+  LogicalProject(ss_ext_list_price=[$16])
+    LogicalFilter(condition=[AND(>=($9, 81), <=($9, 100))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}), $SCALAR_QUERY({
+LogicalAggregate(group=[{}], EXPR$0=[AVG($0)])
+  LogicalProject(ss_net_paid_inc_tax=[$20])
+    LogicalFilter(condition=[AND(>=($9, 81), <=($9, 100))])
+      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+}))])
++- LogicalFilter(condition=[=($0, 1)])
+   +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, reason]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Calc(select=[CASE((EXPR$0 > 409437), EXPR$00, EXPR$01) AS bucket1, CASE((EXPR$02 > 4595804), EXPR$03, EXPR$04) AS bucket2, CASE((EXPR$05 > 7887297), EXPR$06, EXPR$07) AS bucket3, CASE((EXPR$08 > 10872978), EXPR$09, EXPR$010) AS bucket4, CASE((EXPR$011 > 43571537), EXPR$012, EXPR$013) AS bucket5])
++- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01, EXPR$02, EXPR$03, EXPR$04, EXPR$05, EXPR$06, EXPR$07, EXPR$08, EXPR$09, EXPR$010, EXPR$011, EXPR$012, EXPR$013], build=[right], singleRowJoin=[true])
+   :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01, EXPR$02, EXPR$03, EXPR$04, EXPR$05, EXPR$06, EXPR$07, EXPR$08, EXPR$09, EXPR$010, EXPR$011, EXPR$012], build=[right], singleRowJoin=[true])
+   :  :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01, EXPR$02, EXPR$03, EXPR$04, EXPR$05, EXPR$06, EXPR$07, EXPR$08, EXPR$09, EXPR$010, EXPR$011], build=[right], singleRowJoin=[true])
+   :  :  :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01, EXPR$02, EXPR$03, EXPR$04, EXPR$05, EXPR$06, EXPR$07, EXPR$08, EXPR$09, EXPR$010], build=[right], singleRowJoin=[true])
+   :  :  :  :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01, EXPR$02, EXPR$03, EXPR$04, EXPR$05, EXPR$06, EXPR$07, EXPR$08, EXPR$09], build=[right], singleRowJoin=[true])
+   :  :  :  :  :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01, EXPR$02, EXPR$03, EXPR$04, EXPR$05, EXPR$06, EXPR$07, EXPR$08], build=[right], singleRowJoin=[true])
+   :  :  :  :  :  :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01, EXPR$02, EXPR$03, EXPR$04, EXPR$05, EXPR$06, EXPR$07], build=[right], singleRowJoin=[true])
+   :  :  :  :  :  :  :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01, EXPR$02, EXPR$03, EXPR$04, EXPR$05, EXPR$06], build=[right], singleRowJoin=[true])
+   :  :  :  :  :  :  :  :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01, EXPR$02, EXPR$03, EXPR$04, EXPR$05], build=[right], singleRowJoin=[true])
+   :  :  :  :  :  :  :  :  :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01, EXPR$02, EXPR$03, EXPR$04], build=[right], singleRowJoin=[true])
+   :  :  :  :  :  :  :  :  :  :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01, EXPR$02, EXPR$03], build=[right], singleRowJoin=[true])
+   :  :  :  :  :  :  :  :  :  :  :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01, EXPR$02], build=[right], singleRowJoin=[true])
+   :  :  :  :  :  :  :  :  :  :  :  :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00, EXPR$01], build=[right], singleRowJoin=[true])
+   :  :  :  :  :  :  :  :  :  :  :  :  :- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[EXPR$0, EXPR$00], build=[right], singleRowJoin=[true])
+   :  :  :  :  :  :  :  :  :  :  :  :  :  :- Calc(select=[EXPR$0])
+   :  :  :  :  :  :  :  :  :  :  :  :  :  :  +- NestedLoopJoin(joinType=[LeftOuterJoin], where=[true], select=[r_reason_sk, EXPR$0], build=[right], singleRowJoin=[true])
+   :  :  :  :  :  :  :  :  :  :  :  :  :  :     :- Calc(select=[r_reason_sk], where=[(r_reason_sk = 1)])
+   :  :  :  :  :  :  :  :  :  :  :  :  :  :     :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, reason, project=[r_reason_sk]]], fields=[r_reason_sk])
+   :  :  :  :  :  :  :  :  :  :  :  :  :  :     +- Exchange(distribution=[broadcast])
+   :  :  :  :  :  :  :  :  :  :  :  :  :  :        +- HashAggregate(isMerge=[true], select=[Final_COUNT(count1$0) AS EXPR$0])
+   :  :  :  :  :  :  :  :  :  :  :  :  :  :           +- Exchange(distribution=[single])
+   :  :  :  :  :  :  :  :  :  :  :  :  :  :              +- LocalHashAggregate(select=[Partial_COUNT(*) AS count1$0])
+   :  :  :  :  :  :  :  :  :  :  :  :  :  :                 +- Calc(select=[0 AS $f0], where=[SEARCH(ss_quantity, Sarg[[1..20]])])
+   :  :  :  :  :  :  :  :  :  :  :  :  :  :                    +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_quantity]]], fields=[ss_quantity])(reuse_id=[1])
+   :  :  :  :  :  :  :  :  :  :  :  :  :  +- Exchange(distribution=[broadcast])
+   :  :  :  :  :  :  :  :  :  :  :  :  :     +- HashAggregate(isMerge=[true], select=[Final_AVG(sum$0, count$1) AS EXPR$0])
+   :  :  :  :  :  :  :  :  :  :  :  :  :        +- Exchange(distribution=[single])
+   :  :  :  :  :  :  :  :  :  :  :  :  :           +- LocalHashAggregate(select=[Partial_AVG(ss_ext_list_price) AS (sum$0, count$1)])
+   :  :  :  :  :  :  :  :  :  :  :  :  :              +- Calc(select=[ss_ext_list_price], where=[SEARCH(ss_quantity, Sarg[[1..20]])])
+   :  :  :  :  :  :  :  :  :  :  :  :  :                 +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_quantity, ss_ext_list_price]]], fields=[ss_quantity, ss_ext_list_price])(reuse_id=[2])
+   :  :  :  :  :  :  :  :  :  :  :  :  +- Exchange(distribution=[broadcast])
+   :  :  :  :  :  :  :  :  :  :  :  :     +- HashAggregate(isMerge=[true], select=[Final_AVG(sum$0, count$1) AS EXPR$0])
+   :  :  :  :  :  :  :  :  :  :  :  :        +- Exchange(distribution=[single])
+   :  :  :  :  :  :  :  :  :  :  :  :           +- LocalHashAggregate(select=[Partial_AVG(ss_net_paid_inc_tax) AS (sum$0, count$1)])
+   :  :  :  :  :  :  :  :  :  :  :  :              +- Calc(select=[ss_net_paid_inc_tax], where=[SEARCH(ss_quantity, Sarg[[1..20]])])
+   :  :  :  :  :  :  :  :  :  :  :  :                 +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_quantity, ss_net_paid_inc_tax]]], fields=[ss_quantity, ss_net_paid_inc_tax])(reuse_id=[3])
+   :  :  :  :  :  :  :  :  :  :  :  +- Exchange(distribution=[broadcast])
+   :  :  :  :  :  :  :  :  :  :  :     +- HashAggregate(isMerge=[true], select=[Final_COUNT(count1$0) AS EXPR$0])
+   :  :  :  :  :  :  :  :  :  :  :        +- Exchange(distribution=[single])
+   :  :  :  :  :  :  :  :  :  :  :           +- LocalHashAggregate(select=[Partial_COUNT(*) AS count1$0])
+   :  :  :  :  :  :  :  :  :  :  :              +- Calc(select=[0 AS $f0], where=[SEARCH(ss_quantity, Sarg[[21..40]])])
+   :  :  :  :  :  :  :  :  :  :  :                 +- Reused(reference_id=[1])
+   :  :  :  :  :  :  :  :  :  :  +- Exchange(distribution=[broadcast])
+   :  :  :  :  :  :  :  :  :  :     +- HashAggregate(isMerge=[true], select=[Final_AVG(sum$0, count$1) AS EXPR$0])
+   :  :  :  :  :  :  :  :  :  :        +- Exchange(distribution=[single])
+   :  :  :  :  :  :  :  :  :  :           +- LocalHashAggregate(select=[Partial_AVG(ss_ext_list_price) AS (sum$0, count$1)])
+   :  :  :  :  :  :  :  :  :  :              +- Calc(select=[ss_ext_list_price], where=[SEARCH(ss_quantity, Sarg[[21..40]])])
+   :  :  :  :  :  :  :  :  :  :                 +- Reused(reference_id=[2])
+   :  :  :  :  :  :  :  :  :  +- Exchange(distribution=[broadcast])
+   :  :  :  :  :  :  :  :  :     +- HashAggregate(isMerge=[true], select=[Final_AVG(sum$0, count$1) AS EXPR$0])
+   :  :  :  :  :  :  :  :  :        +- Exchange(distribution=[single])
+   :  :  :  :  :  :  :  :  :           +- LocalHashAggregate(select=[Partial_AVG(ss_net_paid_inc_tax) AS (sum$0, count$1)])
+   :  :  :  :  :  :  :  :  :              +- Calc(select=[ss_net_paid_inc_tax], where=[SEARCH(ss_quantity, Sarg[[21..40]])])
+   :  :  :  :  :  :  :  :  :                 +- Reused(reference_id=[3])
+   :  :  :  :  :  :  :  :  +- Exchange(distribution=[broadcast])
+   :  :  :  :  :  :  :  :     +- HashAggregate(isMerge=[true], select=[Final_COUNT(count1$0) AS EXPR$0])
+   :  :  :  :  :  :  :  :        +- Exchange(distribution=[single])
+   :  :  :  :  :  :  :  :           +- LocalHashAggregate(select=[Partial_COUNT(*) AS count1$0])
+   :  :  :  :  :  :  :  :              +- Calc(select=[0 AS $f0], where=[SEARCH(ss_quantity, Sarg[[41..60]])])
+   :  :  :  :  :  :  :  :                 +- Reused(reference_id=[1])
+   :  :  :  :  :  :  :  +- Exchange(distribution=[broadcast])
+   :  :  :  :  :  :  :     +- HashAggregate(isMerge=[true], select=[Final_AVG(sum$0, count$1) AS EXPR$0])
+   :  :  :  :  :  :  :        +- Exchange(distribution=[single])
+   :  :  :  :  :  :  :           +- LocalHashAggregate(select=[Partial_AVG(ss_ext_list_price) AS (sum$0, count$1)])
+   :  :  :  :  :  :  :              +- Calc(select=[ss_ext_list_price], where=[SEARCH(ss_quantity, Sarg[[41..60]])])
+   :  :  :  :  :  :  :                 +- Reused(reference_id=[2])
+   :  :  :  :  :  :  +- Exchange(distribution=[broadcast])
+   :  :  :  :  :  :     +- HashAggregate(isMerge=[true], select=[Final_AVG(sum$0, count$1) AS EXPR$0])
+   :  :  :  :  :  :        +- Exchange(distribution=[single])
+   :  :  :  :  :  :           +- LocalHashAggregate(select=[Partial_AVG(ss_net_paid_inc_tax) AS (sum$0, count$1)])
+   :  :  :  :  :  :              +- Calc(select=[ss_net_paid_inc_tax], where=[SEARCH(ss_quantity, Sarg[[41..60]])])
+   :  :  :  :  :  :                 +- Reused(reference_id=[3])
+   :  :  :  :  :  +- Exchange(distribution=[broadcast])
+   :  :  :  :  :     +- HashAggregate(isMerge=[true], select=[Final_COUNT(count1$0) AS EXPR$0])
+   :  :  :  :  :        +- Exchange(distribution=[single])
+   :  :  :  :  :           +- LocalHashAggregate(select=[Partial_COUNT(*) AS count1$0])
+   :  :  :  :  :              +- Calc(select=[0 AS $f0], where=[SEARCH(ss_quantity, Sarg[[61..80]])])
+   :  :  :  :  :                 +- Reused(reference_id=[1])
+   :  :  :  :  +- Exchange(distribution=[broadcast])
+   :  :  :  :     +- HashAggregate(isMerge=[true], select=[Final_AVG(sum$0, count$1) AS EXPR$0])
+   :  :  :  :        +- Exchange(distribution=[single])
+   :  :  :  :           +- LocalHashAggregate(select=[Partial_AVG(ss_ext_list_price) AS (sum$0, count$1)])
+   :  :  :  :              +- Calc(select=[ss_ext_list_price], where=[SEARCH(ss_quantity, Sarg[[61..80]])])
+   :  :  :  :                 +- Reused(reference_id=[2])
+   :  :  :  +- Exchange(distribution=[broadcast])
+   :  :  :     +- HashAggregate(isMerge=[true], select=[Final_AVG(sum$0, count$1) AS EXPR$0])
+   :  :  :        +- Exchange(distribution=[single])
+   :  :  :           +- LocalHashAggregate(select=[Partial_AVG(ss_net_paid_inc_tax) AS (sum$0, count$1)])
+   :  :  :              +- Calc(select=[ss_net_paid_inc_tax], where=[SEARCH(ss_quantity, Sarg[[61..80]])])
+   :  :  :                 +- Reused(reference_id=[3])
+   :  :  +- Exchange(distribution=[broadcast])
+   :  :     +- HashAggregate(isMerge=[true], select=[Final_COUNT(count1$0) AS EXPR$0])
+   :  :        +- Exchange(distribution=[single])
+   :  :           +- LocalHashAggregate(select=[Partial_COUNT(*) AS count1$0])
+   :  :              +- Calc(select=[0 AS $f0], where=[SEARCH(ss_quantity, Sarg[[81..100]])])
+   :  :                 +- Reused(reference_id=[1])
+   :  +- Exchange(distribution=[broadcast])
+   :     +- HashAggregate(isMerge=[true], select=[Final_AVG(sum$0, count$1) AS EXPR$0])
+   :        +- Exchange(distribution=[single])
+   :           +- LocalHashAggregate(select=[Partial_AVG(ss_ext_list_price) AS (sum$0, count$1)])
+   :              +- Calc(select=[ss_ext_list_price], where=[SEARCH(ss_quantity, Sarg[[81..100]])])
+   :                 +- Reused(reference_id=[2])
+   +- Exchange(distribution=[broadcast])
+      +- HashAggregate(isMerge=[true], select=[Final_AVG(sum$0, count$1) AS EXPR$0])
+         +- Exchange(distribution=[single])
+            +- LocalHashAggregate(select=[Partial_AVG(ss_net_paid_inc_tax) AS (sum$0, count$1)])
+               +- Calc(select=[ss_net_paid_inc_tax], where=[SEARCH(ss_quantity, Sarg[[81..100]])])
+                  +- Reused(reference_id=[3])
+]]>
+    </Resource>
+  </TestCase>

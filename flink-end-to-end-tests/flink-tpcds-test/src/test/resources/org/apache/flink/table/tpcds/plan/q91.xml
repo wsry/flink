@@ -1,0 +1,118 @@
+  <TestCase name="getExecPlan[q91]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query91.tpl and seed 1930872976
+select  
+        cc_call_center_id Call_Center,
+        cc_name Call_Center_Name,
+        cc_manager Manager,
+        sum(cr_net_loss) Returns_Loss
+from
+        call_center,
+        catalog_returns,
+        date_dim,
+        customer,
+        customer_address,
+        customer_demographics,
+        household_demographics
+where
+        cr_call_center_sk       = cc_call_center_sk
+and     cr_returned_date_sk     = d_date_sk
+and     cr_returning_customer_sk= c_customer_sk
+and     cd_demo_sk              = c_current_cdemo_sk
+and     hd_demo_sk              = c_current_hdemo_sk
+and     ca_address_sk           = c_current_addr_sk
+and     d_year                  = 1999 
+and     d_moy                   = 11
+and     ( (cd_marital_status       = 'M' and cd_education_status     = 'Unknown')
+        or(cd_marital_status       = 'W' and cd_education_status     = 'Advanced Degree'))
+and     hd_buy_potential like '0-500%'
+and     ca_gmt_offset           = -7
+group by cc_call_center_id,cc_name,cc_manager,cd_marital_status,cd_education_status
+order by sum(cr_net_loss) desc
+
+-- end query 1 in stream 0 using template query91.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$3], dir0=[DESC-nulls-last])
++- LogicalProject(Call_Center=[$0], Call_Center_Name=[$1], Manager=[$2], Returns_Loss=[$5])
+   +- LogicalAggregate(group=[{0, 1, 2, 3, 4}], Returns_Loss=[SUM($5)])
+      +- LogicalProject(Call_Center=[$1], Call_Center_Name=[$6], Manager=[$11], cd_marital_status=[$119], cd_education_status=[$120], cr_net_loss=[$56])
+         +- LogicalFilter(condition=[AND(=($41, $0), =($57, $58), =($37, $86), =($117, $88), =($126, $89), =($104, $90), =($64, 1999), =($66, 11), OR(AND(=($119, _UTF-16LE'M'), =($120, _UTF-16LE'Unknown')), AND(=($119, _UTF-16LE'W'), =($120, _UTF-16LE'Advanced Degree'))), LIKE($128, _UTF-16LE'0-500%'), =($115, -7))])
+            +- LogicalJoin(condition=[true], joinType=[inner])
+               :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :  :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, call_center]])
+               :  :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_returns]])
+               :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+               :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+               :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+               :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics]])
+               +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Sort(orderBy=[Returns_Loss DESC])
++- Exchange(distribution=[single])
+   +- Calc(select=[cc_call_center_id AS Call_Center, cc_name AS Call_Center_Name, cc_manager AS Manager, Returns_Loss])
+      +- HashAggregate(isMerge=[true], groupBy=[cd_marital_status, cd_education_status, cc_call_center_id, cc_name, cc_manager], select=[cd_marital_status, cd_education_status, cc_call_center_id, cc_name, cc_manager, Final_SUM(sum$0) AS Returns_Loss])
+         +- Exchange(distribution=[hash[cd_marital_status, cd_education_status, cc_call_center_id, cc_name, cc_manager]])
+            +- LocalHashAggregate(groupBy=[cd_marital_status, cd_education_status, cc_call_center_id, cc_name, cc_manager], select=[cd_marital_status, cd_education_status, cc_call_center_id, cc_name, cc_manager, Partial_SUM(Returns_Loss) AS sum$0])
+               +- HashJoin(joinType=[InnerJoin], where=[(cr_call_center_sk = cc_call_center_sk)], select=[cr_call_center_sk, cd_marital_status, cd_education_status, Returns_Loss, cc_call_center_sk, cc_call_center_id, cc_name, cc_manager], isBroadcast=[true], build=[right])
+                  :- HashAggregate(isMerge=[true], groupBy=[cr_call_center_sk, cd_marital_status, cd_education_status], select=[cr_call_center_sk, cd_marital_status, cd_education_status, Final_SUM(sum$0) AS Returns_Loss])
+                  :  +- Exchange(distribution=[hash[cr_call_center_sk, cd_marital_status, cd_education_status]])
+                  :     +- LocalHashAggregate(groupBy=[cr_call_center_sk, cd_marital_status, cd_education_status], select=[cr_call_center_sk, cd_marital_status, cd_education_status, Partial_SUM(cr_net_loss) AS sum$0])
+                  :        +- Calc(select=[cr_call_center_sk, cr_net_loss, cd_marital_status, cd_education_status])
+                  :           +- HashJoin(joinType=[InnerJoin], where=[(ca_address_sk = c_current_addr_sk)], select=[ca_address_sk, c_current_addr_sk, cr_call_center_sk, cr_net_loss, cd_marital_status, cd_education_status], isBroadcast=[true], build=[right])
+                  :              :- Calc(select=[ca_address_sk], where=[(ca_gmt_offset = -7)])
+                  :              :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address, project=[ca_address_sk, ca_gmt_offset]]], fields=[ca_address_sk, ca_gmt_offset])
+                  :              +- Exchange(distribution=[broadcast])
+                  :                 +- Calc(select=[c_current_addr_sk, cr_call_center_sk, cr_net_loss, cd_marital_status, cd_education_status])
+                  :                    +- HashJoin(joinType=[InnerJoin], where=[(hd_demo_sk = c_current_hdemo_sk)], select=[c_current_hdemo_sk, c_current_addr_sk, cr_call_center_sk, cr_net_loss, cd_marital_status, cd_education_status, hd_demo_sk], isBroadcast=[true], build=[right])
+                  :                       :- Calc(select=[c_current_hdemo_sk, c_current_addr_sk, cr_call_center_sk, cr_net_loss, cd_marital_status, cd_education_status])
+                  :                       :  +- HashJoin(joinType=[InnerJoin], where=[(cd_demo_sk = c_current_cdemo_sk)], select=[c_current_cdemo_sk, c_current_hdemo_sk, c_current_addr_sk, cr_call_center_sk, cr_net_loss, cd_demo_sk, cd_marital_status, cd_education_status], isBroadcast=[true], build=[right])
+                  :                       :     :- Calc(select=[c_current_cdemo_sk, c_current_hdemo_sk, c_current_addr_sk, cr_call_center_sk, cr_net_loss])
+                  :                       :     :  +- HashJoin(joinType=[InnerJoin], where=[(cr_returning_customer_sk = c_customer_sk)], select=[c_customer_sk, c_current_cdemo_sk, c_current_hdemo_sk, c_current_addr_sk, cr_returning_customer_sk, cr_call_center_sk, cr_net_loss], build=[right])
+                  :                       :     :     :- Exchange(distribution=[hash[c_customer_sk]])
+                  :                       :     :     :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer, project=[c_customer_sk, c_current_cdemo_sk, c_current_hdemo_sk, c_current_addr_sk]]], fields=[c_customer_sk, c_current_cdemo_sk, c_current_hdemo_sk, c_current_addr_sk])
+                  :                       :     :     +- Exchange(distribution=[hash[cr_returning_customer_sk]])
+                  :                       :     :        +- Calc(select=[cr_returning_customer_sk, cr_call_center_sk, cr_net_loss])
+                  :                       :     :           +- HashJoin(joinType=[InnerJoin], where=[(cr_returned_date_sk = d_date_sk)], select=[cr_returning_customer_sk, cr_call_center_sk, cr_net_loss, cr_returned_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                  :                       :     :              :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_returns, project=[cr_returning_customer_sk, cr_call_center_sk, cr_net_loss, cr_returned_date_sk], project=[cr_returning_customer_sk, cr_call_center_sk, cr_net_loss, cr_returned_date_sk]]], fields=[cr_returning_customer_sk, cr_call_center_sk, cr_net_loss, cr_returned_date_sk], dpp=[d_date_sk])
+                  :                       :     :              +- Exchange(distribution=[broadcast])
+                  :                       :     :                 +- Calc(select=[d_date_sk], where=[((d_year = 1999) AND (d_moy = 11))])
+                  :                       :     :                    +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_year, d_moy]]], fields=[d_date_sk, d_year, d_moy])
+                  :                       :     +- Exchange(distribution=[broadcast])
+                  :                       :        +- Calc(select=[cd_demo_sk, cd_marital_status, cd_education_status], where=[(((cd_marital_status = 'M') AND (cd_education_status = 'Unknown')) OR ((cd_marital_status = 'W') AND (cd_education_status = 'Advanced Degree')))])
+                  :                       :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics, project=[cd_demo_sk, cd_marital_status, cd_education_status]]], fields=[cd_demo_sk, cd_marital_status, cd_education_status])
+                  :                       +- Exchange(distribution=[broadcast])
+                  :                          +- Calc(select=[hd_demo_sk], where=[LIKE(hd_buy_potential, '0-500%')])
+                  :                             +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics, project=[hd_demo_sk, hd_buy_potential]]], fields=[hd_demo_sk, hd_buy_potential])
+                  +- Exchange(distribution=[broadcast])
+                     +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, call_center, project=[cc_call_center_sk, cc_call_center_id, cc_name, cc_manager]]], fields=[cc_call_center_sk, cc_call_center_id, cc_name, cc_manager])
+]]>
+    </Resource>
+  </TestCase>

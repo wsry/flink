@@ -1,0 +1,87 @@
+  <TestCase name="getExecPlan[q22]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query22.tpl and seed 1819994127
+select  i_product_name
+             ,i_brand
+             ,i_class
+             ,i_category
+             ,avg(inv_quantity_on_hand) qoh
+       from inventory
+           ,date_dim
+           ,item
+           ,warehouse
+       where inv_date_sk=d_date_sk
+              and inv_item_sk=i_item_sk
+              and inv_warehouse_sk = w_warehouse_sk
+              and d_month_seq between 1212 and 1212 + 11
+       group by rollup(i_product_name
+                       ,i_brand
+                       ,i_class
+                       ,i_category)
+order by qoh, i_product_name, i_brand, i_class, i_category
+limit 100
+
+-- end query 1 in stream 0 using template query22.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$4], sort1=[$0], sort2=[$1], sort3=[$2], sort4=[$3], dir0=[ASC-nulls-first], dir1=[ASC-nulls-first], dir2=[ASC-nulls-first], dir3=[ASC-nulls-first], dir4=[ASC-nulls-first], fetch=[100])
++- LogicalAggregate(group=[{0, 1, 2, 3}], groups=[[{0, 1, 2, 3}, {0, 1, 2}, {0, 1}, {0}, {}]], qoh=[AVG($4)])
+   +- LogicalProject(i_product_name=[$53], i_brand=[$40], i_class=[$42], i_category=[$44], inv_quantity_on_hand=[$3])
+      +- LogicalFilter(condition=[AND(=($0, $4), =($1, $32), =($2, $54), >=($7, 1212), <=($7, +(1212, 11)))])
+         +- LogicalJoin(condition=[true], joinType=[inner])
+            :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, inventory]])
+            :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+            :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+            +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, warehouse]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Calc(select=[i_product_name, i_brand, i_class, i_category, qoh])
++- SortLimit(orderBy=[qoh ASC, i_product_name ASC, i_brand ASC, i_class ASC, i_category ASC], offset=[0], fetch=[100], global=[true])
+   +- Exchange(distribution=[single])
+      +- SortLimit(orderBy=[qoh ASC, i_product_name ASC, i_brand ASC, i_class ASC, i_category ASC], offset=[0], fetch=[100], global=[false])
+         +- HashAggregate(isMerge=[true], groupBy=[i_product_name, i_brand, i_class, i_category, $e], select=[i_product_name, i_brand, i_class, i_category, $e, Final_AVG(sum$0, count$1) AS qoh])
+            +- Exchange(distribution=[hash[i_product_name, i_brand, i_class, i_category, $e]])
+               +- LocalHashAggregate(groupBy=[i_product_name, i_brand, i_class, i_category, $e], select=[i_product_name, i_brand, i_class, i_category, $e, Partial_AVG(inv_quantity_on_hand) AS (sum$0, count$1)])
+                  +- Expand(projects=[{i_product_name, i_brand, i_class, i_category, inv_quantity_on_hand, 0 AS $e}, {i_product_name, i_brand, i_class, null AS i_category, inv_quantity_on_hand, 1 AS $e}, {i_product_name, i_brand, null AS i_class, null AS i_category, inv_quantity_on_hand, 3 AS $e}, {i_product_name, null AS i_brand, null AS i_class, null AS i_category, inv_quantity_on_hand, 7 AS $e}, {null AS i_product_name, null AS i_brand, null AS i_class, null AS i_category, inv_quantity_on_hand, 15 AS $e}])
+                     +- Calc(select=[i_product_name, i_brand, i_class, i_category, inv_quantity_on_hand])
+                        +- HashJoin(joinType=[InnerJoin], where=[(inv_date_sk = d_date_sk)], select=[inv_date_sk, inv_quantity_on_hand, i_brand, i_class, i_category, i_product_name, d_date_sk], isBroadcast=[true], build=[right])
+                           :- Calc(select=[inv_date_sk, inv_quantity_on_hand, i_brand, i_class, i_category, i_product_name])
+                           :  +- HashJoin(joinType=[InnerJoin], where=[(inv_item_sk = i_item_sk)], select=[inv_date_sk, inv_item_sk, inv_quantity_on_hand, i_item_sk, i_brand, i_class, i_category, i_product_name], build=[right])
+                           :     :- Exchange(distribution=[hash[inv_item_sk]])
+                           :     :  +- Calc(select=[inv_date_sk, inv_item_sk, inv_quantity_on_hand])
+                           :     :     +- HashJoin(joinType=[InnerJoin], where=[(inv_warehouse_sk = w_warehouse_sk)], select=[inv_date_sk, inv_item_sk, inv_warehouse_sk, inv_quantity_on_hand, w_warehouse_sk], isBroadcast=[true], build=[right])
+                           :     :        :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, inventory]], fields=[inv_date_sk, inv_item_sk, inv_warehouse_sk, inv_quantity_on_hand])
+                           :     :        +- Exchange(distribution=[broadcast])
+                           :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, warehouse, project=[w_warehouse_sk]]], fields=[w_warehouse_sk])
+                           :     +- Exchange(distribution=[hash[i_item_sk]])
+                           :        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_brand, i_class, i_category, i_product_name]]], fields=[i_item_sk, i_brand, i_class, i_category, i_product_name])
+                           +- Exchange(distribution=[broadcast])
+                              +- Calc(select=[d_date_sk], where=[SEARCH(d_month_seq, Sarg[[1212..1223]])])
+                                 +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_month_seq]]], fields=[d_date_sk, d_month_seq])
+]]>
+    </Resource>
+  </TestCase>

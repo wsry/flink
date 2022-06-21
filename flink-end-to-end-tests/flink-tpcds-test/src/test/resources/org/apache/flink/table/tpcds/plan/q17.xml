@@ -1,0 +1,135 @@
+  <TestCase name="getExecPlan[q17]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query17.tpl and seed 1819994127
+select  i_item_id
+       ,i_item_desc
+       ,s_state
+       ,count(ss_quantity) as store_sales_quantitycount
+       ,avg(ss_quantity) as store_sales_quantityave
+       ,stddev_samp(ss_quantity) as store_sales_quantitystdev
+       ,stddev_samp(ss_quantity)/avg(ss_quantity) as store_sales_quantitycov
+       ,count(sr_return_quantity) as_store_returns_quantitycount
+       ,avg(sr_return_quantity) as_store_returns_quantityave
+       ,stddev_samp(sr_return_quantity) as_store_returns_quantitystdev
+       ,stddev_samp(sr_return_quantity)/avg(sr_return_quantity) as store_returns_quantitycov
+       ,count(cs_quantity) as catalog_sales_quantitycount ,avg(cs_quantity) as catalog_sales_quantityave
+       ,stddev_samp(cs_quantity)/avg(cs_quantity) as catalog_sales_quantitystdev
+       ,stddev_samp(cs_quantity)/avg(cs_quantity) as catalog_sales_quantitycov
+ from store_sales
+     ,store_returns
+     ,catalog_sales
+     ,date_dim d1
+     ,date_dim d2
+     ,date_dim d3
+     ,store
+     ,item
+ where d1.d_quarter_name = '2000Q1'
+   and d1.d_date_sk = ss_sold_date_sk
+   and i_item_sk = ss_item_sk
+   and s_store_sk = ss_store_sk
+   and ss_customer_sk = sr_customer_sk
+   and ss_item_sk = sr_item_sk
+   and ss_ticket_number = sr_ticket_number
+   and sr_returned_date_sk = d2.d_date_sk
+   and d2.d_quarter_name in ('2000Q1','2000Q2','2000Q3')
+   and sr_customer_sk = cs_bill_customer_sk
+   and sr_item_sk = cs_item_sk
+   and cs_sold_date_sk = d3.d_date_sk
+   and d3.d_quarter_name in ('2000Q1','2000Q2','2000Q3')
+ group by i_item_id
+         ,i_item_desc
+         ,s_state
+ order by i_item_id
+         ,i_item_desc
+         ,s_state
+limit 100
+
+-- end query 1 in stream 0 using template query17.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[ASC-nulls-first], dir1=[ASC-nulls-first], dir2=[ASC-nulls-first], fetch=[100])
++- LogicalProject(i_item_id=[$0], i_item_desc=[$1], s_state=[$2], store_sales_quantitycount=[$3], store_sales_quantityave=[$4], store_sales_quantitystdev=[$5], store_sales_quantitycov=[/($5, $4)], as_store_returns_quantitycount=[$6], as_store_returns_quantityave=[$7], as_store_returns_quantitystdev=[$8], store_returns_quantitycov=[/($8, $7)], catalog_sales_quantitycount=[$9], catalog_sales_quantityave=[$10], catalog_sales_quantitystdev=[/($11, $10)], catalog_sales_quantitycov=[/($11, $10)])
+   +- LogicalAggregate(group=[{0, 1, 2}], store_sales_quantitycount=[COUNT($3)], store_sales_quantityave=[AVG($3)], store_sales_quantitystdev=[STDDEV_SAMP($3)], as_store_returns_quantitycount=[COUNT($4)], as_store_returns_quantityave=[AVG($4)], as_store_returns_quantitystdev=[STDDEV_SAMP($4)], catalog_sales_quantitycount=[COUNT($5)], catalog_sales_quantityave=[AVG($5)], agg#8=[STDDEV_SAMP($5)])
+      +- LogicalProject(i_item_id=[$191], i_item_desc=[$194], s_state=[$185], ss_quantity=[$9], sr_return_quantity=[$32], cs_quantity=[$60])
+         +- LogicalFilter(condition=[AND(=($92, _UTF-16LE'2000Q1'), =($77, $22), =($190, $1), =($161, $6), =($2, $25), =($1, $24), =($8, $31), =($42, $105), OR(=($120, _UTF-16LE'2000Q1'), =($120, _UTF-16LE'2000Q2'), =($120, _UTF-16LE'2000Q3')), =($25, $45), =($24, $57), =($76, $133), OR(=($148, _UTF-16LE'2000Q1'), =($148, _UTF-16LE'2000Q2'), =($148, _UTF-16LE'2000Q3')))])
+            +- LogicalJoin(condition=[true], joinType=[inner])
+               :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :  :  :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+               :  :  :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_returns]])
+               :  :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales]])
+               :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+               :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+               :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+               :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store]])
+               +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Calc(select=[i_item_id, i_item_desc, s_state, store_sales_quantitycount, CAST(($f4 / store_sales_quantitycount) AS INTEGER) AS store_sales_quantityave, CAST(POWER((($f5 - (($f4 * $f4) / store_sales_quantitycount)) / CASE((store_sales_quantitycount = 1), null:BIGINT, (store_sales_quantitycount - 1))), 0.5) AS INTEGER) AS store_sales_quantitystdev, (CAST(POWER((($f5 - (($f4 * $f4) / store_sales_quantitycount)) / CASE((store_sales_quantitycount = 1), null:BIGINT, (store_sales_quantitycount - 1))), 0.5) AS INTEGER) / CAST(($f4 / store_sales_quantitycount) AS INTEGER)) AS store_sales_quantitycov, as_store_returns_quantitycount, CAST(($f7 / as_store_returns_quantitycount) AS INTEGER) AS as_store_returns_quantityave, CAST(POWER((($f8 - (($f7 * $f7) / as_store_returns_quantitycount)) / CASE((as_store_returns_quantitycount = 1), null:BIGINT, (as_store_returns_quantitycount - 1))), 0.5) AS INTEGER) AS as_store_returns_quantitystdev, (CAST(POWER((($f8 - (($f7 * $f7) / as_store_returns_quantitycount)) / CASE((as_store_returns_quantitycount = 1), null:BIGINT, (as_store_returns_quantitycount - 1))), 0.5) AS INTEGER) / CAST(($f7 / as_store_returns_quantitycount) AS INTEGER)) AS store_returns_quantitycov, catalog_sales_quantitycount, CAST(($f10 / catalog_sales_quantitycount) AS INTEGER) AS catalog_sales_quantityave, (CAST(POWER((($f11 - (($f10 * $f10) / catalog_sales_quantitycount)) / CASE((catalog_sales_quantitycount = 1), null:BIGINT, (catalog_sales_quantitycount - 1))), 0.5) AS INTEGER) / CAST(($f10 / catalog_sales_quantitycount) AS INTEGER)) AS catalog_sales_quantitystdev, (CAST(POWER((($f11 - (($f10 * $f10) / catalog_sales_quantitycount)) / CASE((catalog_sales_quantitycount = 1), null:BIGINT, (catalog_sales_quantitycount - 1))), 0.5) AS INTEGER) / CAST(($f10 / catalog_sales_quantitycount) AS INTEGER)) AS catalog_sales_quantitycov])
++- SortLimit(orderBy=[i_item_id ASC, i_item_desc ASC, s_state ASC], offset=[0], fetch=[100], global=[true])
+   +- Exchange(distribution=[single])
+      +- SortLimit(orderBy=[i_item_id ASC, i_item_desc ASC, s_state ASC], offset=[0], fetch=[100], global=[false])
+         +- HashAggregate(isMerge=[false], groupBy=[i_item_id, i_item_desc, s_state], select=[i_item_id, i_item_desc, s_state, COUNT(ss_quantity) AS store_sales_quantitycount, SUM(ss_quantity) AS $f4, SUM($f6) AS $f5, COUNT(sr_return_quantity) AS as_store_returns_quantitycount, SUM(sr_return_quantity) AS $f7, SUM($f7) AS $f8, COUNT(cs_quantity) AS catalog_sales_quantitycount, SUM(cs_quantity) AS $f10, SUM($f8) AS $f11])
+            +- Calc(select=[i_item_id, i_item_desc, s_state, ss_quantity, sr_return_quantity, cs_quantity, (ss_quantity * ss_quantity) AS $f6, (sr_return_quantity * sr_return_quantity) AS $f7, (cs_quantity * cs_quantity) AS $f8])
+               +- Exchange(distribution=[hash[i_item_id, i_item_desc, s_state]])
+                  +- HashJoin(joinType=[InnerJoin], where=[(s_store_sk = ss_store_sk)], select=[cs_quantity, ss_store_sk, ss_quantity, sr_return_quantity, i_item_id, i_item_desc, s_store_sk, s_state], isBroadcast=[true], build=[right])
+                     :- Calc(select=[cs_quantity, ss_store_sk, ss_quantity, sr_return_quantity, i_item_id, i_item_desc])
+                     :  +- HashJoin(joinType=[InnerJoin], where=[(cs_sold_date_sk = d_date_sk)], select=[cs_quantity, cs_sold_date_sk, ss_store_sk, ss_quantity, sr_return_quantity, i_item_id, i_item_desc, d_date_sk], isBroadcast=[true], build=[right])
+                     :     :- Calc(select=[cs_quantity, cs_sold_date_sk, ss_store_sk, ss_quantity, sr_return_quantity, i_item_id, i_item_desc])
+                     :     :  +- HashJoin(joinType=[InnerJoin], where=[(ss_item_sk = i_item_sk)], select=[cs_quantity, cs_sold_date_sk, ss_item_sk, ss_store_sk, ss_quantity, sr_return_quantity, i_item_sk, i_item_id, i_item_desc], build=[right])
+                     :     :     :- Calc(select=[cs_quantity, cs_sold_date_sk, ss_item_sk, ss_store_sk, ss_quantity, sr_return_quantity])
+                     :     :     :  +- HashJoin(joinType=[InnerJoin], where=[((cs_bill_customer_sk = ss_customer_sk) AND (cs_item_sk = ss_item_sk))], select=[cs_bill_customer_sk, cs_item_sk, cs_quantity, cs_sold_date_sk, ss_item_sk, ss_customer_sk, ss_store_sk, ss_quantity, sr_return_quantity], build=[right])
+                     :     :     :     :- Exchange(distribution=[hash[cs_item_sk]])
+                     :     :     :     :  +- Calc(select=[cs_bill_customer_sk, cs_item_sk, cs_quantity, cs_sold_date_sk], where=[cs_bill_customer_sk IS NOT NULL])
+                     :     :     :     :     +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, catalog_sales, project=[cs_bill_customer_sk, cs_item_sk, cs_quantity, cs_sold_date_sk]]], fields=[cs_bill_customer_sk, cs_item_sk, cs_quantity, cs_sold_date_sk])
+                     :     :     :     +- Calc(select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_quantity, sr_return_quantity])
+                     :     :     :        +- HashJoin(joinType=[InnerJoin], where=[(d_date_sk = ss_sold_date_sk)], select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_quantity, ss_sold_date_sk, sr_return_quantity, d_date_sk], isBroadcast=[true], build=[right])
+                     :     :     :           :- Calc(select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_quantity, ss_sold_date_sk, sr_return_quantity])
+                     :     :     :           :  +- HashJoin(joinType=[InnerJoin], where=[((ss_customer_sk = sr_customer_sk) AND (ss_item_sk = sr_item_sk) AND (ss_ticket_number = sr_ticket_number))], select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ticket_number, ss_quantity, ss_sold_date_sk, sr_item_sk, sr_customer_sk, sr_ticket_number, sr_return_quantity], build=[right])
+                     :     :     :           :     :- Exchange(distribution=[hash[ss_item_sk]])
+                     :     :     :           :     :  +- Calc(select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ticket_number, ss_quantity, ss_sold_date_sk], where=[ss_customer_sk IS NOT NULL])
+                     :     :     :           :     :     +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ticket_number, ss_quantity, ss_sold_date_sk]]], fields=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ticket_number, ss_quantity, ss_sold_date_sk])
+                     :     :     :           :     +- Exchange(distribution=[hash[sr_item_sk]])
+                     :     :     :           :        +- Calc(select=[sr_item_sk, sr_customer_sk, sr_ticket_number, sr_return_quantity])
+                     :     :     :           :           +- HashJoin(joinType=[InnerJoin], where=[(sr_returned_date_sk = d_date_sk)], select=[sr_item_sk, sr_customer_sk, sr_ticket_number, sr_return_quantity, sr_returned_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                     :     :     :           :              :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_returns, project=[sr_item_sk, sr_customer_sk, sr_ticket_number, sr_return_quantity, sr_returned_date_sk], project=[sr_item_sk, sr_customer_sk, sr_ticket_number, sr_return_quantity, sr_returned_date_sk]]], fields=[sr_item_sk, sr_customer_sk, sr_ticket_number, sr_return_quantity, sr_returned_date_sk], dpp=[d_date_sk])
+                     :     :     :           :              +- Exchange(distribution=[broadcast])(reuse_id=[2])
+                     :     :     :           :                 +- Calc(select=[d_date_sk], where=[SEARCH(d_quarter_name, Sarg[_UTF-16LE'2000Q1', _UTF-16LE'2000Q2', _UTF-16LE'2000Q3'])])
+                     :     :     :           :                    +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_quarter_name]]], fields=[d_date_sk, d_quarter_name])(reuse_id=[1])
+                     :     :     :           +- Exchange(distribution=[broadcast])
+                     :     :     :              +- Calc(select=[d_date_sk], where=[SEARCH(d_quarter_name, Sarg[_UTF-16LE'2000Q1'])])
+                     :     :     :                 +- Reused(reference_id=[1])
+                     :     :     +- Exchange(distribution=[hash[i_item_sk]])
+                     :     :        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_item_id, i_item_desc]]], fields=[i_item_sk, i_item_id, i_item_desc])
+                     :     +- Reused(reference_id=[2])
+                     +- Exchange(distribution=[broadcast])
+                        +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store, project=[s_store_sk, s_state]]], fields=[s_store_sk, s_state])
+]]>
+    </Resource>
+  </TestCase>

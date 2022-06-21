@@ -1,0 +1,176 @@
+  <TestCase name="getExecPlan[q85]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query85.tpl and seed 622697896
+select  substr(r_reason_desc,1,20)
+       ,avg(ws_quantity)
+       ,avg(wr_refunded_cash)
+       ,avg(wr_fee)
+ from web_sales, web_returns, web_page, customer_demographics cd1,
+      customer_demographics cd2, customer_address, date_dim, reason 
+ where ws_web_page_sk = wp_web_page_sk
+   and ws_item_sk = wr_item_sk
+   and ws_order_number = wr_order_number
+   and ws_sold_date_sk = d_date_sk and d_year = 1998
+   and cd1.cd_demo_sk = wr_refunded_cdemo_sk 
+   and cd2.cd_demo_sk = wr_returning_cdemo_sk
+   and ca_address_sk = wr_refunded_addr_sk
+   and r_reason_sk = wr_reason_sk
+   and
+   (
+    (
+     cd1.cd_marital_status = 'M'
+     and
+     cd1.cd_marital_status = cd2.cd_marital_status
+     and
+     cd1.cd_education_status = '4 yr Degree'
+     and 
+     cd1.cd_education_status = cd2.cd_education_status
+     and
+     ws_sales_price between 100.00 and 150.00
+    )
+   or
+    (
+     cd1.cd_marital_status = 'D'
+     and
+     cd1.cd_marital_status = cd2.cd_marital_status
+     and
+     cd1.cd_education_status = 'Primary' 
+     and
+     cd1.cd_education_status = cd2.cd_education_status
+     and
+     ws_sales_price between 50.00 and 100.00
+    )
+   or
+    (
+     cd1.cd_marital_status = 'U'
+     and
+     cd1.cd_marital_status = cd2.cd_marital_status
+     and
+     cd1.cd_education_status = 'Advanced Degree'
+     and
+     cd1.cd_education_status = cd2.cd_education_status
+     and
+     ws_sales_price between 150.00 and 200.00
+    )
+   )
+   and
+   (
+    (
+     ca_country = 'United States'
+     and
+     ca_state in ('KY', 'GA', 'NM')
+     and ws_net_profit between 100 and 200  
+    )
+    or
+    (
+     ca_country = 'United States'
+     and
+     ca_state in ('MT', 'OR', 'IN')
+     and ws_net_profit between 150 and 300  
+    )
+    or
+    (
+     ca_country = 'United States'
+     and
+     ca_state in ('WI', 'MO', 'WV')
+     and ws_net_profit between 50 and 250  
+    )
+   )
+group by r_reason_desc
+order by substr(r_reason_desc,1,20)
+        ,avg(ws_quantity)
+        ,avg(wr_refunded_cash)
+        ,avg(wr_fee)
+limit 100
+
+-- end query 1 in stream 0 using template query85.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC-nulls-first], dir1=[ASC-nulls-first], dir2=[ASC-nulls-first], dir3=[ASC-nulls-first], fetch=[100])
++- LogicalProject(EXPR$0=[SUBSTR($0, 1, 20)], EXPR$1=[$1], EXPR$2=[$2], EXPR$3=[$3])
+   +- LogicalAggregate(group=[{0}], EXPR$1=[AVG($1)], EXPR$2=[AVG($2)], EXPR$3=[AVG($3)])
+      +- LogicalProject(r_reason_desc=[$133], ws_quantity=[$17], wr_refunded_cash=[$53], wr_fee=[$51])
+         +- LogicalFilter(condition=[AND(=($11, $58), =($2, $35), =($16, $46), =($33, $103), =($109, 1998), =($72, $37), =($81, $41), =($90, $39), =($131, $45), OR(AND(=($74, _UTF-16LE'M'), =($74, $83), =($75, _UTF-16LE'4 yr Degree'), =($75, $84), >=($20, 100.00:DECIMAL(5, 2)), <=($20, 150.00:DECIMAL(5, 2))), AND(=($74, _UTF-16LE'D'), =($74, $83), =($75, _UTF-16LE'Primary'), =($75, $84), >=($20, 50.00:DECIMAL(4, 2)), <=($20, 100.00:DECIMAL(5, 2))), AND(=($74, _UTF-16LE'U'), =($74, $83), =($75, _UTF-16LE'Advanced Degree'), =($75, $84), >=($20, 150.00:DECIMAL(5, 2)), <=($20, 200.00:DECIMAL(5, 2)))), OR(AND(=($100, _UTF-16LE'United States'), OR(=($98, _UTF-16LE'KY'), =($98, _UTF-16LE'GA'), =($98, _UTF-16LE'NM')), >=($32, 100), <=($32, 200)), AND(=($100, _UTF-16LE'United States'), OR(=($98, _UTF-16LE'MT'), =($98, _UTF-16LE'OR'), =($98, _UTF-16LE'IN')), >=($32, 150), <=($32, 300)), AND(=($100, _UTF-16LE'United States'), OR(=($98, _UTF-16LE'WI'), =($98, _UTF-16LE'MO'), =($98, _UTF-16LE'WV')), >=($32, 50), <=($32, 250))))])
+            +- LogicalJoin(condition=[true], joinType=[inner])
+               :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+               :  :  :  :  :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales]])
+               :  :  :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_returns]])
+               :  :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_page]])
+               :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics]])
+               :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics]])
+               :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+               :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+               +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, reason]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[EXPR$0 ASC, EXPR$1 ASC, EXPR$2 ASC, EXPR$3 ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[EXPR$0 ASC, EXPR$1 ASC, EXPR$2 ASC, EXPR$3 ASC], offset=[0], fetch=[100], global=[false])
+      +- Calc(select=[SUBSTR(r_reason_desc, 1, 20) AS EXPR$0, EXPR$1, EXPR$2, EXPR$3])
+         +- HashAggregate(isMerge=[true], groupBy=[r_reason_desc], select=[r_reason_desc, Final_AVG(sum$0, count$1) AS EXPR$1, Final_AVG(sum$2, count$3) AS EXPR$2, Final_AVG(sum$4, count$5) AS EXPR$3])
+            +- Exchange(distribution=[hash[r_reason_desc]])
+               +- LocalHashAggregate(groupBy=[r_reason_desc], select=[r_reason_desc, Partial_AVG(ws_quantity) AS (sum$0, count$1), Partial_AVG(wr_refunded_cash) AS (sum$2, count$3), Partial_AVG(wr_fee) AS (sum$4, count$5)])
+                  +- Calc(select=[r_reason_desc, ws_quantity, wr_refunded_cash, wr_fee])
+                     +- HashJoin(joinType=[InnerJoin], where=[(ws_web_page_sk = wp_web_page_sk)], select=[wp_web_page_sk, wr_fee, wr_refunded_cash, ws_web_page_sk, ws_quantity, r_reason_desc], isBroadcast=[true], build=[left])
+                        :- Exchange(distribution=[broadcast])
+                        :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_page, project=[wp_web_page_sk]]], fields=[wp_web_page_sk])
+                        +- Calc(select=[wr_fee, wr_refunded_cash, ws_web_page_sk, ws_quantity, r_reason_desc])
+                           +- HashJoin(joinType=[InnerJoin], where=[((cd_demo_sk = wr_returning_cdemo_sk) AND (cd_marital_status0 = cd_marital_status) AND (cd_education_status0 = cd_education_status))], select=[cd_demo_sk, cd_marital_status, cd_education_status, wr_returning_cdemo_sk, wr_fee, wr_refunded_cash, ws_web_page_sk, ws_quantity, cd_marital_status0, cd_education_status0, r_reason_desc], isBroadcast=[true], build=[right])
+                              :- Exchange(distribution=[any], shuffle_mode=[BATCH])
+                              :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics, project=[cd_demo_sk, cd_marital_status, cd_education_status]]], fields=[cd_demo_sk, cd_marital_status, cd_education_status])(reuse_id=[1])
+                              +- Exchange(distribution=[broadcast])
+                                 +- Calc(select=[wr_returning_cdemo_sk, wr_fee, wr_refunded_cash, ws_web_page_sk, ws_quantity, cd_marital_status, cd_education_status, r_reason_desc])
+                                    +- HashJoin(joinType=[InnerJoin], where=[(r_reason_sk = wr_reason_sk)], select=[wr_returning_cdemo_sk, wr_reason_sk, wr_fee, wr_refunded_cash, ws_web_page_sk, ws_quantity, cd_marital_status, cd_education_status, r_reason_sk, r_reason_desc], isBroadcast=[true], build=[right])
+                                       :- Calc(select=[wr_returning_cdemo_sk, wr_reason_sk, wr_fee, wr_refunded_cash, ws_web_page_sk, ws_quantity, cd_marital_status, cd_education_status])
+                                       :  +- HashJoin(joinType=[InnerJoin], where=[((ca_address_sk = wr_refunded_addr_sk) AND ((SEARCH(ca_state, Sarg[_UTF-16LE'GA', _UTF-16LE'KY', _UTF-16LE'NM']) AND SEARCH(ws_net_profit, Sarg[[100..200]])) OR (SEARCH(ca_state, Sarg[_UTF-16LE'IN', _UTF-16LE'MT', _UTF-16LE'OR']) AND SEARCH(ws_net_profit, Sarg[[150..300]])) OR (SEARCH(ca_state, Sarg[_UTF-16LE'MO', _UTF-16LE'WI', _UTF-16LE'WV']) AND SEARCH(ws_net_profit, Sarg[[50..250]]))))], select=[ca_address_sk, ca_state, wr_refunded_addr_sk, wr_returning_cdemo_sk, wr_reason_sk, wr_fee, wr_refunded_cash, ws_web_page_sk, ws_quantity, ws_net_profit, cd_marital_status, cd_education_status], isBroadcast=[true], build=[right])
+                                       :     :- Calc(select=[ca_address_sk, ca_state], where=[(SEARCH(ca_country, Sarg[_UTF-16LE'United States']) AND SEARCH(ca_state, Sarg[_UTF-16LE'GA', _UTF-16LE'IN', _UTF-16LE'KY', _UTF-16LE'MO', _UTF-16LE'MT', _UTF-16LE'NM', _UTF-16LE'OR', _UTF-16LE'WI', _UTF-16LE'WV']))])
+                                       :     :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address, project=[ca_address_sk, ca_state, ca_country]]], fields=[ca_address_sk, ca_state, ca_country])
+                                       :     +- Exchange(distribution=[broadcast])
+                                       :        +- Calc(select=[wr_refunded_addr_sk, wr_returning_cdemo_sk, wr_reason_sk, wr_fee, wr_refunded_cash, ws_web_page_sk, ws_quantity, ws_net_profit, cd_marital_status, cd_education_status])
+                                       :           +- HashJoin(joinType=[InnerJoin], where=[((cd_demo_sk = wr_refunded_cdemo_sk) AND ((SEARCH(cd_marital_status, Sarg[_UTF-16LE'M']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'4 yr Degree']) AND SEARCH(ws_sales_price, Sarg[[100.00..150.00]])) OR (SEARCH(cd_marital_status, Sarg[_UTF-16LE'D']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'Primary']) AND SEARCH(ws_sales_price, Sarg[[50.00..100.00]])) OR (SEARCH(cd_marital_status, Sarg[_UTF-16LE'U']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'Advanced Degree']) AND SEARCH(ws_sales_price, Sarg[[150.00..200.00]]))))], select=[wr_refunded_cdemo_sk, wr_refunded_addr_sk, wr_returning_cdemo_sk, wr_reason_sk, wr_fee, wr_refunded_cash, ws_web_page_sk, ws_quantity, ws_sales_price, ws_net_profit, cd_demo_sk, cd_marital_status, cd_education_status], isBroadcast=[true], build=[right])
+                                       :              :- Calc(select=[wr_refunded_cdemo_sk, wr_refunded_addr_sk, wr_returning_cdemo_sk, wr_reason_sk, wr_fee, wr_refunded_cash, ws_web_page_sk, ws_quantity, ws_sales_price, ws_net_profit])
+                                       :              :  +- HashJoin(joinType=[InnerJoin], where=[((ws_item_sk = wr_item_sk) AND (ws_order_number = wr_order_number))], select=[wr_item_sk, wr_refunded_cdemo_sk, wr_refunded_addr_sk, wr_returning_cdemo_sk, wr_reason_sk, wr_order_number, wr_fee, wr_refunded_cash, ws_item_sk, ws_web_page_sk, ws_order_number, ws_quantity, ws_sales_price, ws_net_profit], build=[right])
+                                       :              :     :- Exchange(distribution=[hash[wr_item_sk, wr_order_number]])
+                                       :              :     :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_returns, project=[wr_item_sk, wr_refunded_cdemo_sk, wr_refunded_addr_sk, wr_returning_cdemo_sk, wr_reason_sk, wr_order_number, wr_fee, wr_refunded_cash]]], fields=[wr_item_sk, wr_refunded_cdemo_sk, wr_refunded_addr_sk, wr_returning_cdemo_sk, wr_reason_sk, wr_order_number, wr_fee, wr_refunded_cash])
+                                       :              :     +- Exchange(distribution=[hash[ws_item_sk, ws_order_number]])
+                                       :              :        +- Calc(select=[ws_item_sk, ws_web_page_sk, ws_order_number, ws_quantity, ws_sales_price, ws_net_profit])
+                                       :              :           +- HashJoin(joinType=[InnerJoin], where=[(ws_sold_date_sk = d_date_sk)], select=[ws_item_sk, ws_web_page_sk, ws_order_number, ws_quantity, ws_sales_price, ws_net_profit, ws_sold_date_sk, d_date_sk], isBroadcast=[true], build=[right])
+                                       :              :              :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, web_sales, project=[ws_item_sk, ws_web_page_sk, ws_order_number, ws_quantity, ws_sales_price, ws_net_profit, ws_sold_date_sk], project=[ws_item_sk, ws_web_page_sk, ws_order_number, ws_quantity, ws_sales_price, ws_net_profit, ws_sold_date_sk]]], fields=[ws_item_sk, ws_web_page_sk, ws_order_number, ws_quantity, ws_sales_price, ws_net_profit, ws_sold_date_sk], dpp=[d_date_sk])
+                                       :              :              +- Exchange(distribution=[broadcast])
+                                       :              :                 +- Calc(select=[d_date_sk], where=[(d_year = 1998)])
+                                       :              :                    +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_year]]], fields=[d_date_sk, d_year])
+                                       :              +- Exchange(distribution=[broadcast])
+                                       :                 +- Calc(select=[cd_demo_sk, cd_marital_status, cd_education_status], where=[((SEARCH(cd_marital_status, Sarg[_UTF-16LE'M']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'4 yr Degree'])) OR (SEARCH(cd_marital_status, Sarg[_UTF-16LE'D']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'Primary'])) OR (SEARCH(cd_marital_status, Sarg[_UTF-16LE'U']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'Advanced Degree'])))])
+                                       :                    +- Reused(reference_id=[1])
+                                       +- Exchange(distribution=[broadcast])
+                                          +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, reason, project=[r_reason_sk, r_reason_desc]]], fields=[r_reason_sk, r_reason_desc])
+]]>
+    </Resource>
+  </TestCase>

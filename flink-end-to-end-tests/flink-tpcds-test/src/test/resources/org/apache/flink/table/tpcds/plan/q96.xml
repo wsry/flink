@@ -1,0 +1,81 @@
+  <TestCase name="getExecPlan[q96]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query96.tpl and seed 1819994127
+select  count(*) 
+from store_sales
+    ,household_demographics 
+    ,time_dim, store
+where ss_sold_time_sk = time_dim.t_time_sk   
+    and ss_hdemo_sk = household_demographics.hd_demo_sk 
+    and ss_store_sk = s_store_sk
+    and time_dim.t_hour = 8
+    and time_dim.t_minute >= 30
+    and household_demographics.hd_dep_count = 5
+    and store.s_store_name = 'ese'
+order by count(*)
+limit 100
+
+-- end query 1 in stream 0 using template query96.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], dir0=[ASC-nulls-first], fetch=[100])
++- LogicalAggregate(group=[{}], EXPR$0=[COUNT()])
+   +- LogicalProject($f0=[0])
+      +- LogicalFilter(condition=[AND(=($0, $28), =($4, $23), =($6, $38), =($31, 8), >=($32, 30), =($26, 5), =($43, _UTF-16LE'ese'))])
+         +- LogicalJoin(condition=[true], joinType=[inner])
+            :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :- LogicalJoin(condition=[true], joinType=[inner])
+            :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+            :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics]])
+            :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, time_dim]])
+            +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[EXPR$0 ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[EXPR$0 ASC], offset=[0], fetch=[100], global=[false])
+      +- HashAggregate(isMerge=[true], select=[Final_COUNT(count1$0) AS EXPR$0])
+         +- Exchange(distribution=[single])
+            +- LocalHashAggregate(select=[Partial_COUNT(*) AS count1$0])
+               +- Calc(select=[0 AS $f0])
+                  +- HashJoin(joinType=[InnerJoin], where=[(ss_store_sk = s_store_sk)], select=[ss_store_sk, s_store_sk], isBroadcast=[true], build=[right])
+                     :- Calc(select=[ss_store_sk])
+                     :  +- HashJoin(joinType=[InnerJoin], where=[(ss_hdemo_sk = hd_demo_sk)], select=[ss_hdemo_sk, ss_store_sk, hd_demo_sk], isBroadcast=[true], build=[right])
+                     :     :- Calc(select=[ss_hdemo_sk, ss_store_sk])
+                     :     :  +- HashJoin(joinType=[InnerJoin], where=[(ss_sold_time_sk = t_time_sk)], select=[ss_sold_time_sk, ss_hdemo_sk, ss_store_sk, t_time_sk], isBroadcast=[true], build=[right])
+                     :     :     :- Calc(select=[ss_sold_time_sk, ss_hdemo_sk, ss_store_sk], where=[ss_hdemo_sk IS NOT NULL])
+                     :     :     :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_sold_time_sk, ss_hdemo_sk, ss_store_sk]]], fields=[ss_sold_time_sk, ss_hdemo_sk, ss_store_sk])
+                     :     :     +- Exchange(distribution=[broadcast])
+                     :     :        +- Calc(select=[t_time_sk], where=[((t_hour = 8) AND (t_minute >= 30))])
+                     :     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, time_dim, project=[t_time_sk, t_hour, t_minute]]], fields=[t_time_sk, t_hour, t_minute])
+                     :     +- Exchange(distribution=[broadcast])
+                     :        +- Calc(select=[hd_demo_sk], where=[(hd_dep_count = 5)])
+                     :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics, project=[hd_demo_sk, hd_dep_count]]], fields=[hd_demo_sk, hd_dep_count])
+                     +- Exchange(distribution=[broadcast])
+                        +- Calc(select=[s_store_sk], where=[(s_store_name = 'ese')])
+                           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store, project=[s_store_sk, s_store_name]]], fields=[s_store_sk, s_store_name])
+]]>
+    </Resource>
+  </TestCase>

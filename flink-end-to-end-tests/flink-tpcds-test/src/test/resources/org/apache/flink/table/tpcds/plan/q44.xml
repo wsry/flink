@@ -1,0 +1,146 @@
+  <TestCase name="getExecPlan[q44]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query44.tpl and seed 1819994127
+select  asceding.rnk, i1.i_product_name best_performing, i2.i_product_name worst_performing
+from(select *
+     from (select item_sk,rank() over (order by rank_col asc) rnk
+           from (select ss_item_sk item_sk,avg(ss_net_profit) rank_col 
+                 from store_sales ss1
+                 where ss_store_sk = 410
+                 group by ss_item_sk
+                 having avg(ss_net_profit) > 0.9*(select avg(ss_net_profit) rank_col
+                                                  from store_sales
+                                                  where ss_store_sk = 410
+                                                    and ss_hdemo_sk is null
+                                                  group by ss_store_sk))V1)V11
+     where rnk  < 11) asceding,
+    (select *
+     from (select item_sk,rank() over (order by rank_col desc) rnk
+           from (select ss_item_sk item_sk,avg(ss_net_profit) rank_col
+                 from store_sales ss1
+                 where ss_store_sk = 410
+                 group by ss_item_sk
+                 having avg(ss_net_profit) > 0.9*(select avg(ss_net_profit) rank_col
+                                                  from store_sales
+                                                  where ss_store_sk = 410
+                                                    and ss_hdemo_sk is null
+                                                  group by ss_store_sk))V2)V21
+     where rnk  < 11) descending,
+item i1,
+item i2
+where asceding.rnk = descending.rnk 
+  and i1.i_item_sk=asceding.item_sk
+  and i2.i_item_sk=descending.item_sk
+order by asceding.rnk
+limit 100
+
+-- end query 1 in stream 0 using template query44.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalSort(sort0=[$0], dir0=[ASC-nulls-first], fetch=[100])
++- LogicalProject(rnk=[$1], best_performing=[$25], worst_performing=[$47])
+   +- LogicalFilter(condition=[AND(=($1, $3), =($4, $0), =($26, $2))])
+      +- LogicalJoin(condition=[true], joinType=[inner])
+         :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :- LogicalProject(item_sk=[$0], rnk=[$1])
+         :  :  :  +- LogicalFilter(condition=[<($1, 11)])
+         :  :  :     +- LogicalProject(item_sk=[$0], rnk=[RANK() OVER (ORDER BY $1 NULLS FIRST)])
+         :  :  :        +- LogicalFilter(condition=[>($1, *(0.9:DECIMAL(2, 1), $SCALAR_QUERY({
+LogicalProject(rank_col=[$1])
+  LogicalAggregate(group=[{0}], rank_col=[AVG($1)])
+    LogicalProject(ss_store_sk=[$6], ss_net_profit=[$21])
+      LogicalFilter(condition=[AND(=($6, 410), IS NULL($4))])
+        LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+})))])
+         :  :  :           +- LogicalAggregate(group=[{0}], rank_col=[AVG($1)])
+         :  :  :              +- LogicalProject(item_sk=[$1], ss_net_profit=[$21])
+         :  :  :                 +- LogicalFilter(condition=[=($6, 410)])
+         :  :  :                    +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+         :  :  +- LogicalProject(item_sk=[$0], rnk=[$1])
+         :  :     +- LogicalFilter(condition=[<($1, 11)])
+         :  :        +- LogicalProject(item_sk=[$0], rnk=[RANK() OVER (ORDER BY $1 DESC NULLS LAST)])
+         :  :           +- LogicalFilter(condition=[>($1, *(0.9:DECIMAL(2, 1), $SCALAR_QUERY({
+LogicalProject(rank_col=[$1])
+  LogicalAggregate(group=[{0}], rank_col=[AVG($1)])
+    LogicalProject(ss_store_sk=[$6], ss_net_profit=[$21])
+      LogicalFilter(condition=[AND(=($6, 410), IS NULL($4))])
+        LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+})))])
+         :  :              +- LogicalAggregate(group=[{0}], rank_col=[AVG($1)])
+         :  :                 +- LogicalProject(item_sk=[$1], ss_net_profit=[$21])
+         :  :                    +- LogicalFilter(condition=[=($6, 410)])
+         :  :                       +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+         :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+         +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+SortLimit(orderBy=[rnk ASC], offset=[0], fetch=[100], global=[true])
++- Exchange(distribution=[single])
+   +- SortLimit(orderBy=[rnk ASC], offset=[0], fetch=[100], global=[false])
+      +- Calc(select=[rnk, i_product_name0 AS best_performing, i_product_name AS worst_performing])
+         +- HashJoin(joinType=[InnerJoin], where=[(i_item_sk = item_sk0)], select=[i_item_sk, i_product_name, i_product_name0, rnk, item_sk0], isBroadcast=[true], build=[right])
+            :- Exchange(distribution=[any], shuffle_mode=[BATCH])
+            :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_product_name]]], fields=[i_item_sk, i_product_name])(reuse_id=[1])
+            +- Exchange(distribution=[broadcast])
+               +- Calc(select=[i_product_name, rnk, item_sk0])
+                  +- HashJoin(joinType=[InnerJoin], where=[(i_item_sk = item_sk)], select=[i_item_sk, i_product_name, item_sk, rnk, item_sk0], isBroadcast=[true], build=[right])
+                     :- Reused(reference_id=[1])
+                     +- Exchange(distribution=[broadcast])
+                        +- Calc(select=[item_sk, w0$o0 AS rnk, item_sk0])
+                           +- NestedLoopJoin(joinType=[InnerJoin], where=[(w0$o0 = w0$o00)], select=[item_sk, w0$o0, item_sk0, w0$o00], build=[left])
+                              :- Exchange(distribution=[broadcast])
+                              :  +- Calc(select=[item_sk, w0$o0])
+                              :     +- Rank(rankType=[RANK], rankRange=[rankStart=1, rankEnd=10], partitionBy=[], orderBy=[rank_col ASC], global=[true], select=[item_sk, rank_col, w0$o0])
+                              :        +- Sort(orderBy=[rank_col ASC])
+                              :           +- Exchange(distribution=[single])
+                              :              +- Rank(rankType=[RANK], rankRange=[rankStart=1, rankEnd=10], partitionBy=[], orderBy=[rank_col ASC], global=[false], select=[item_sk, rank_col])
+                              :                 +- Sort(orderBy=[rank_col ASC])
+                              :                    +- Calc(select=[item_sk, rank_col])(reuse_id=[2])
+                              :                       +- NestedLoopJoin(joinType=[InnerJoin], where=[(rank_col > (0.9 * $f0))], select=[item_sk, rank_col, $f0], build=[right], singleRowJoin=[true])
+                              :                          :- HashAggregate(isMerge=[true], groupBy=[item_sk], select=[item_sk, Final_AVG(sum$0, count$1) AS rank_col])
+                              :                          :  +- Exchange(distribution=[hash[item_sk]])
+                              :                          :     +- LocalHashAggregate(groupBy=[item_sk], select=[item_sk, Partial_AVG(ss_net_profit) AS (sum$0, count$1)])
+                              :                          :        +- Calc(select=[ss_item_sk AS item_sk, ss_net_profit], where=[(ss_store_sk = 410)])
+                              :                          :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_item_sk, ss_store_sk, ss_net_profit]]], fields=[ss_item_sk, ss_store_sk, ss_net_profit])
+                              :                          +- Exchange(distribution=[broadcast])
+                              :                             +- HashAggregate(isMerge=[false], select=[SINGLE_VALUE(rank_col) AS $f0])
+                              :                                +- Exchange(distribution=[single])
+                              :                                   +- Calc(select=[rank_col])
+                              :                                      +- HashAggregate(isMerge=[true], groupBy=[ss_store_sk], select=[ss_store_sk, Final_AVG(sum$0, count$1) AS rank_col])
+                              :                                         +- Exchange(distribution=[hash[ss_store_sk]])
+                              :                                            +- LocalHashAggregate(groupBy=[ss_store_sk], select=[ss_store_sk, Partial_AVG(ss_net_profit) AS (sum$0, count$1)])
+                              :                                               +- Calc(select=[CAST(410 AS BIGINT) AS ss_store_sk, ss_net_profit], where=[((ss_store_sk = 410) AND ss_hdemo_sk IS NULL)])
+                              :                                                  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_hdemo_sk, ss_store_sk, ss_net_profit]]], fields=[ss_hdemo_sk, ss_store_sk, ss_net_profit])
+                              +- Calc(select=[item_sk, w0$o0])
+                                 +- Rank(rankType=[RANK], rankRange=[rankStart=1, rankEnd=10], partitionBy=[], orderBy=[rank_col DESC], global=[true], select=[item_sk, rank_col, w0$o0])
+                                    +- Sort(orderBy=[rank_col DESC])
+                                       +- Exchange(distribution=[single])
+                                          +- Rank(rankType=[RANK], rankRange=[rankStart=1, rankEnd=10], partitionBy=[], orderBy=[rank_col DESC], global=[false], select=[item_sk, rank_col])
+                                             +- Sort(orderBy=[rank_col DESC])
+                                                +- Reused(reference_id=[2])
+]]>
+    </Resource>
+  </TestCase>

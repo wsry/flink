@@ -1,0 +1,126 @@
+  <TestCase name="getExecPlan[q13]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query13.tpl and seed 622697896
+select avg(ss_quantity)
+       ,avg(ss_ext_sales_price)
+       ,avg(ss_ext_wholesale_cost)
+       ,sum(ss_ext_wholesale_cost)
+ from store_sales
+     ,store
+     ,customer_demographics
+     ,household_demographics
+     ,customer_address
+     ,date_dim
+ where s_store_sk = ss_store_sk
+ and  ss_sold_date_sk = d_date_sk and d_year = 2001
+ and((ss_hdemo_sk=hd_demo_sk
+  and cd_demo_sk = ss_cdemo_sk
+  and cd_marital_status = 'M'
+  and cd_education_status = '4 yr Degree'
+  and ss_sales_price between 100.00 and 150.00
+  and hd_dep_count = 3   
+     )or
+     (ss_hdemo_sk=hd_demo_sk
+  and cd_demo_sk = ss_cdemo_sk
+  and cd_marital_status = 'D'
+  and cd_education_status = 'Primary'
+  and ss_sales_price between 50.00 and 100.00   
+  and hd_dep_count = 1
+     ) or 
+     (ss_hdemo_sk=hd_demo_sk
+  and cd_demo_sk = ss_cdemo_sk
+  and cd_marital_status = 'U'
+  and cd_education_status = 'Advanced Degree'
+  and ss_sales_price between 150.00 and 200.00 
+  and hd_dep_count = 1  
+     ))
+ and((ss_addr_sk = ca_address_sk
+  and ca_country = 'United States'
+  and ca_state in ('KY', 'GA', 'NM')
+  and ss_net_profit between 100 and 200  
+     ) or
+     (ss_addr_sk = ca_address_sk
+  and ca_country = 'United States'
+  and ca_state in ('MT', 'OR', 'IN')
+  and ss_net_profit between 150 and 300  
+     ) or
+     (ss_addr_sk = ca_address_sk
+  and ca_country = 'United States'
+  and ca_state in ('WI', 'MO', 'WV')
+  and ss_net_profit between 50 and 250  
+     ))
+
+
+-- end query 1 in stream 0 using template query13.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalAggregate(group=[{}], EXPR$0=[AVG($0)], EXPR$1=[AVG($1)], EXPR$2=[AVG($2)], EXPR$3=[SUM($2)])
++- LogicalProject(ss_quantity=[$9], ss_ext_sales_price=[$14], ss_ext_wholesale_cost=[$15])
+   +- LogicalFilter(condition=[AND(=($23, $6), =($22, $79), =($85, 2001), OR(AND(=($4, $61), =($52, $3), =($54, _UTF-16LE'M'), =($55, _UTF-16LE'4 yr Degree'), >=($12, 100.00:DECIMAL(5, 2)), <=($12, 150.00:DECIMAL(5, 2)), =($64, 3)), AND(=($4, $61), =($52, $3), =($54, _UTF-16LE'D'), =($55, _UTF-16LE'Primary'), >=($12, 50.00:DECIMAL(4, 2)), <=($12, 100.00:DECIMAL(5, 2)), =($64, 1)), AND(=($4, $61), =($52, $3), =($54, _UTF-16LE'U'), =($55, _UTF-16LE'Advanced Degree'), >=($12, 150.00:DECIMAL(5, 2)), <=($12, 200.00:DECIMAL(5, 2)), =($64, 1))), OR(AND(=($5, $66), =($76, _UTF-16LE'United States'), OR(=($74, _UTF-16LE'KY'), =($74, _UTF-16LE'GA'), =($74, _UTF-16LE'NM')), >=($21, 100), <=($21, 200)), AND(=($5, $66), =($76, _UTF-16LE'United States'), OR(=($74, _UTF-16LE'MT'), =($74, _UTF-16LE'OR'), =($74, _UTF-16LE'IN')), >=($21, 150), <=($21, 300)), AND(=($5, $66), =($76, _UTF-16LE'United States'), OR(=($74, _UTF-16LE'WI'), =($74, _UTF-16LE'MO'), =($74, _UTF-16LE'WV')), >=($21, 50), <=($21, 250))))])
+      +- LogicalJoin(condition=[true], joinType=[inner])
+         :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+         :  :  :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+         :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store]])
+         :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics]])
+         :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics]])
+         :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+         +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+HashAggregate(isMerge=[true], select=[Final_AVG(sum$0, count$1) AS EXPR$0, Final_AVG(sum$2, count$3) AS EXPR$1, Final_AVG(sum$4, count$5) AS EXPR$2, Final_SUM(sum$6) AS EXPR$3])
++- Exchange(distribution=[single])
+   +- LocalHashAggregate(select=[Partial_AVG(ss_quantity) AS (sum$0, count$1), Partial_AVG(ss_ext_sales_price) AS (sum$2, count$3), Partial_AVG(ss_ext_wholesale_cost) AS (sum$4, count$5), Partial_SUM(ss_ext_wholesale_cost) AS sum$6])
+      +- Calc(select=[ss_quantity, ss_ext_sales_price, ss_ext_wholesale_cost])
+         +- HashJoin(joinType=[InnerJoin], where=[(s_store_sk = ss_store_sk)], select=[s_store_sk, ss_store_sk, ss_quantity, ss_ext_sales_price, ss_ext_wholesale_cost], isBroadcast=[true], build=[right])
+            :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store, project=[s_store_sk]]], fields=[s_store_sk])
+            +- Exchange(distribution=[broadcast])
+               +- Calc(select=[ss_store_sk, ss_quantity, ss_ext_sales_price, ss_ext_wholesale_cost])
+                  +- HashJoin(joinType=[InnerJoin], where=[(ss_sold_date_sk = d_date_sk)], select=[d_date_sk, ss_store_sk, ss_quantity, ss_ext_sales_price, ss_ext_wholesale_cost, ss_sold_date_sk], isBroadcast=[true], build=[right])
+                     :- Calc(select=[d_date_sk], where=[(d_year = 2001)])
+                     :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, date_dim, project=[d_date_sk, d_year]]], fields=[d_date_sk, d_year])
+                     +- Exchange(distribution=[broadcast])
+                        +- Calc(select=[ss_store_sk, ss_quantity, ss_ext_sales_price, ss_ext_wholesale_cost, ss_sold_date_sk])
+                           +- HashJoin(joinType=[InnerJoin], where=[((ss_addr_sk = ca_address_sk) AND ((SEARCH(ca_state, Sarg[_UTF-16LE'GA', _UTF-16LE'KY', _UTF-16LE'NM']) AND SEARCH(ss_net_profit, Sarg[[100..200]])) OR (SEARCH(ca_state, Sarg[_UTF-16LE'IN', _UTF-16LE'MT', _UTF-16LE'OR']) AND SEARCH(ss_net_profit, Sarg[[150..300]])) OR (SEARCH(ca_state, Sarg[_UTF-16LE'MO', _UTF-16LE'WI', _UTF-16LE'WV']) AND SEARCH(ss_net_profit, Sarg[[50..250]]))))], select=[ca_address_sk, ca_state, ss_addr_sk, ss_store_sk, ss_quantity, ss_ext_sales_price, ss_ext_wholesale_cost, ss_net_profit, ss_sold_date_sk], isBroadcast=[true], build=[right])
+                              :- Calc(select=[ca_address_sk, ca_state], where=[(SEARCH(ca_country, Sarg[_UTF-16LE'United States']) AND SEARCH(ca_state, Sarg[_UTF-16LE'GA', _UTF-16LE'IN', _UTF-16LE'KY', _UTF-16LE'MO', _UTF-16LE'MT', _UTF-16LE'NM', _UTF-16LE'OR', _UTF-16LE'WI', _UTF-16LE'WV']))])
+                              :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address, project=[ca_address_sk, ca_state, ca_country]]], fields=[ca_address_sk, ca_state, ca_country])
+                              +- Exchange(distribution=[broadcast])
+                                 +- Calc(select=[ss_addr_sk, ss_store_sk, ss_quantity, ss_ext_sales_price, ss_ext_wholesale_cost, ss_net_profit, ss_sold_date_sk])
+                                    +- HashJoin(joinType=[InnerJoin], where=[((ss_hdemo_sk = hd_demo_sk) AND ((SEARCH(cd_marital_status, Sarg[_UTF-16LE'M']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'4 yr Degree']) AND SEARCH(ss_sales_price, Sarg[[100.00..150.00]]) AND SEARCH(hd_dep_count, Sarg[3])) OR (SEARCH(cd_marital_status, Sarg[_UTF-16LE'D']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'Primary']) AND SEARCH(ss_sales_price, Sarg[[50.00..100.00]]) AND SEARCH(hd_dep_count, Sarg[1])) OR (SEARCH(cd_marital_status, Sarg[_UTF-16LE'U']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'Advanced Degree']) AND SEARCH(ss_sales_price, Sarg[[150.00..200.00]]) AND SEARCH(hd_dep_count, Sarg[1]))))], select=[ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_quantity, ss_sales_price, ss_ext_sales_price, ss_ext_wholesale_cost, ss_net_profit, ss_sold_date_sk, cd_marital_status, cd_education_status, hd_demo_sk, hd_dep_count], isBroadcast=[true], build=[right])
+                                       :- Calc(select=[ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_quantity, ss_sales_price, ss_ext_sales_price, ss_ext_wholesale_cost, ss_net_profit, ss_sold_date_sk, cd_marital_status, cd_education_status])
+                                       :  +- HashJoin(joinType=[InnerJoin], where=[((cd_demo_sk = ss_cdemo_sk) AND ((SEARCH(cd_marital_status, Sarg[_UTF-16LE'M']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'4 yr Degree']) AND SEARCH(ss_sales_price, Sarg[[100.00..150.00]])) OR (SEARCH(cd_marital_status, Sarg[_UTF-16LE'D']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'Primary']) AND SEARCH(ss_sales_price, Sarg[[50.00..100.00]])) OR (SEARCH(cd_marital_status, Sarg[_UTF-16LE'U']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'Advanced Degree']) AND SEARCH(ss_sales_price, Sarg[[150.00..200.00]]))))], select=[ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_quantity, ss_sales_price, ss_ext_sales_price, ss_ext_wholesale_cost, ss_net_profit, ss_sold_date_sk, cd_demo_sk, cd_marital_status, cd_education_status], isBroadcast=[true], build=[right])
+                                       :     :- Calc(select=[ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_quantity, ss_sales_price, ss_ext_sales_price, ss_ext_wholesale_cost, ss_net_profit, ss_sold_date_sk], where=[((SEARCH(ss_net_profit, Sarg[[100..200]]) OR SEARCH(ss_net_profit, Sarg[[150..300]]) OR SEARCH(ss_net_profit, Sarg[[50..250]])) AND (SEARCH(ss_sales_price, Sarg[[100.00..150.00]]) OR SEARCH(ss_sales_price, Sarg[[50.00..100.00]]) OR SEARCH(ss_sales_price, Sarg[[150.00..200.00]])) AND ss_store_sk IS NOT NULL)])
+                                       :     :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_quantity, ss_sales_price, ss_ext_sales_price, ss_ext_wholesale_cost, ss_net_profit, ss_sold_date_sk]]], fields=[ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_quantity, ss_sales_price, ss_ext_sales_price, ss_ext_wholesale_cost, ss_net_profit, ss_sold_date_sk])
+                                       :     +- Exchange(distribution=[broadcast])
+                                       :        +- Calc(select=[cd_demo_sk, cd_marital_status, cd_education_status], where=[((SEARCH(cd_marital_status, Sarg[_UTF-16LE'M']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'4 yr Degree'])) OR (SEARCH(cd_marital_status, Sarg[_UTF-16LE'D']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'Primary'])) OR (SEARCH(cd_marital_status, Sarg[_UTF-16LE'U']) AND SEARCH(cd_education_status, Sarg[_UTF-16LE'Advanced Degree'])))])
+                                       :           +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_demographics, project=[cd_demo_sk, cd_marital_status, cd_education_status]]], fields=[cd_demo_sk, cd_marital_status, cd_education_status])
+                                       +- Exchange(distribution=[broadcast])
+                                          +- Calc(select=[hd_demo_sk, hd_dep_count], where=[SEARCH(hd_dep_count, Sarg[1, 3])])
+                                             +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, household_demographics, project=[hd_demo_sk, hd_dep_count]]], fields=[hd_demo_sk, hd_dep_count])
+]]>
+    </Resource>
+  </TestCase>

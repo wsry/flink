@@ -1,0 +1,168 @@
+  <TestCase name="getExecPlan[q24]">
+    <Resource name="sql">
+      <![CDATA[/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- start query 1 in stream 0 using template query24.tpl and seed 1220860970
+with ssales as
+(select c_last_name
+      ,c_first_name
+      ,s_store_name
+      ,ca_state
+      ,s_state
+      ,i_color
+      ,i_current_price
+      ,i_manager_id
+      ,i_units
+      ,i_size
+      ,sum(ss_sales_price) netpaid
+from store_sales
+    ,store_returns
+    ,store
+    ,item
+    ,customer
+    ,customer_address
+where ss_ticket_number = sr_ticket_number
+  and ss_item_sk = sr_item_sk
+  and ss_customer_sk = c_customer_sk
+  and ss_item_sk = i_item_sk
+  and ss_store_sk = s_store_sk
+  and c_current_addr_sk = ca_address_sk
+  and c_birth_country <> upper(ca_country)
+  and s_zip = ca_zip
+and s_market_id=7
+group by c_last_name
+        ,c_first_name
+        ,s_store_name
+        ,ca_state
+        ,s_state
+        ,i_color
+        ,i_current_price
+        ,i_manager_id
+        ,i_units
+        ,i_size)
+select c_last_name
+      ,c_first_name
+      ,s_store_name
+      ,sum(netpaid) paid
+from ssales
+where i_color = 'orchid'
+group by c_last_name
+        ,c_first_name
+        ,s_store_name
+having sum(netpaid) > (select 0.05*avg(netpaid)
+                                 from ssales)
+
+
+-- end query 1 in stream 0 using template query24.tpl
+]]>
+    </Resource>
+    <Resource name="ast">
+      <![CDATA[
+LogicalFilter(condition=[>($3, $SCALAR_QUERY({
+LogicalProject(EXPR$0=[*(0.05:DECIMAL(3, 2), $0)])
+  LogicalAggregate(group=[{}], agg#0=[AVG($0)])
+    LogicalProject(netpaid=[$10])
+      LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}], netpaid=[SUM($10)])
+        LogicalProject(c_last_name=[$103], c_first_name=[$102], s_store_name=[$48], ca_state=[$120], s_state=[$67], i_color=[$89], i_current_price=[$77], i_manager_id=[$92], i_units=[$90], i_size=[$87], ss_sales_price=[$12])
+          LogicalFilter(condition=[AND(=($8, $31), =($1, $24), =($2, $94), =($1, $72), =($6, $43), =($98, $112), <>($108, UPPER($122)), =($68, $121), =($53, 7))])
+            LogicalJoin(condition=[true], joinType=[inner])
+              LogicalJoin(condition=[true], joinType=[inner])
+                LogicalJoin(condition=[true], joinType=[inner])
+                  LogicalJoin(condition=[true], joinType=[inner])
+                    LogicalJoin(condition=[true], joinType=[inner])
+                      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+                      LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_returns]])
+                    LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store]])
+                  LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+                LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+              LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+}))])
++- LogicalAggregate(group=[{0, 1, 2}], paid=[SUM($3)])
+   +- LogicalProject(c_last_name=[$0], c_first_name=[$1], s_store_name=[$2], netpaid=[$10])
+      +- LogicalFilter(condition=[=($5, _UTF-16LE'orchid')])
+         +- LogicalAggregate(group=[{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}], netpaid=[SUM($10)])
+            +- LogicalProject(c_last_name=[$103], c_first_name=[$102], s_store_name=[$48], ca_state=[$120], s_state=[$67], i_color=[$89], i_current_price=[$77], i_manager_id=[$92], i_units=[$90], i_size=[$87], ss_sales_price=[$12])
+               +- LogicalFilter(condition=[AND(=($8, $31), =($1, $24), =($2, $94), =($1, $72), =($6, $43), =($98, $112), <>($108, UPPER($122)), =($68, $121), =($53, 7))])
+                  +- LogicalJoin(condition=[true], joinType=[inner])
+                     :- LogicalJoin(condition=[true], joinType=[inner])
+                     :  :- LogicalJoin(condition=[true], joinType=[inner])
+                     :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+                     :  :  :  :- LogicalJoin(condition=[true], joinType=[inner])
+                     :  :  :  :  :- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales]])
+                     :  :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_returns]])
+                     :  :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store]])
+                     :  :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item]])
+                     :  +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer]])
+                     +- LogicalTableScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address]])
+]]>
+    </Resource>
+    <Resource name="optimized exec plan">
+      <![CDATA[
+Calc(select=[c_last_name, c_first_name, s_store_name, paid])
++- NestedLoopJoin(joinType=[InnerJoin], where=[(paid > $f0)], select=[c_last_name, c_first_name, s_store_name, paid, $f0], build=[right], singleRowJoin=[true])
+   :- HashAggregate(isMerge=[false], groupBy=[c_last_name, c_first_name, s_store_name], select=[c_last_name, c_first_name, s_store_name, SUM(netpaid) AS paid])
+   :  +- Exchange(distribution=[hash[c_last_name, c_first_name, s_store_name]])
+   :     +- Calc(select=[c_last_name, c_first_name, s_store_name, netpaid])
+   :        +- HashAggregate(isMerge=[true], groupBy=[c_last_name, c_first_name, s_store_name, ca_state, s_state, i_color, i_current_price, i_manager_id, i_units, i_size], select=[c_last_name, c_first_name, s_store_name, ca_state, s_state, i_color, i_current_price, i_manager_id, i_units, i_size, Final_SUM(sum$0) AS netpaid])
+   :           +- Exchange(distribution=[hash[c_last_name, c_first_name, s_store_name, ca_state, s_state, i_color, i_current_price, i_manager_id, i_units, i_size]])
+   :              +- LocalHashAggregate(groupBy=[c_last_name, c_first_name, s_store_name, ca_state, s_state, i_color, i_current_price, i_manager_id, i_units, i_size], select=[c_last_name, c_first_name, s_store_name, ca_state, s_state, i_color, i_current_price, i_manager_id, i_units, i_size, Partial_SUM(ss_sales_price) AS sum$0])
+   :                 +- Calc(select=[c_last_name, c_first_name, s_store_name, ca_state, s_state, CAST('orchid' AS VARCHAR(2147483647)) AS i_color, i_current_price, i_manager_id, i_units, i_size, ss_sales_price])
+   :                    +- HashJoin(joinType=[InnerJoin], where=[(sr_item_sk = i_item_sk)], select=[sr_item_sk, ss_sales_price, c_first_name, c_last_name, ca_state, s_store_name, s_state, i_item_sk, i_current_price, i_size, i_units, i_manager_id], isBroadcast=[true], build=[right])
+   :                       :- Calc(select=[sr_item_sk, ss_sales_price, c_first_name, c_last_name, ca_state, s_store_name, s_state])(reuse_id=[1])
+   :                       :  +- HashJoin(joinType=[InnerJoin], where=[((ss_ticket_number = sr_ticket_number) AND (ss_item_sk = sr_item_sk))], select=[sr_item_sk, sr_ticket_number, ss_item_sk, ss_ticket_number, ss_sales_price, c_first_name, c_last_name, ca_state, s_store_name, s_state], build=[right])
+   :                       :     :- Exchange(distribution=[hash[sr_item_sk]])
+   :                       :     :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_returns, project=[sr_item_sk, sr_ticket_number]]], fields=[sr_item_sk, sr_ticket_number])
+   :                       :     +- Exchange(distribution=[hash[ss_item_sk]])
+   :                       :        +- Calc(select=[ss_item_sk, ss_ticket_number, ss_sales_price, c_first_name, c_last_name, ca_state, s_store_name, s_state])
+   :                       :           +- HashJoin(joinType=[InnerJoin], where=[((ss_customer_sk = c_customer_sk) AND (ss_store_sk = s_store_sk))], select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ticket_number, ss_sales_price, c_customer_sk, c_first_name, c_last_name, ca_state, s_store_sk, s_store_name, s_state], build=[right])
+   :                       :              :- Exchange(distribution=[hash[ss_customer_sk, ss_store_sk]])
+   :                       :              :  +- Calc(select=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ticket_number, ss_sales_price], where=[(ss_customer_sk IS NOT NULL AND ss_store_sk IS NOT NULL)])
+   :                       :              :     +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store_sales, project=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ticket_number, ss_sales_price]]], fields=[ss_item_sk, ss_customer_sk, ss_store_sk, ss_ticket_number, ss_sales_price])
+   :                       :              +- Exchange(distribution=[hash[c_customer_sk, s_store_sk]])
+   :                       :                 +- Calc(select=[c_customer_sk, c_first_name, c_last_name, ca_state, s_store_sk, s_store_name, s_state])
+   :                       :                    +- HashJoin(joinType=[InnerJoin], where=[((c_current_addr_sk = ca_address_sk) AND (c_birth_country <> UPPER(ca_country)))], select=[c_customer_sk, c_current_addr_sk, c_first_name, c_last_name, c_birth_country, ca_address_sk, ca_state, ca_country, s_store_sk, s_store_name, s_state], build=[right])
+   :                       :                       :- Exchange(distribution=[hash[c_current_addr_sk]])
+   :                       :                       :  +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer, project=[c_customer_sk, c_current_addr_sk, c_first_name, c_last_name, c_birth_country]]], fields=[c_customer_sk, c_current_addr_sk, c_first_name, c_last_name, c_birth_country])
+   :                       :                       +- Exchange(distribution=[hash[ca_address_sk]])
+   :                       :                          +- Calc(select=[ca_address_sk, ca_state, ca_country, s_store_sk, s_store_name, s_state])
+   :                       :                             +- HashJoin(joinType=[InnerJoin], where=[(s_zip = ca_zip)], select=[ca_address_sk, ca_state, ca_zip, ca_country, s_store_sk, s_store_name, s_state, s_zip], isBroadcast=[true], build=[right])
+   :                       :                                :- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, customer_address, project=[ca_address_sk, ca_state, ca_zip, ca_country]]], fields=[ca_address_sk, ca_state, ca_zip, ca_country])
+   :                       :                                +- Exchange(distribution=[broadcast])
+   :                       :                                   +- Calc(select=[s_store_sk, s_store_name, s_state, s_zip], where=[(s_market_id = 7)])
+   :                       :                                      +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, store, project=[s_store_sk, s_store_name, s_market_id, s_state, s_zip]]], fields=[s_store_sk, s_store_name, s_market_id, s_state, s_zip])
+   :                       +- Exchange(distribution=[broadcast])
+   :                          +- Calc(select=[i_item_sk, i_current_price, i_size, i_units, i_manager_id], where=[(i_color = 'orchid')])
+   :                             +- TableSourceScan(table=[[hive, tpcds_bin_partitioned_orc_10000, item, project=[i_item_sk, i_current_price, i_size, i_color, i_units, i_manager_id]]], fields=[i_item_sk, i_current_price, i_size, i_color, i_units, i_manager_id])(reuse_id=[2])
+   +- Exchange(distribution=[broadcast])
+      +- HashAggregate(isMerge=[false], select=[SINGLE_VALUE(EXPR$0) AS $f0])
+         +- Calc(select=[(0.05 * $f0) AS EXPR$0])
+            +- HashAggregate(isMerge=[true], select=[Final_AVG(sum$0, count$1) AS $f0])
+               +- Exchange(distribution=[single])
+                  +- LocalHashAggregate(select=[Partial_AVG(netpaid) AS (sum$0, count$1)])
+                     +- Calc(select=[netpaid])
+                        +- HashAggregate(isMerge=[false], groupBy=[c_last_name, c_first_name, s_store_name, ca_state, s_state, i_color, i_current_price, i_manager_id, i_units, i_size], select=[c_last_name, c_first_name, s_store_name, ca_state, s_state, i_color, i_current_price, i_manager_id, i_units, i_size, SUM(ss_sales_price) AS netpaid])
+                           +- Exchange(distribution=[hash[c_last_name, c_first_name, s_store_name, ca_state, s_state, i_color, i_current_price, i_manager_id, i_units, i_size]])
+                              +- Calc(select=[c_last_name, c_first_name, s_store_name, ca_state, s_state, i_color, i_current_price, i_manager_id, i_units, i_size, ss_sales_price])
+                                 +- HashJoin(joinType=[InnerJoin], where=[(sr_item_sk = i_item_sk)], select=[sr_item_sk, ss_sales_price, c_first_name, c_last_name, ca_state, s_store_name, s_state, i_item_sk, i_current_price, i_size, i_color, i_units, i_manager_id], build=[right])
+                                    :- Reused(reference_id=[1])
+                                    +- Exchange(distribution=[hash[i_item_sk]])
+                                       +- Reused(reference_id=[2])
+]]>
+    </Resource>
+  </TestCase>
