@@ -17,7 +17,9 @@
  */
 package org.apache.flink.table.planner.plan.rules.physical.batch
 
-import org.apache.flink.configuration.ReadableConfig
+import org.apache.flink.annotation.Experimental
+import org.apache.flink.configuration.ConfigOptions.key
+import org.apache.flink.configuration.{ConfigOption, ReadableConfig}
 import org.apache.flink.table.api.config.OptimizerConfigOptions
 import org.apache.flink.table.planner.JDouble
 import org.apache.flink.table.planner.plan.`trait`.FlinkRelDistribution
@@ -35,6 +37,7 @@ import org.apache.calcite.rel.core.{Join, JoinRelType}
 import org.apache.calcite.util.ImmutableIntList
 
 import java.util
+import java.lang.{Long => JLong}
 
 import scala.collection.JavaConversions._
 
@@ -64,6 +67,13 @@ class BatchPhysicalHashJoinRule
     val leftSize = binaryRowRelNodeSize(join.getLeft)
     val rightSize = binaryRowRelNodeSize(join.getRight)
     val (isBroadcast, _) = canBroadcast(join.getJoinType, leftSize, rightSize, tableConfig)
+
+    val sortMergeThreshold =
+      tableConfig.get(BatchPhysicalHashJoinRule.TABLE_OPTIMIZER_JOIN_TRANSLATE_TO_MERGE_SORT_JOIN_THRESHOLD)
+
+    if (leftSize > sortMergeThreshold && rightSize > sortMergeThreshold) {
+      return false
+    }
 
     // TODO use shuffle hash join if isBroadcast is true and isBroadcastHashJoinEnabled is false ?
     if (isBroadcast) isBroadcastHashJoinEnabled else isShuffleHashJoinEnabled
@@ -195,4 +205,12 @@ class BatchPhysicalHashJoinRule
 
 object BatchPhysicalHashJoinRule {
   val INSTANCE = new BatchPhysicalHashJoinRule
+
+  // It is a experimental config, will may be removed later.
+  @Experimental
+  val TABLE_OPTIMIZER_JOIN_TRANSLATE_TO_MERGE_SORT_JOIN_THRESHOLD: ConfigOption[JLong] =
+  key("table.optimizer.join.translate-to-merge-sort-join-threshold")
+    .longType()
+    .defaultValue(JLong.valueOf(300000000L))
+    .withDescription("if join tables are two big table, we need translate hash join to sort merge join")
 }
