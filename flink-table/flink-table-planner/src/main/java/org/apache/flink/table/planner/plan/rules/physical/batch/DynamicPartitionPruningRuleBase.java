@@ -78,7 +78,16 @@ public abstract class DynamicPartitionPruningRuleBase extends RelRule<RelRule.Co
         }
 
         // TODO support more join types
-        if (join.getJoinType() != JoinRelType.INNER) {
+        if (join.getJoinType() == JoinRelType.LEFT) {
+            if (factInLeft) {
+                return false;
+            }
+        } else if (join.getJoinType() == JoinRelType.RIGHT) {
+            if (!factInLeft) {
+                return false;
+            }
+        } else if (join.getJoinType() != JoinRelType.INNER
+                && join.getJoinType() != JoinRelType.SEMI) {
             return false;
         }
 
