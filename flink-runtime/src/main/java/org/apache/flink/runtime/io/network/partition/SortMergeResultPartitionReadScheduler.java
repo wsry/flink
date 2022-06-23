@@ -22,6 +22,7 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.runtime.io.disk.BatchShuffleReadBufferPool;
+import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferRecycler;
 import org.apache.flink.util.FatalExitExceptionHandler;
 import org.apache.flink.util.IOUtils;
@@ -124,6 +125,8 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
     @GuardedBy("lock")
     private volatile boolean isReleased;
 
+    private final BatchShuffleDataCache dataCache = new BatchShuffleDataCache();
+
     SortMergeResultPartitionReadScheduler(
             int numSubpartitions,
             BatchShuffleReadBufferPool bufferPool,
@@ -154,10 +157,16 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
     public synchronized void run() {
         Queue<SortMergeSubpartitionReader> availableReaders = getAvailableReaders();
 
-        Queue<MemorySegment> buffers = allocateBuffers(availableReaders);
+        Queue<MemorySegment> buffers;
+        if (!dataCache.isEmpty()) {
+            buffers = new ArrayDeque<>();
+        } else {
+            buffers = allocateBuffers(availableReaders);
+        }
         int numBuffersAllocated = buffers.size();
 
-        Set<SortMergeSubpartitionReader> finishedReaders = readData(availableReaders, buffers);
+        Set<SortMergeSubpartitionReader> finishedReaders =
+                readData(availableReaders, buffers, dataCache);
 
         int numBuffersRead = numBuffersAllocated - buffers.size();
         releaseBuffers(buffers);
@@ -215,13 +224,15 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
     }
 
     private Set<SortMergeSubpartitionReader> readData(
-            Queue<SortMergeSubpartitionReader> availableReaders, Queue<MemorySegment> buffers) {
+            Queue<SortMergeSubpartitionReader> availableReaders,
+            Queue<MemorySegment> buffers,
+            BatchShuffleDataCache dataCache) {
         Set<SortMergeSubpartitionReader> finishedReaders = new HashSet<>();
 
-        while (!availableReaders.isEmpty() && !buffers.isEmpty()) {
+        while (!availableReaders.isEmpty() && (!buffers.isEmpty() || !dataCache.isEmpty())) {
             SortMergeSubpartitionReader subpartitionReader = availableReaders.poll();
             try {
-                if (!subpartitionReader.readBuffers(buffers, this)) {
+                if (!subpartitionReader.readBuffers(buffers, this, dataCache)) {
                     // there is no resource to release for finished readers currently
                     finishedReaders.add(subpartitionReader);
                 }
@@ -252,6 +263,7 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
 
     private void removeFinishedAndFailedReaders(
             int numBuffersRead, Set<SortMergeSubpartitionReader> finishedReaders) {
+        List<Buffer> toRecycle = null;
         synchronized (lock) {
             for (SortMergeSubpartitionReader reader : finishedReaders) {
                 allReaders.remove(reader);
@@ -266,12 +278,18 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
             if (allReaders.isEmpty()) {
                 bufferPool.unregisterRequester(this);
                 closeFileChannels();
+                toRecycle = dataCache.clearCache();
             }
 
             numRequestedBuffers += numBuffersRead;
             isRunning = false;
             mayTriggerReading();
             mayNotifyReleased();
+        }
+
+        if (toRecycle != null) {
+            toRecycle.forEach(Buffer::recycleBuffer);
+            toRecycle.clear();
         }
     }
 
@@ -298,12 +316,23 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
             int targetSubpartition,
             PartitionedFile resultFile)
             throws IOException {
+        return createSubpartitionReader(
+                false, availabilityListener, targetSubpartition, resultFile);
+    }
+
+    SortMergeSubpartitionReader createSubpartitionReader(
+            boolean isBroadcastPartition,
+            BufferAvailabilityListener availabilityListener,
+            int targetSubpartition,
+            PartitionedFile resultFile)
+            throws IOException {
         synchronized (lock) {
             checkState(!isReleased, "Partition is already released.");
 
             PartitionedFileReader fileReader = createFileReader(resultFile, targetSubpartition);
             SortMergeSubpartitionReader subpartitionReader =
-                    new SortMergeSubpartitionReader(availabilityListener, fileReader);
+                    new SortMergeSubpartitionReader(
+                            isBroadcastPartition, availabilityListener, fileReader);
             if (allReaders.isEmpty()) {
                 bufferPool.registerRequester(this);
             }

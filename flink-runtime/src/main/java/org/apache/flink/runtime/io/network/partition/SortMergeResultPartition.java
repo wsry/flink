@@ -133,6 +133,8 @@ public class SortMergeResultPartition extends ResultPartition {
     /** {@link DataBuffer} for records sent by {@link #emitRecord(ByteBuffer, int)}. */
     private DataBuffer unicastDataBuffer;
 
+    private boolean isBroadcastPartition = true;
+
     public SortMergeResultPartition(
             String owningTaskName,
             int partitionIndex,
@@ -315,6 +317,7 @@ public class SortMergeResultPartition extends ResultPartition {
     }
 
     private DataBuffer getUnicastDataBuffer() throws IOException {
+        isBroadcastPartition = false;
         flushBroadcastDataBuffer();
 
         if (unicastDataBuffer != null && !unicastDataBuffer.isFinished()) {
@@ -476,7 +479,10 @@ public class SortMergeResultPartition extends ResultPartition {
 
             resultFile = fileWriter.finish();
             super.finish();
-            LOG.info("New partitioned file produced: {}.", resultFile);
+            LOG.info(
+                    "New partitioned file produced: {}, isBroadcast: {}.",
+                    resultFile,
+                    isBroadcastPartition);
         }
     }
 
@@ -515,29 +521,15 @@ public class SortMergeResultPartition extends ResultPartition {
             }
 
             return readScheduler.createSubpartitionReader(
-                    availabilityListener, subpartitionIndex, resultFile);
+                    isBroadcastPartition, availabilityListener, subpartitionIndex, resultFile);
         }
     }
 
     @Override
-    public void flushAll() {
-        try {
-            flushUnicastDataBuffer();
-            flushBroadcastDataBuffer();
-        } catch (IOException e) {
-            LOG.error("Failed to flush the current sort buffer.", e);
-        }
-    }
+    public void flushAll() {}
 
     @Override
-    public void flush(int subpartitionIndex) {
-        try {
-            flushUnicastDataBuffer();
-            flushBroadcastDataBuffer();
-        } catch (IOException e) {
-            LOG.error("Failed to flush the current sort buffer.", e);
-        }
-    }
+    public void flush(int subpartitionIndex) {}
 
     @Override
     public CompletableFuture<?> getAvailableFuture() {

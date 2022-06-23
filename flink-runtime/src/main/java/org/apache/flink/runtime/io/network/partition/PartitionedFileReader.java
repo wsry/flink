@@ -183,7 +183,7 @@ class PartitionedFileReader {
     }
 
     /** Gets read priority of this file reader. Smaller value indicates higher priority. */
-    long getPriority() {
+    long getNextOffsetToRead() {
         return nextOffsetToRead;
     }
 

@@ -23,6 +23,9 @@ import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferRecycler;
 import org.apache.flink.runtime.io.network.partition.ResultSubpartition.BufferAndBacklog;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
@@ -39,6 +42,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /** Subpartition data reader for {@link SortMergeResultPartition}. */
 class SortMergeSubpartitionReader
         implements ResultSubpartitionView, Comparable<SortMergeSubpartitionReader> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SortMergeSubpartitionReader.class);
 
     private final Object lock = new Object();
 
@@ -70,10 +75,20 @@ class SortMergeSubpartitionReader
     /** Sequence number of the next buffer to be sent to the consumer. */
     private int sequenceNumber;
 
+    private final boolean isBroadcastPartition;
+
     SortMergeSubpartitionReader(
-            BufferAvailabilityListener listener, PartitionedFileReader fileReader) {
+            boolean isBroadcastPartition,
+            BufferAvailabilityListener listener,
+            PartitionedFileReader fileReader) {
+        this.isBroadcastPartition = isBroadcastPartition;
         this.availabilityListener = checkNotNull(listener);
         this.fileReader = checkNotNull(fileReader);
+    }
+
+    SortMergeSubpartitionReader(
+            BufferAvailabilityListener listener, PartitionedFileReader fileReader) {
+        this(false, listener, fileReader);
     }
 
     @Nullable
@@ -98,7 +113,7 @@ class SortMergeSubpartitionReader
         }
     }
 
-    private void addBuffer(List<Buffer> buffers) {
+    void addBuffers(List<Buffer> buffers) {
         boolean notifyAvailable = false;
         boolean needRecycleBuffer = false;
 
@@ -127,8 +142,21 @@ class SortMergeSubpartitionReader
         }
     }
 
+    void readBuffers(Queue<MemorySegment> buffers, BufferRecycler recycler) throws IOException {
+        readBuffers(buffers, recycler, new BatchShuffleDataCache());
+    }
+
     /** This method is called by the IO thread of {@link SortMergeResultPartitionReadScheduler}. */
-    boolean readBuffers(Queue<MemorySegment> buffers, BufferRecycler recycler) throws IOException {
+    boolean readBuffers(
+            Queue<MemorySegment> buffers, BufferRecycler recycler, BatchShuffleDataCache dataCache)
+            throws IOException {
+        long nextOffsetToRead = fileReader.getNextOffsetToRead();
+        if (nextOffsetToRead == 0 && !dataCache.isEmpty()) {
+            addBuffers(dataCache.getData());
+            LOG.info("Reuse broadcast data: {}.", dataCache.size());
+            return false;
+        }
+
         while (!buffers.isEmpty()) {
             MemorySegment segment = buffers.poll();
 
@@ -144,10 +172,25 @@ class SortMergeSubpartitionReader
             }
 
             if (!buffersRead.isEmpty()) {
-                addBuffer(buffersRead);
+                if (isBroadcastPartition && nextOffsetToRead == 0) {
+                    dataCache.cacheData(buffersRead);
+                }
+                addBuffers(buffersRead);
             }
         }
-        return fileReader.hasRemaining();
+
+        boolean hasRemaining = fileReader.hasRemaining();
+        if (dataCache.isEmpty()) {
+            LOG.info("No data cached: {}.", isBroadcastPartition);
+            return hasRemaining;
+        } else if (hasRemaining) {
+            LOG.info("Clear data cached: {}.", dataCache.size());
+            dataCache.clearCache().forEach(Buffer::recycleBuffer);
+            return true;
+        } else {
+            LOG.info("Cache broadcast data: {}.", dataCache.size());
+            return false;
+        }
     }
 
     CompletableFuture<?> getReleaseFuture() {
@@ -169,8 +212,8 @@ class SortMergeSubpartitionReader
 
     @Override
     public int compareTo(SortMergeSubpartitionReader that) {
-        long thisPriority = fileReader.getPriority();
-        long thatPriority = that.fileReader.getPriority();
+        long thisPriority = fileReader.getNextOffsetToRead();
+        long thatPriority = that.fileReader.getNextOffsetToRead();
 
         if (thisPriority == thatPriority) {
             return 0;
