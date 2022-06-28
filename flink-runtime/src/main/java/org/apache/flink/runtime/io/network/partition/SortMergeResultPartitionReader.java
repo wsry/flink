@@ -1,0 +1,698 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.flink.runtime.io.network.partition;
+
+import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.TaskManagerOptions;
+import org.apache.flink.core.memory.MemorySegment;
+import org.apache.flink.runtime.io.disk.BatchShuffleReadBufferPool;
+import org.apache.flink.runtime.io.network.buffer.Buffer;
+import org.apache.flink.runtime.io.network.buffer.BufferRecycler;
+import org.apache.flink.runtime.io.network.buffer.NetworkBuffer;
+import org.apache.flink.util.FatalExitExceptionHandler;
+import org.apache.flink.util.IOUtils;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.concurrent.GuardedBy;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Duration;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.apache.flink.runtime.io.network.partition.BufferReaderWriterUtil.HEADER_LENGTH;
+import static org.apache.flink.runtime.io.network.partition.BufferReaderWriterUtil.parseBufferHeader;
+import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
+
+/**
+ * Data reader for {@link SortMergeResultPartition} which can read data for all downstream tasks
+ * consuming the corresponding {@link SortMergeResultPartition}. It always tries to read shuffle
+ * data in order of file offset, which maximums the sequential read so can improve the blocking
+ * shuffle performance.
+ */
+class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SortMergeResultPartitionReader.class);
+
+    private static final long MIN_READING_BUFFER_SIZE = (long) 1024 * 1024;
+
+    /**
+     * Default maximum time (5min) to wait when requesting read buffers from the buffer pool before
+     * throwing an exception.
+     */
+    private static final Duration DEFAULT_BUFFER_REQUEST_TIMEOUT = Duration.ofMinutes(5);
+
+    /** Lock used to synchronize multi-thread access to thread-unsafe fields. */
+    private final Object lock;
+
+    /** Used to read index entry from index file. */
+    private final ByteBuffer indexEntryBuf;
+
+    /**
+     * A {@link CompletableFuture} to be completed when this read scheduler including all resources
+     * is released.
+     */
+    private final CompletableFuture<?> releaseFuture = new CompletableFuture<>();
+
+    /** Buffer pool from which to allocate buffers for shuffle data reading. */
+    private final BatchShuffleReadBufferPool bufferPool;
+
+    /** Executor to run the shuffle data reading task. */
+    private final Executor ioExecutor;
+
+    /** Maximum number of buffers can be allocated by this partition reader. */
+    private final int maxRequestedBuffers;
+
+    /**
+     * Maximum time to wait when requesting read buffers from the buffer pool before throwing an
+     * exception.
+     */
+    private final Duration bufferRequestTimeout;
+
+    /** All failed subpartition readers to be released. */
+    @GuardedBy("lock")
+    private final Set<SortMergeSubpartitionView> failedViews = new HashSet<>();
+
+    /** All readers waiting to read data of different subpartitions. */
+    @GuardedBy("lock")
+    private final Set<SortMergeSubpartitionView> allViews = new HashSet<>();
+
+    /** File channel shared by all subpartitions to read data from. */
+    @GuardedBy("lock")
+    private FileChannel dataFileChannel;
+
+    /** File channel shared by all subpartitions to read index from. */
+    @GuardedBy("lock")
+    private FileChannel indexFileChannel;
+
+    /**
+     * Whether the data reading task is currently running or not. This flag is used when trying to
+     * submit the data reading task.
+     */
+    @GuardedBy("lock")
+    private boolean isRunning;
+
+    /** Number of buffers already allocated and still not recycled by this partition reader. */
+    @GuardedBy("lock")
+    private volatile int numRequestedBuffers;
+
+    /** Whether this reader has been released or not. */
+    @GuardedBy("lock")
+    private volatile boolean isReleased;
+
+    SortMergeResultPartitionReader(
+            int numSubpartitions,
+            BatchShuffleReadBufferPool bufferPool,
+            Executor ioExecutor,
+            Object lock) {
+        this(numSubpartitions, bufferPool, ioExecutor, lock, DEFAULT_BUFFER_REQUEST_TIMEOUT);
+    }
+
+    SortMergeResultPartitionReader(
+            int numSubpartitions,
+            BatchShuffleReadBufferPool bufferPool,
+            Executor ioExecutor,
+            Object lock,
+            Duration bufferRequestTimeout) {
+        checkArgument(bufferPool.getBufferSize() > HEADER_LENGTH, "Too small buffer size.");
+
+        this.lock = checkNotNull(lock);
+        this.bufferPool = checkNotNull(bufferPool);
+        this.ioExecutor = checkNotNull(ioExecutor);
+        // one partition reader can consume at most Math.max(16M, numSubpartitions) (the expected
+        // buffers per request is 8M) buffers for data read, which means larger parallelism, more
+        // buffers. Currently, it is only an empirical strategy which can not be configured.
+        this.maxRequestedBuffers =
+                Math.max(2 * bufferPool.getNumBuffersPerRequest(), numSubpartitions);
+        this.bufferRequestTimeout = checkNotNull(bufferRequestTimeout);
+
+        this.indexEntryBuf = ByteBuffer.allocateDirect(PartitionedFile.INDEX_ENTRY_SIZE);
+        BufferReaderWriterUtil.configureByteBuffer(indexEntryBuf);
+    }
+
+    @Override
+    public synchronized void run() {
+        Tuple2<List<SortMergeSubpartitionView>, List<ReadingRequest>> views =
+                computeReadingRequests();
+
+        Queue<MemorySegment> buffers = allocateBuffers(views.f0);
+        int numBuffersAllocated = buffers.size();
+
+        Set<SortMergeSubpartitionView> finishedViews = readData(views.f1, buffers);
+
+        int numBuffersRead = numBuffersAllocated - buffers.size();
+        releaseBuffers(buffers);
+
+        removeFinishedAndFailedViews(numBuffersRead, finishedViews);
+    }
+
+    @VisibleForTesting
+    Queue<MemorySegment> allocateBuffers(List<SortMergeSubpartitionView> availableViews) {
+        if (availableViews.isEmpty()) {
+            return new ArrayDeque<>();
+        }
+
+        try {
+            long timeoutTime = getBufferRequestTimeoutTime();
+            do {
+                List<MemorySegment> buffers = bufferPool.requestBuffers();
+                if (!buffers.isEmpty()) {
+                    return new ArrayDeque<>(buffers);
+                }
+                checkState(!isReleased, "Result partition has been already released.");
+            } while (System.nanoTime() < timeoutTime
+                    || System.nanoTime() < (timeoutTime = getBufferRequestTimeoutTime()));
+
+            if (numRequestedBuffers <= 0) {
+                throw new TimeoutException(
+                        String.format(
+                                "Buffer request timeout, this means there is a fierce contention of"
+                                        + " the batch shuffle read memory, please increase '%s'.",
+                                TaskManagerOptions.NETWORK_BATCH_SHUFFLE_READ_MEMORY.key()));
+            }
+        } catch (Throwable throwable) {
+            // fail all pending subpartition readers immediately if any exception occurs
+            failSubpartitionReaders(availableViews, throwable);
+            LOG.error("Failed to request buffers for data reading.", throwable);
+        }
+        return new ArrayDeque<>();
+    }
+
+    private long getBufferRequestTimeoutTime() {
+        return bufferPool.getLastBufferOperationTimestamp() + bufferRequestTimeout.toNanos();
+    }
+
+    private void releaseBuffers(Queue<MemorySegment> buffers) {
+        if (!buffers.isEmpty()) {
+            try {
+                bufferPool.recycle(buffers);
+                buffers.clear();
+            } catch (Throwable throwable) {
+                // this should never happen so just trigger fatal error
+                FatalExitExceptionHandler.INSTANCE.uncaughtException(
+                        Thread.currentThread(), throwable);
+            }
+        }
+    }
+
+    private Set<SortMergeSubpartitionView> readData(
+            List<ReadingRequest> readingRequests, Queue<MemorySegment> buffers) {
+        Set<SortMergeSubpartitionView> finishedViews = new HashSet<>();
+        BufferReaderWriterUtil.BufferHeader currentHeader = null;
+        ByteBuffer headerBuffer = BufferReaderWriterUtil.allocatedHeaderBuffer();
+
+        for (ReadingRequest readingRequest : readingRequests) {
+            if ((long) buffers.size() * bufferPool.getBufferSize() < MIN_READING_BUFFER_SIZE) {
+                break;
+            }
+
+            long requestBytes = readingRequest.endOffset - readingRequest.startOffset;
+            int bufferSize = bufferPool.getBufferSize();
+            int numBuffers =
+                    Math.max((int) Math.min(requestBytes / bufferSize + 1, buffers.size() / 2), 1);
+            ByteBuffer[] readingBuffers = new ByteBuffer[numBuffers];
+            List<MemorySegment> readingSegments = new ArrayList<>(numBuffers);
+            for (int i = 0; i < readingBuffers.length; ++i) {
+                MemorySegment segment = checkNotNull(buffers.poll());
+                readingSegments.add(segment);
+                readingBuffers[i] = segment.wrap(0, segment.size());
+            }
+
+            try {
+                if (requestBytes > 0) {
+                    dataFileChannel.position(readingRequest.startOffset);
+                    dataFileChannel.read(readingBuffers);
+                }
+            } catch (Throwable throwable) {
+                buffers.addAll(readingSegments);
+                failSubpartitionReaders(readingRequest.views, throwable);
+                LOG.debug("Failed to read shuffle data.", throwable);
+                continue;
+            }
+
+            PartialBuffer partialBuffer = null;
+            long currentBufferFileOffset = readingRequest.startOffset;
+            long[] subpartitionBytes = new long[readingRequest.views.size()];
+            Arrays.fill(subpartitionBytes, 0);
+
+            for (int i = 0; i < numBuffers; ++i) {
+                ByteBuffer currentBuffer = readingBuffers[i];
+                currentBuffer.flip();
+
+                MemorySegment currentSegment = readingSegments.get(i);
+                int currentBufferBytes = currentBuffer.remaining();
+                SharedBufferRecycler sharedRecycler = new SharedBufferRecycler(currentSegment);
+
+                if (currentBufferBytes <= 0) {
+                    buffers.add(currentSegment);
+                    continue;
+                }
+
+                while (currentBuffer.hasRemaining()) {
+                    if (headerBuffer.position() > 0) {
+                        while (headerBuffer.hasRemaining()) {
+                            headerBuffer.put(currentBuffer.get());
+                        }
+                        headerBuffer.flip();
+                        currentHeader = parseBufferHeader(headerBuffer);
+                        headerBuffer.clear();
+                    }
+
+                    if (currentHeader == null && currentBuffer.remaining() < HEADER_LENGTH) {
+                        checkState(currentBuffer.position() > 0);
+                        headerBuffer.put(currentBuffer);
+                        break;
+                    } else if (currentHeader == null) {
+                        currentHeader = parseBufferHeader(currentBuffer);
+                    }
+
+                    MemorySegment targetSegment = currentSegment;
+                    BufferRecycler targetRecycler = sharedRecycler;
+                    int readerIndex = currentBuffer.position();
+                    int writerIndex = currentHeader.getLength();
+
+                    if (partialBuffer != null) {
+                        readerIndex = 0;
+                        int bytesToCopy = currentHeader.getLength() - partialBuffer.length;
+                        checkState(currentBuffer.remaining() >= bytesToCopy);
+                        partialBuffer.segment.put(partialBuffer.length, currentBuffer, bytesToCopy);
+                        targetSegment = partialBuffer.segment;
+                        targetRecycler = this;
+                        partialBuffer = null;
+                    } else if (currentBuffer.remaining() < currentHeader.getLength()) {
+                        MemorySegment segment = checkNotNull(buffers.poll());
+                        partialBuffer = new PartialBuffer(currentBuffer.remaining(), segment);
+                        segment.put(0, currentBuffer, currentBuffer.remaining());
+                        break;
+                    } else {
+                        writerIndex = readerIndex + currentHeader.getLength();
+                        currentBuffer.position(currentBuffer.position());
+                    }
+
+                    for (int viewIndex = 0; viewIndex < readingRequest.views.size(); ++viewIndex) {
+                        SortMergeSubpartitionView view = readingRequest.views.get(i);
+                        if (view == null) {
+                            continue;
+                        }
+                        try {
+                            int length = currentHeader.getLength();
+                            if (view.getReadingProgress()
+                                    .isDataInRange(currentBufferFileOffset + readerIndex, length)) {
+                                sharedRecycler.retain();
+                                Buffer slicedBuffer =
+                                        new NetworkBuffer(
+                                                        targetSegment,
+                                                        targetRecycler,
+                                                        currentHeader.getDataType(),
+                                                        false,
+                                                        writerIndex)
+                                                .readOnlySlice(readerIndex, length);
+                                slicedBuffer.setCompressed(currentHeader.isCompressed());
+                                subpartitionBytes[viewIndex] += length + HEADER_LENGTH;
+                                view.addBuffer(slicedBuffer);
+                            }
+                        } catch (Throwable throwable) {
+                            readingRequest.views.set(i, null);
+                            failSubpartitionReaders(Collections.singletonList(view), throwable);
+                            LOG.debug("Failed to read shuffle data.", throwable);
+                        }
+                    }
+                }
+                sharedRecycler.recycle();
+                currentBufferFileOffset += currentBufferBytes;
+            }
+
+            for (int i = 0; i < readingRequest.views.size(); ++i) {
+                SortMergeSubpartitionView view = readingRequest.views.get(i);
+                if (view == null) {
+                    continue;
+                }
+                try {
+                    if (!view.getReadingProgress()
+                            .updateReadingProgress(subpartitionBytes[i], indexEntryBuf)) {
+                        // there is no resource to release for finished readers currently
+                        finishedViews.add(view);
+                    }
+                } catch (Throwable throwable) {
+                    failSubpartitionReaders(Collections.singletonList(view), throwable);
+                    LOG.debug("Failed to read shuffle data.", throwable);
+                }
+            }
+            if (partialBuffer != null) {
+                buffers.add(partialBuffer.segment);
+            }
+        }
+        return finishedViews;
+    }
+
+    private void failSubpartitionReaders(
+            Collection<SortMergeSubpartitionView> views, Throwable failureCause) {
+        synchronized (lock) {
+            failedViews.addAll(views);
+        }
+
+        for (SortMergeSubpartitionView view : views) {
+            try {
+                view.fail(failureCause);
+            } catch (Throwable throwable) {
+                // this should never happen so just trigger fatal error
+                FatalExitExceptionHandler.INSTANCE.uncaughtException(
+                        Thread.currentThread(), throwable);
+            }
+        }
+    }
+
+    private void removeFinishedAndFailedViews(
+            int numBuffersRead, Set<SortMergeSubpartitionView> finishedViews) {
+        synchronized (lock) {
+            for (SortMergeSubpartitionView view : finishedViews) {
+                allViews.remove(view);
+            }
+            finishedViews.clear();
+
+            for (SortMergeSubpartitionView view : failedViews) {
+                allViews.remove(view);
+            }
+            failedViews.clear();
+
+            if (allViews.isEmpty()) {
+                bufferPool.unregisterRequester(this);
+                closeFileChannels();
+            }
+
+            numRequestedBuffers += numBuffersRead;
+            isRunning = false;
+            mayTriggerReading();
+            mayNotifyReleased();
+        }
+    }
+
+    private void mayNotifyReleased() {
+        assert Thread.holdsLock(lock);
+
+        if (isReleased && allViews.isEmpty()) {
+            releaseFuture.complete(null);
+        }
+    }
+
+    private Tuple2<List<SortMergeSubpartitionView>, List<ReadingRequest>> computeReadingRequests() {
+        synchronized (lock) {
+            if (isReleased || allViews.isEmpty()) {
+                return Tuple2.of(Collections.emptyList(), Collections.emptyList());
+            }
+
+            int regionIndex = Integer.MAX_VALUE;
+            for (SortMergeSubpartitionView view : allViews) {
+                int viewRegionIndex = view.getReadingProgress().getNextRegionIndex();
+                if (viewRegionIndex < regionIndex) {
+                    regionIndex = viewRegionIndex;
+                }
+            }
+
+            ArrayList<SortMergeSubpartitionView> views = new ArrayList<>();
+            for (SortMergeSubpartitionView view : allViews) {
+                if (view.getReadingProgress().getNextRegionIndex() == regionIndex) {
+                    views.add(view);
+                }
+            }
+            Collections.sort(views);
+
+            ArrayList<ReadingRequest> readingRequests = new ArrayList<>();
+            ReadingRequest prevReadingRequest = null;
+            for (SortMergeSubpartitionView view : views) {
+                SubpartitionReadingProgress readingProgress = view.getReadingProgress();
+                if (prevReadingRequest == null
+                        || prevReadingRequest.endOffset < readingProgress.getFileOffset()) {
+                    ReadingRequest readingRequest =
+                            new ReadingRequest(
+                                    readingProgress.getFileOffset(),
+                                    readingProgress.getFileOffset()
+                                            + readingProgress.getCurrentRegionRemainingBytes(),
+                                    new ArrayList<>());
+                    readingRequests.add(readingRequest);
+                    prevReadingRequest = readingRequest;
+                } else {
+                    long newEndOffset =
+                            readingProgress.getFileOffset()
+                                    + readingProgress.getCurrentRegionRemainingBytes();
+                    if (newEndOffset > prevReadingRequest.endOffset) {
+                        prevReadingRequest.updateEndOffset(newEndOffset);
+                    }
+                    prevReadingRequest.addSubpartitionView(view);
+                }
+            }
+            return Tuple2.of(views, readingRequests);
+        }
+    }
+
+    SortMergeSubpartitionView createSubpartitionReader(
+            BufferAvailabilityListener availabilityListener,
+            int targetSubpartition,
+            PartitionedFile resultFile)
+            throws IOException {
+        synchronized (lock) {
+            checkState(!isReleased, "Partition is already released.");
+
+            mayOpenFileChannels(resultFile);
+            SortMergeSubpartitionView subpartitionView =
+                    new SortMergeSubpartitionView(
+                            availabilityListener,
+                            new SubpartitionReadingProgress(
+                                    resultFile, indexFileChannel, targetSubpartition));
+            if (allViews.isEmpty()) {
+                bufferPool.registerRequester(this);
+            }
+            allViews.add(subpartitionView);
+            subpartitionView
+                    .getReleaseFuture()
+                    .thenRun(() -> releaseSubpartitionView(subpartitionView));
+
+            mayTriggerReading();
+            return subpartitionView;
+        }
+    }
+
+    private void releaseSubpartitionView(SortMergeSubpartitionView subpartitionView) {
+        synchronized (lock) {
+            if (allViews.contains(subpartitionView)) {
+                failedViews.add(subpartitionView);
+            }
+        }
+    }
+
+    private void mayOpenFileChannels(PartitionedFile resultFile) throws IOException {
+        assert Thread.holdsLock(lock);
+
+        try {
+            if (allViews.isEmpty()) {
+                openFileChannels(resultFile);
+            }
+        } catch (Throwable throwable) {
+            if (allViews.isEmpty()) {
+                closeFileChannels();
+            }
+            throw throwable;
+        }
+    }
+
+    private void openFileChannels(PartitionedFile resultFile) throws IOException {
+        assert Thread.holdsLock(lock);
+
+        closeFileChannels();
+        dataFileChannel = openFileChannel(resultFile.getDataFilePath());
+        indexFileChannel = openFileChannel(resultFile.getIndexFilePath());
+    }
+
+    private void closeFileChannels() {
+        assert Thread.holdsLock(lock);
+
+        IOUtils.closeAllQuietly(dataFileChannel, indexFileChannel);
+        dataFileChannel = null;
+        indexFileChannel = null;
+    }
+
+    @Override
+    public void recycle(MemorySegment segment) {
+        synchronized (lock) {
+            bufferPool.recycle(segment);
+            --numRequestedBuffers;
+
+            mayTriggerReading();
+        }
+    }
+
+    private void mayTriggerReading() {
+        assert Thread.holdsLock(lock);
+
+        if (!isRunning
+                && !allViews.isEmpty()
+                && numRequestedBuffers + bufferPool.getNumBuffersPerRequest() <= maxRequestedBuffers
+                && numRequestedBuffers < bufferPool.getAverageBuffersPerRequester()) {
+            isRunning = true;
+            ioExecutor.execute(this);
+        }
+    }
+
+    /**
+     * Releases this read scheduler and returns a {@link CompletableFuture} which will be completed
+     * when all resources are released.
+     */
+    CompletableFuture<?> release() {
+        List<SortMergeSubpartitionView> pendingViews;
+        synchronized (lock) {
+            if (isReleased) {
+                return releaseFuture;
+            }
+            isReleased = true;
+
+            failedViews.addAll(allViews);
+            pendingViews = new ArrayList<>(allViews);
+            mayNotifyReleased();
+        }
+
+        failSubpartitionReaders(
+                pendingViews,
+                new IllegalStateException("Result partition has been already released."));
+        return releaseFuture;
+    }
+
+    private static FileChannel openFileChannel(Path path) throws IOException {
+        return FileChannel.open(path, StandardOpenOption.READ);
+    }
+
+    @VisibleForTesting
+    int getNumPendingReaders() {
+        synchronized (lock) {
+            return allViews.size();
+        }
+    }
+
+    @VisibleForTesting
+    FileChannel getDataFileChannel() {
+        synchronized (lock) {
+            return dataFileChannel;
+        }
+    }
+
+    @VisibleForTesting
+    FileChannel getIndexFileChannel() {
+        synchronized (lock) {
+            return indexFileChannel;
+        }
+    }
+
+    @VisibleForTesting
+    CompletableFuture<?> getReleaseFuture() {
+        return releaseFuture;
+    }
+
+    @VisibleForTesting
+    boolean isRunning() {
+        synchronized (lock) {
+            return isRunning;
+        }
+    }
+
+    private static class ReadingRequest {
+
+        private final long startOffset;
+
+        private final ArrayList<SortMergeSubpartitionView> views;
+
+        private long endOffset;
+
+        private ReadingRequest(
+                long startOffset, long endOffset, ArrayList<SortMergeSubpartitionView> views) {
+            this.startOffset = startOffset;
+            this.endOffset = endOffset;
+            this.views = checkNotNull(views);
+        }
+
+        void addSubpartitionView(SortMergeSubpartitionView view) {
+            views.add(view);
+        }
+
+        void updateEndOffset(long newEndOffset) {
+            endOffset = newEndOffset;
+        }
+    }
+
+    private class SharedBufferRecycler implements BufferRecycler {
+
+        private final AtomicInteger referenceCount = new AtomicInteger(1);
+
+        public final MemorySegment segment;
+
+        SharedBufferRecycler(MemorySegment segment) {
+            this.segment = checkNotNull(segment);
+        }
+
+        @Override
+        public void recycle(MemorySegment memorySegment) {
+            checkArgument(memorySegment == segment);
+
+            int count = referenceCount.decrementAndGet();
+            if (count == 0) {
+                SortMergeResultPartitionReader.this.recycle(memorySegment);
+            } else if (count < 0) {
+                throw new IllegalStateException("Illegal reference count.");
+            }
+        }
+
+        void retain() {
+            referenceCount.incrementAndGet();
+        }
+
+        void recycle() {
+            recycle(segment);
+        }
+    }
+
+    private static class PartialBuffer {
+
+        private final int length;
+
+        private final MemorySegment segment;
+
+        PartialBuffer(int length, MemorySegment segment) {
+            this.length = length;
+            this.segment = checkNotNull(segment);
+        }
+    }
+}

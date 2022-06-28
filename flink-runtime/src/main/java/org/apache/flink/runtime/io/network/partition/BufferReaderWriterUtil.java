@@ -34,8 +34,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 
-import static org.apache.flink.util.Preconditions.checkArgument;
-
 /**
  * Putting and getting of a sequence of buffers to/from a FileChannel or a ByteBuffer. This class
  * handles the headers, length encoding, memory slicing.
@@ -268,8 +266,6 @@ public final class BufferReaderWriterUtil {
     }
 
     static BufferHeader parseBufferHeader(ByteBuffer headerBuffer) {
-        checkArgument(headerBuffer.remaining() == HEADER_LENGTH, "Illegal header length.");
-
         configureByteBuffer(headerBuffer);
         boolean isEvent = headerBuffer.getShort() == HEADER_VALUE_IS_EVENT;
         boolean isCompressed = headerBuffer.getShort() == BUFFER_IS_COMPRESSED;

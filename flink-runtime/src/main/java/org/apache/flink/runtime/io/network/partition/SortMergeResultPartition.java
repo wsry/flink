@@ -113,7 +113,7 @@ public class SortMergeResultPartition extends ResultPartition {
     /**
      * Data read scheduler for this result partition which schedules data read of all subpartitions.
      */
-    private final SortMergeResultPartitionReadScheduler readScheduler;
+    private final SortMergeResultPartitionReader resultPartitionReader;
 
     /**
      * Number of guaranteed network buffers can be used by {@link #unicastDataBuffer} and {@link
@@ -168,8 +168,8 @@ public class SortMergeResultPartition extends ResultPartition {
         // reading the output of all upstream tasks in the same order, which is better for data
         // input balance of the downstream tasks
         this.subpartitionOrder = getRandomSubpartitionOrder(numSubpartitions);
-        this.readScheduler =
-                new SortMergeResultPartitionReadScheduler(
+        this.resultPartitionReader =
+                new SortMergeResultPartitionReader(
                         numSubpartitions, readBufferPool, readIOExecutor, lock);
     }
 
@@ -238,7 +238,7 @@ public class SortMergeResultPartition extends ResultPartition {
             }
 
             // delete the produced file only when no reader is reading now
-            readScheduler
+            resultPartitionReader
                     .release()
                     .thenRun(
                             () -> {
@@ -520,8 +520,8 @@ public class SortMergeResultPartition extends ResultPartition {
                 throw new PartitionNotFoundException(getPartitionId());
             }
 
-            return readScheduler.createSubpartitionReader(
-                    isBroadcastPartition, availabilityListener, subpartitionIndex, resultFile);
+            return resultPartitionReader.createSubpartitionReader(
+                    availabilityListener, subpartitionIndex, resultFile);
         }
     }
 
