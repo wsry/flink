@@ -24,6 +24,7 @@ import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.runtime.io.disk.BatchShuffleReadBufferPool;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferRecycler;
+import org.apache.flink.runtime.io.network.buffer.CompositeBuffer;
 import org.apache.flink.runtime.io.network.buffer.NetworkBuffer;
 import org.apache.flink.util.FatalExitExceptionHandler;
 import org.apache.flink.util.IOUtils;
@@ -251,7 +252,7 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
             int bufferSize = bufferPool.getBufferSize();
             long maxRequiredBuffers =
                     requestedBytes / bufferSize + (requestedBytes % bufferSize == 0 ? 0 : 1);
-            int numBuffers = Math.max((int) Math.min(maxRequiredBuffers, buffers.size() / 2), 1);
+            int numBuffers = Math.max((int) Math.min(maxRequiredBuffers, buffers.size()), 1);
             ByteBuffer[] readingBuffers = new ByteBuffer[numBuffers];
             List<MemorySegment> readingSegments = new ArrayList<>(numBuffers);
             for (int i = 0; i < readingBuffers.length; ++i) {
@@ -266,7 +267,7 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
             try {
                 if (requestedBytes > 0) {
                     dataFileChannel.position(readingRequest.startOffset);
-                    long totalBytesRead = dataFileChannel.read(readingBuffers);
+                    dataFileChannel.read(readingBuffers);
                 }
             } catch (Throwable throwable) {
                 buffers.addAll(readingSegments);
@@ -275,7 +276,7 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                 continue;
             }
 
-            PartialBuffer partialBuffer = null;
+            CompositeBuffer compositeBuffer = null;
             long currentBufferFileOffset = readingRequest.startOffset;
             long[] subpartitionBytes = new long[readingRequest.views.size()];
             Arrays.fill(subpartitionBytes, 0);
@@ -313,29 +314,58 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                         currentHeader = parseBufferHeader(currentBuffer);
                     }
 
-                    MemorySegment targetSegment = currentSegment;
-                    SharedBufferRecycler targetRecycler = sharedRecycler;
-                    int readerIndex = currentBuffer.position();
-                    int writerIndex = currentHeader.getLength();
-
-                    if (partialBuffer != null) {
-                        readerIndex = 0;
-                        int bytesToCopy = currentHeader.getLength() - partialBuffer.length;
-                        checkState(currentBuffer.remaining() >= bytesToCopy);
-                        partialBuffer.segment.put(partialBuffer.length, currentBuffer, bytesToCopy);
-                        targetSegment = partialBuffer.segment;
-                        targetRecycler = partialBuffer.recycler;
-                        partialBuffer = null;
+                    if (compositeBuffer != null) {
+                        int position = currentBuffer.position() + compositeBuffer.missingLength();
+                        sharedRecycler.retain();
+                        compositeBuffer.addPartialBuffer(
+                                new NetworkBuffer(
+                                                currentSegment,
+                                                sharedRecycler,
+                                                currentHeader.getDataType(),
+                                                false,
+                                                currentSegment.size())
+                                        .readOnlySlice(
+                                                currentBuffer.position(),
+                                                compositeBuffer.missingLength()));
+                        checkState(compositeBuffer.missingLength() == 0);
+                        currentBuffer.position(position);
                     } else if (currentBuffer.remaining() < currentHeader.getLength()) {
-                        MemorySegment segment = checkNotNull(buffers.poll());
-                        partialBuffer = new PartialBuffer(currentBuffer.remaining(), segment);
-                        if (currentBuffer.hasRemaining()) {
-                            segment.put(0, currentBuffer, currentBuffer.remaining());
-                        }
+                        compositeBuffer =
+                                new CompositeBuffer(
+                                        currentHeader.getDataType(),
+                                        currentHeader.getLength(),
+                                        currentHeader.isCompressed());
+                        sharedRecycler.retain();
+                        compositeBuffer.addPartialBuffer(
+                                new NetworkBuffer(
+                                                currentSegment,
+                                                sharedRecycler,
+                                                currentHeader.getDataType(),
+                                                false,
+                                                currentSegment.size())
+                                        .readOnlySlice(
+                                                currentBuffer.position(),
+                                                currentBuffer.remaining()));
                         break;
                     } else {
-                        writerIndex = readerIndex + currentHeader.getLength();
-                        currentBuffer.position(writerIndex);
+                        compositeBuffer =
+                                new CompositeBuffer(
+                                        currentHeader.getDataType(),
+                                        currentHeader.getLength(),
+                                        currentHeader.isCompressed());
+                        sharedRecycler.retain();
+                        compositeBuffer.addPartialBuffer(
+                                new NetworkBuffer(
+                                                currentSegment,
+                                                sharedRecycler,
+                                                currentHeader.getDataType(),
+                                                false,
+                                                currentSegment.size())
+                                        .readOnlySlice(
+                                                currentBuffer.position(),
+                                                currentHeader.getLength()));
+                        currentBuffer.position(
+                                currentBuffer.position() + currentHeader.getLength());
                     }
 
                     for (int viewIndex = 0; viewIndex < readingRequest.views.size(); ++viewIndex) {
@@ -350,18 +380,10 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                                 break;
                             }
                             if (readingProgress.isDataInRange(currentBufferFileOffset, length)) {
-                                targetRecycler.retain();
-                                Buffer slicedBuffer =
-                                        new NetworkBuffer(
-                                                        targetSegment,
-                                                        targetRecycler,
-                                                        currentHeader.getDataType(),
-                                                        false,
-                                                        writerIndex)
-                                                .readOnlySlice(readerIndex, length);
-                                slicedBuffer.setCompressed(currentHeader.isCompressed());
+                                compositeBuffer.retainBuffer();
+                                Buffer buffer = compositeBuffer.duplicate();
                                 subpartitionBytes[viewIndex] += length + HEADER_LENGTH;
-                                view.addBuffer(slicedBuffer);
+                                view.addBuffer(buffer);
                             }
                         } catch (Throwable throwable) {
                             readingRequest.views.set(i, null);
@@ -371,11 +393,10 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                     }
                     currentBufferFileOffset += currentHeader.getLength();
                     currentHeader = null;
-                    if (targetRecycler != sharedRecycler) {
-                        targetRecycler.recycle();
-                    }
+                    compositeBuffer.recycleBuffer();
+                    compositeBuffer = null;
                 }
-                sharedRecycler.recycle();
+                sharedRecycler.recycle(currentSegment);
             }
 
             for (int i = 0; i < readingRequest.views.size(); ++i) {
@@ -394,8 +415,8 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                     LOG.debug("Failed to read shuffle data.", throwable);
                 }
             }
-            if (partialBuffer != null) {
-                partialBuffer.recycle();
+            if (compositeBuffer != null) {
+                compositeBuffer.recycleBuffer();
             }
         }
         return finishedViews;
@@ -704,29 +725,6 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
 
         void retain() {
             referenceCount.incrementAndGet();
-        }
-
-        void recycle() {
-            recycle(segment);
-        }
-    }
-
-    private class PartialBuffer {
-
-        private final SharedBufferRecycler recycler;
-
-        private final int length;
-
-        private final MemorySegment segment;
-
-        PartialBuffer(int length, MemorySegment segment) {
-            this.length = length;
-            this.segment = checkNotNull(segment);
-            this.recycler = new SharedBufferRecycler(segment);
-        }
-
-        void recycle() {
-            recycler.recycle();
         }
     }
 }

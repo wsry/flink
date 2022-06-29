@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * An implementation of {@link Buffer} which contains multiple partial buffers for network data
@@ -43,6 +44,8 @@ public class CompositeBuffer implements Buffer {
     private final boolean isCompressed;
 
     private final List<Buffer> partialBuffers = new ArrayList<>();
+
+    private int currentLength;
 
     private ByteBufAllocator allocator;
 
@@ -74,12 +77,12 @@ public class CompositeBuffer implements Buffer {
 
     @Override
     public int getSize() {
-        return length;
+        return currentLength;
     }
 
     @Override
     public int readableBytes() {
-        return length;
+        return currentLength;
     }
 
     @Override
@@ -93,7 +96,7 @@ public class CompositeBuffer implements Buffer {
         for (Buffer buffer : partialBuffers) {
             compositeByteBuf.addComponent(buffer.asByteBuf());
         }
-        compositeByteBuf.writerIndex(length);
+        compositeByteBuf.writerIndex(currentLength);
         return compositeByteBuf;
     }
 
@@ -107,8 +110,50 @@ public class CompositeBuffer implements Buffer {
         return dataType;
     }
 
+    public Buffer duplicate() {
+        CompositeBuffer compositeBuffer = new CompositeBuffer(dataType, length, isCompressed);
+        for (Buffer partialBuffer : partialBuffers) {
+            compositeBuffer.addPartialBuffer(partialBuffer.readOnlySlice());
+        }
+        return compositeBuffer;
+    }
+
+    public int numPartialBuffers() {
+        return partialBuffers.size();
+    }
+
+    public Buffer getFullBuffer() {
+        checkState(partialBuffers.size() == 1);
+
+        Buffer buffer = partialBuffers.get(0).readOnlySlice();
+        buffer.setCompressed(isCompressed);
+        return buffer;
+    }
+
+    public Buffer getFullBuffer(MemorySegment segment) {
+        checkState(currentLength <= segment.size());
+
+        int offset = 0;
+        for (Buffer buffer : partialBuffers) {
+            segment.put(offset, buffer.getNioBufferReadable(), buffer.readableBytes());
+            offset += buffer.readableBytes();
+        }
+        return new NetworkBuffer(
+                segment,
+                BufferRecycler.DummyBufferRecycler.INSTANCE,
+                dataType,
+                isCompressed,
+                currentLength);
+    }
+
     public void addPartialBuffer(Buffer buffer) {
         partialBuffers.add(buffer);
+        currentLength += buffer.readableBytes();
+        checkState(currentLength <= length);
+    }
+
+    public int missingLength() {
+        return length - currentLength;
     }
 
     @Override

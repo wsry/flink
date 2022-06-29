@@ -27,6 +27,7 @@ import org.apache.flink.runtime.execution.CancelTaskException;
 import org.apache.flink.runtime.io.network.TaskEventPublisher;
 import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
+import org.apache.flink.runtime.io.network.buffer.CompositeBuffer;
 import org.apache.flink.runtime.io.network.buffer.FileRegionBuffer;
 import org.apache.flink.runtime.io.network.logger.NetworkActionsLogger;
 import org.apache.flink.runtime.io.network.partition.BufferAvailabilityListener;
@@ -228,6 +229,9 @@ public class LocalInputChannel extends InputChannel implements BufferAvailabilit
 
         if (next == null) {
             if (subpartitionView.isReleased()) {
+                if (subpartitionView.getFailureCause() != null) {
+                    subpartitionView.getFailureCause().printStackTrace();
+                }
                 throw new CancelTaskException(
                         "Consumed partition " + subpartitionView + " has been released.");
             } else {
@@ -239,6 +243,17 @@ public class LocalInputChannel extends InputChannel implements BufferAvailabilit
 
         if (buffer instanceof FileRegionBuffer) {
             buffer = ((FileRegionBuffer) buffer).readInto(inputGate.getUnpooledSegment());
+        } else if (buffer instanceof CompositeBuffer) {
+            CompositeBuffer compositeBuffer = (CompositeBuffer) buffer;
+            int numPartialBuffers = compositeBuffer.numPartialBuffers();
+            checkState(numPartialBuffers > 0);
+
+            if (numPartialBuffers == 1) {
+                buffer = compositeBuffer.getFullBuffer();
+            } else {
+                buffer = compositeBuffer.getFullBuffer(inputGate.getUnpooledSegment());
+                compositeBuffer.recycleBuffer();
+            }
         }
 
         numBytesIn.inc(buffer.readableBytes());
