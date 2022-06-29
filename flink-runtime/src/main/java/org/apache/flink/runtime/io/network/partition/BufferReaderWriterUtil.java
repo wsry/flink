@@ -267,6 +267,7 @@ public final class BufferReaderWriterUtil {
 
     static BufferHeader parseBufferHeader(ByteBuffer headerBuffer) {
         configureByteBuffer(headerBuffer);
+
         boolean isEvent = headerBuffer.getShort() == HEADER_VALUE_IS_EVENT;
         boolean isCompressed = headerBuffer.getShort() == BUFFER_IS_COMPRESSED;
         int length = headerBuffer.getInt();

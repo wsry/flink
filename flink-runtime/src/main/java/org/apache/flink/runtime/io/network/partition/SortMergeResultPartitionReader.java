@@ -236,28 +236,43 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
         Set<SortMergeSubpartitionView> finishedViews = new HashSet<>();
         BufferReaderWriterUtil.BufferHeader currentHeader = null;
         ByteBuffer headerBuffer = BufferReaderWriterUtil.allocatedHeaderBuffer();
+        System.out.println(readingRequests.size());
 
         for (ReadingRequest readingRequest : readingRequests) {
+            System.out.println(
+                    readingRequest.startOffset
+                            + " "
+                            + readingRequest.endOffset
+                            + " "
+                            + readingRequest.views.size()
+                            + " "
+                            + buffers.size());
             if ((long) buffers.size() * bufferPool.getBufferSize() < MIN_READING_BUFFER_SIZE) {
                 break;
             }
 
-            long requestBytes = readingRequest.endOffset - readingRequest.startOffset;
+            long requestedBytes = readingRequest.endOffset - readingRequest.startOffset;
             int bufferSize = bufferPool.getBufferSize();
-            int numBuffers =
-                    Math.max((int) Math.min(requestBytes / bufferSize + 1, buffers.size() / 2), 1);
+            long maxRequiredBuffers =
+                    requestedBytes / bufferSize + (requestedBytes % bufferSize == 0 ? 0 : 1);
+            int numBuffers = Math.max((int) Math.min(maxRequiredBuffers, buffers.size() / 2), 1);
             ByteBuffer[] readingBuffers = new ByteBuffer[numBuffers];
             List<MemorySegment> readingSegments = new ArrayList<>(numBuffers);
             for (int i = 0; i < readingBuffers.length; ++i) {
                 MemorySegment segment = checkNotNull(buffers.poll());
                 readingSegments.add(segment);
-                readingBuffers[i] = segment.wrap(0, segment.size());
+                readingBuffers[i] =
+                        segment.wrap(
+                                0,
+                                (int) Math.min(requestedBytes - (long) i * bufferSize, bufferSize));
             }
 
+            System.out.println("numBuffers: " + numBuffers + " " + maxRequiredBuffers);
             try {
-                if (requestBytes > 0) {
+                if (requestedBytes > 0) {
                     dataFileChannel.position(readingRequest.startOffset);
-                    dataFileChannel.read(readingBuffers);
+                    long totalBytesRead = dataFileChannel.read(readingBuffers);
+                    System.out.println("total bytes read: " + totalBytesRead);
                 }
             } catch (Throwable throwable) {
                 buffers.addAll(readingSegments);
@@ -277,13 +292,13 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
 
                 MemorySegment currentSegment = readingSegments.get(i);
                 int currentBufferBytes = currentBuffer.remaining();
-                SharedBufferRecycler sharedRecycler = new SharedBufferRecycler(currentSegment);
 
                 if (currentBufferBytes <= 0) {
                     buffers.add(currentSegment);
                     continue;
                 }
 
+                SharedBufferRecycler sharedRecycler = new SharedBufferRecycler(currentSegment);
                 while (currentBuffer.hasRemaining()) {
                     if (headerBuffer.position() > 0) {
                         while (headerBuffer.hasRemaining()) {
@@ -291,50 +306,97 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                         }
                         headerBuffer.flip();
                         currentHeader = parseBufferHeader(headerBuffer);
+                        System.out.println(
+                                "parse header1: "
+                                        + currentHeader.getDataType()
+                                        + " "
+                                        + currentHeader.isCompressed()
+                                        + " "
+                                        + currentHeader.getLength());
                         headerBuffer.clear();
                     }
 
                     if (currentHeader == null && currentBuffer.remaining() < HEADER_LENGTH) {
                         checkState(currentBuffer.position() > 0);
+                        currentBufferFileOffset += HEADER_LENGTH;
                         headerBuffer.put(currentBuffer);
                         break;
                     } else if (currentHeader == null) {
+                        currentBufferFileOffset += HEADER_LENGTH;
                         currentHeader = parseBufferHeader(currentBuffer);
+                        System.out.println(
+                                "parse header2: "
+                                        + currentHeader.getDataType()
+                                        + " "
+                                        + currentHeader.isCompressed()
+                                        + " "
+                                        + currentHeader.getLength());
                     }
+                    System.out.println(
+                            "buffer length: "
+                                    + i
+                                    + " "
+                                    + currentHeader.getLength()
+                                    + " "
+                                    + (partialBuffer != null)
+                                    + " "
+                                    + currentBuffer.position()
+                                    + " "
+                                    + currentBuffer.remaining()
+                                    + " "
+                                    + currentBufferFileOffset);
 
                     MemorySegment targetSegment = currentSegment;
-                    BufferRecycler targetRecycler = sharedRecycler;
+                    SharedBufferRecycler targetRecycler = sharedRecycler;
                     int readerIndex = currentBuffer.position();
                     int writerIndex = currentHeader.getLength();
 
                     if (partialBuffer != null) {
                         readerIndex = 0;
                         int bytesToCopy = currentHeader.getLength() - partialBuffer.length;
+                        System.out.println("bytes to copy: " + bytesToCopy);
                         checkState(currentBuffer.remaining() >= bytesToCopy);
                         partialBuffer.segment.put(partialBuffer.length, currentBuffer, bytesToCopy);
                         targetSegment = partialBuffer.segment;
-                        targetRecycler = this;
+                        targetRecycler = partialBuffer.recycler;
                         partialBuffer = null;
                     } else if (currentBuffer.remaining() < currentHeader.getLength()) {
                         MemorySegment segment = checkNotNull(buffers.poll());
                         partialBuffer = new PartialBuffer(currentBuffer.remaining(), segment);
-                        segment.put(0, currentBuffer, currentBuffer.remaining());
+                        if (currentBuffer.hasRemaining()) {
+                            segment.put(0, currentBuffer, currentBuffer.remaining());
+                        }
                         break;
                     } else {
                         writerIndex = readerIndex + currentHeader.getLength();
-                        currentBuffer.position(currentBuffer.position());
+                        currentBuffer.position(writerIndex);
                     }
 
                     for (int viewIndex = 0; viewIndex < readingRequest.views.size(); ++viewIndex) {
-                        SortMergeSubpartitionView view = readingRequest.views.get(i);
+                        SortMergeSubpartitionView view = readingRequest.views.get(viewIndex);
                         if (view == null) {
                             continue;
                         }
                         try {
                             int length = currentHeader.getLength();
+                            System.out.println(
+                                    "data in range: "
+                                            + view.getReadingProgress()
+                                                    .isDataInRange(currentBufferFileOffset, length)
+                                            + " "
+                                            + currentBufferFileOffset
+                                            + " "
+                                            + view.getReadingProgress().getFileOffset()
+                                            + " "
+                                            + view.getReadingProgress()
+                                                    .getCurrentRegionRemainingBytes()
+                                            + " "
+                                            + length
+                                            + " "
+                                            + readerIndex);
                             if (view.getReadingProgress()
-                                    .isDataInRange(currentBufferFileOffset + readerIndex, length)) {
-                                sharedRecycler.retain();
+                                    .isDataInRange(currentBufferFileOffset, length)) {
+                                targetRecycler.retain();
                                 Buffer slicedBuffer =
                                         new NetworkBuffer(
                                                         targetSegment,
@@ -346,6 +408,7 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                                 slicedBuffer.setCompressed(currentHeader.isCompressed());
                                 subpartitionBytes[viewIndex] += length + HEADER_LENGTH;
                                 view.addBuffer(slicedBuffer);
+                                System.out.println("Add buffer: " + slicedBuffer.readableBytes());
                             }
                         } catch (Throwable throwable) {
                             readingRequest.views.set(i, null);
@@ -353,9 +416,13 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                             LOG.debug("Failed to read shuffle data.", throwable);
                         }
                     }
+                    currentBufferFileOffset += currentHeader.getLength();
+                    currentHeader = null;
+                    if (targetRecycler != sharedRecycler) {
+                        targetRecycler.recycle();
+                    }
                 }
                 sharedRecycler.recycle();
-                currentBufferFileOffset += currentBufferBytes;
             }
 
             for (int i = 0; i < readingRequest.views.size(); ++i) {
@@ -375,7 +442,7 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                 }
             }
             if (partialBuffer != null) {
-                buffers.add(partialBuffer.segment);
+                partialBuffer.recycle();
             }
         }
         return finishedViews;
@@ -384,10 +451,18 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
     private void failSubpartitionReaders(
             Collection<SortMergeSubpartitionView> views, Throwable failureCause) {
         synchronized (lock) {
-            failedViews.addAll(views);
+            for (SortMergeSubpartitionView view : views) {
+                if (view == null) {
+                    continue;
+                }
+                failedViews.add(view);
+            }
         }
 
         for (SortMergeSubpartitionView view : views) {
+            if (view == null) {
+                continue;
+            }
             try {
                 view.fail(failureCause);
             } catch (Throwable throwable) {
@@ -452,6 +527,7 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                 }
             }
             Collections.sort(views);
+            System.out.println("num Views: " + views.size());
 
             ArrayList<ReadingRequest> readingRequests = new ArrayList<>();
             ReadingRequest prevReadingRequest = null;
@@ -474,8 +550,8 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                     if (newEndOffset > prevReadingRequest.endOffset) {
                         prevReadingRequest.updateEndOffset(newEndOffset);
                     }
-                    prevReadingRequest.addSubpartitionView(view);
                 }
+                prevReadingRequest.addSubpartitionView(view);
             }
             return Tuple2.of(views, readingRequests);
         }
@@ -536,6 +612,22 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
 
         closeFileChannels();
         dataFileChannel = openFileChannel(resultFile.getDataFilePath());
+        System.out.println("total bytes: " + dataFileChannel.size());
+        ByteBuffer byteBuffer = ByteBuffer.allocate((int) dataFileChannel.size());
+        dataFileChannel.read(byteBuffer);
+        byteBuffer.flip();
+        while (byteBuffer.hasRemaining()) {
+            BufferReaderWriterUtil.BufferHeader header = parseBufferHeader(byteBuffer);
+            System.out.println(
+                    "openFileChannels: "
+                            + header.getLength()
+                            + " "
+                            + header.isCompressed()
+                            + " "
+                            + header.getDataType());
+            byteBuffer.position(byteBuffer.position() + header.getLength());
+        }
+
         indexFileChannel = openFileChannel(resultFile.getIndexFilePath());
     }
 
@@ -684,7 +776,9 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
         }
     }
 
-    private static class PartialBuffer {
+    private class PartialBuffer {
+
+        private final SharedBufferRecycler recycler;
 
         private final int length;
 
@@ -693,6 +787,11 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
         PartialBuffer(int length, MemorySegment segment) {
             this.length = length;
             this.segment = checkNotNull(segment);
+            this.recycler = new SharedBufferRecycler(segment);
+        }
+
+        void recycle() {
+            recycler.recycle();
         }
     }
 }
