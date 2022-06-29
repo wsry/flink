@@ -82,7 +82,6 @@ public class SubpartitionReadingProgress {
     }
 
     boolean isDataInRange(long startOffset, long length) {
-        return fileOffset <= startOffset
-                && fileOffset + currentRegionRemainingBytes >= startOffset + length;
+        return fileOffset + currentRegionRemainingBytes >= startOffset + length;
     }
 }

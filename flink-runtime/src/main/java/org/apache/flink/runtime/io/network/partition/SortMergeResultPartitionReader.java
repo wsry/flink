@@ -339,9 +339,12 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                             continue;
                         }
                         try {
+                            SubpartitionReadingProgress readingProgress = view.getReadingProgress();
                             int length = currentHeader.getLength();
-                            if (view.getReadingProgress()
-                                    .isDataInRange(currentBufferFileOffset, length)) {
+                            if (currentBufferFileOffset < readingProgress.getFileOffset()) {
+                                break;
+                            }
+                            if (readingProgress.isDataInRange(currentBufferFileOffset, length)) {
                                 targetRecycler.retain();
                                 Buffer slicedBuffer =
                                         new NetworkBuffer(
