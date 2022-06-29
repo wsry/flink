@@ -151,7 +151,6 @@ public class PartitionedFileWriter implements AutoCloseable {
         checkState(!isFinished, "File writer is already finished.");
         checkState(!isClosed, "File writer is already closed.");
 
-        System.out.println("startNewRegion: " + isBroadcastRegion);
         writeRegionIndex();
         this.isBroadcastRegion = isBroadcastRegion;
     }
@@ -187,13 +186,6 @@ public class PartitionedFileWriter implements AutoCloseable {
     private void writeRegionIndex() throws IOException {
         if (Arrays.stream(subpartitionBytes).sum() > 0) {
             for (int channel = 0; channel < numSubpartitions; ++channel) {
-                System.out.println(
-                        "Region index: "
-                                + numRegions
-                                + " "
-                                + subpartitionOffsets[channel]
-                                + " "
-                                + subpartitionBytes[channel]);
                 writeIndexEntry(subpartitionOffsets[channel], subpartitionBytes[channel]);
             }
 
@@ -235,14 +227,6 @@ public class PartitionedFileWriter implements AutoCloseable {
         } else {
             expectedBytes = collectUnicastBuffers(bufferWithChannels, bufferWithHeaders);
         }
-
-        long offset = totalBytesWritten;
-        for (int i = 0; i < bufferWithHeaders.length; i += 2) {
-            int bufferLen = bufferWithHeaders[i].remaining() + bufferWithHeaders[i + 1].remaining();
-            System.out.println("buffer offset: " + offset + " " + bufferLen);
-            offset += bufferLen;
-        }
-
         totalBytesWritten += expectedBytes;
         BufferReaderWriterUtil.writeBuffers(dataFileChannel, expectedBytes, bufferWithHeaders);
     }

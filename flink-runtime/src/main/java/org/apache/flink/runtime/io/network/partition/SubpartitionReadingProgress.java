@@ -70,13 +70,6 @@ public class SubpartitionReadingProgress {
         currentRegionRemainingBytes -= numBytesRead;
         fileOffset += numBytesRead;
 
-        System.out.println(
-                "updateReadingProgress: "
-                        + currentRegionRemainingBytes
-                        + " "
-                        + numBytesRead
-                        + " "
-                        + nextRegionIndex);
         while (currentRegionRemainingBytes <= 0
                 && nextRegionIndex < partitionedFile.getNumRegions()) {
             partitionedFile.getIndexEntry(
@@ -85,13 +78,6 @@ public class SubpartitionReadingProgress {
             currentRegionRemainingBytes = indexEntryBuf.getLong();
             ++nextRegionIndex;
         }
-        System.out.println(
-                "currentRegionRemainingBytes: "
-                        + currentRegionRemainingBytes
-                        + " "
-                        + fileOffset
-                        + " "
-                        + nextRegionIndex);
         return currentRegionRemainingBytes > 0;
     }
 

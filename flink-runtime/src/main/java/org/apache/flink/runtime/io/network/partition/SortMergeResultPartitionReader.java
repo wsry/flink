@@ -236,17 +236,8 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
         Set<SortMergeSubpartitionView> finishedViews = new HashSet<>();
         BufferReaderWriterUtil.BufferHeader currentHeader = null;
         ByteBuffer headerBuffer = BufferReaderWriterUtil.allocatedHeaderBuffer();
-        System.out.println(readingRequests.size());
 
         for (ReadingRequest readingRequest : readingRequests) {
-            System.out.println(
-                    readingRequest.startOffset
-                            + " "
-                            + readingRequest.endOffset
-                            + " "
-                            + readingRequest.views.size()
-                            + " "
-                            + buffers.size());
             if ((long) buffers.size() * bufferPool.getBufferSize() < MIN_READING_BUFFER_SIZE) {
                 break;
             }
@@ -267,12 +258,10 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                                 (int) Math.min(requestedBytes - (long) i * bufferSize, bufferSize));
             }
 
-            System.out.println("numBuffers: " + numBuffers + " " + maxRequiredBuffers);
             try {
                 if (requestedBytes > 0) {
                     dataFileChannel.position(readingRequest.startOffset);
                     long totalBytesRead = dataFileChannel.read(readingBuffers);
-                    System.out.println("total bytes read: " + totalBytesRead);
                 }
             } catch (Throwable throwable) {
                 buffers.addAll(readingSegments);
@@ -306,13 +295,6 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                         }
                         headerBuffer.flip();
                         currentHeader = parseBufferHeader(headerBuffer);
-                        System.out.println(
-                                "parse header1: "
-                                        + currentHeader.getDataType()
-                                        + " "
-                                        + currentHeader.isCompressed()
-                                        + " "
-                                        + currentHeader.getLength());
                         headerBuffer.clear();
                     }
 
@@ -324,27 +306,7 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                     } else if (currentHeader == null) {
                         currentBufferFileOffset += HEADER_LENGTH;
                         currentHeader = parseBufferHeader(currentBuffer);
-                        System.out.println(
-                                "parse header2: "
-                                        + currentHeader.getDataType()
-                                        + " "
-                                        + currentHeader.isCompressed()
-                                        + " "
-                                        + currentHeader.getLength());
                     }
-                    System.out.println(
-                            "buffer length: "
-                                    + i
-                                    + " "
-                                    + currentHeader.getLength()
-                                    + " "
-                                    + (partialBuffer != null)
-                                    + " "
-                                    + currentBuffer.position()
-                                    + " "
-                                    + currentBuffer.remaining()
-                                    + " "
-                                    + currentBufferFileOffset);
 
                     MemorySegment targetSegment = currentSegment;
                     SharedBufferRecycler targetRecycler = sharedRecycler;
@@ -354,7 +316,6 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                     if (partialBuffer != null) {
                         readerIndex = 0;
                         int bytesToCopy = currentHeader.getLength() - partialBuffer.length;
-                        System.out.println("bytes to copy: " + bytesToCopy);
                         checkState(currentBuffer.remaining() >= bytesToCopy);
                         partialBuffer.segment.put(partialBuffer.length, currentBuffer, bytesToCopy);
                         targetSegment = partialBuffer.segment;
@@ -379,21 +340,6 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                         }
                         try {
                             int length = currentHeader.getLength();
-                            System.out.println(
-                                    "data in range: "
-                                            + view.getReadingProgress()
-                                                    .isDataInRange(currentBufferFileOffset, length)
-                                            + " "
-                                            + currentBufferFileOffset
-                                            + " "
-                                            + view.getReadingProgress().getFileOffset()
-                                            + " "
-                                            + view.getReadingProgress()
-                                                    .getCurrentRegionRemainingBytes()
-                                            + " "
-                                            + length
-                                            + " "
-                                            + readerIndex);
                             if (view.getReadingProgress()
                                     .isDataInRange(currentBufferFileOffset, length)) {
                                 targetRecycler.retain();
@@ -408,7 +354,6 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                                 slicedBuffer.setCompressed(currentHeader.isCompressed());
                                 subpartitionBytes[viewIndex] += length + HEADER_LENGTH;
                                 view.addBuffer(slicedBuffer);
-                                System.out.println("Add buffer: " + slicedBuffer.readableBytes());
                             }
                         } catch (Throwable throwable) {
                             readingRequest.views.set(i, null);
@@ -527,7 +472,6 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                 }
             }
             Collections.sort(views);
-            System.out.println("num Views: " + views.size());
 
             ArrayList<ReadingRequest> readingRequests = new ArrayList<>();
             ReadingRequest prevReadingRequest = null;
@@ -612,22 +556,6 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
 
         closeFileChannels();
         dataFileChannel = openFileChannel(resultFile.getDataFilePath());
-        System.out.println("total bytes: " + dataFileChannel.size());
-        ByteBuffer byteBuffer = ByteBuffer.allocate((int) dataFileChannel.size());
-        dataFileChannel.read(byteBuffer);
-        byteBuffer.flip();
-        while (byteBuffer.hasRemaining()) {
-            BufferReaderWriterUtil.BufferHeader header = parseBufferHeader(byteBuffer);
-            System.out.println(
-                    "openFileChannels: "
-                            + header.getLength()
-                            + " "
-                            + header.isCompressed()
-                            + " "
-                            + header.getDataType());
-            byteBuffer.position(byteBuffer.position() + header.getLength());
-        }
-
         indexFileChannel = openFileChannel(resultFile.getIndexFilePath());
     }
 
