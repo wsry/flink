@@ -168,11 +168,6 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
 
     @Override
     public synchronized void run() {
-        List<ReadingRequest> readingRequests = computeReadingRequests();
-        if (readingRequests.isEmpty()) {
-            return;
-        }
-
         Queue<MemorySegment> buffers;
         try {
             buffers = allocateBuffers();
@@ -180,6 +175,12 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
             // fail all pending subpartition readers immediately if any exception occurs
             failSubpartitionReaders(getAllSubpartitionViews(), throwable);
             LOG.error("Failed to request buffers for data reading.", throwable);
+            return;
+        }
+
+        List<ReadingRequest> readingRequests = computeReadingRequests();
+        if (readingRequests.isEmpty()) {
+            releaseBuffers(buffers);
             return;
         }
         int numBuffersAllocated = buffers.size();
