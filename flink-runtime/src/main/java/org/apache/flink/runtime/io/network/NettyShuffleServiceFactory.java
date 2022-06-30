@@ -38,7 +38,6 @@ import org.apache.flink.runtime.shuffle.ShuffleEnvironmentContext;
 import org.apache.flink.runtime.shuffle.ShuffleMasterContext;
 import org.apache.flink.runtime.shuffle.ShuffleServiceFactory;
 import org.apache.flink.runtime.taskmanager.NettyShuffleEnvironmentConfiguration;
-import org.apache.flink.runtime.util.Hardware;
 import org.apache.flink.util.concurrent.ExecutorThreadFactory;
 
 import org.slf4j.Logger;
@@ -172,15 +171,7 @@ public class NettyShuffleServiceFactory
         // TaskManager IO executor pool directly to avoid the potential side effects of execution
         // contention, for example, too long IO or waiting time leading to starvation or timeout
         ExecutorService batchShuffleReadIOExecutor =
-                Executors.newFixedThreadPool(
-                        Math.max(
-                                1,
-                                Math.min(
-                                        batchShuffleReadBufferPool.getMaxConcurrentRequests(),
-                                        Math.min(
-                                                fileChannelManager.getPaths().length,
-                                                4 * Hardware.getNumberCPUCores()))),
-                        new ExecutorThreadFactory("blocking-shuffle-io"));
+                Executors.newFixedThreadPool(10, new ExecutorThreadFactory("blocking-shuffle-io"));
 
         registerShuffleMetrics(metricGroup, networkBufferPool);
 
