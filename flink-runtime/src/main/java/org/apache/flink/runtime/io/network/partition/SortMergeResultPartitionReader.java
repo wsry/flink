@@ -268,16 +268,7 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
             try {
                 if (requestedBytes > 0) {
                     dataFileChannel.position(readingRequest.startOffset);
-                    long numBytesRead = dataFileChannel.read(readingBuffers);
-                    System.out.printf(
-                            "%d Number of bytes read per request: %d KB, %d, %d, %d, %d, %d.%n",
-                            hashCode(),
-                            numBytesRead / 1024,
-                            readingRequests.size(),
-                            requestedBytes,
-                            readingRequest.views.size(),
-                            readingRequest.startOffset,
-                            readingRequest.endOffset);
+                    dataFileChannel.read(readingBuffers);
                 }
             } catch (Throwable throwable) {
                 buffers.addAll(readingSegments);
