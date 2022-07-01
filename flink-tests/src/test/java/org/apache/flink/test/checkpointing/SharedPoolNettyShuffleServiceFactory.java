@@ -94,6 +94,7 @@ public final class SharedPoolNettyShuffleServiceFactory
 
         return NettyShuffleServiceFactory.createNettyShuffleEnvironment(
                 networkConfig,
+                shuffleEnvironmentContext.getNumberOfSlots(),
                 shuffleEnvironmentContext.getTaskExecutorResourceId(),
                 taskEventPublisher,
                 resultPartitionManager,

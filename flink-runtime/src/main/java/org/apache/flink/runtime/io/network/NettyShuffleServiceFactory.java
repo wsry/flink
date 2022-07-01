@@ -77,6 +77,7 @@ public class NettyShuffleServiceFactory
                         shuffleEnvironmentContext.getHostAddress());
         return createNettyShuffleEnvironment(
                 networkConfig,
+                shuffleEnvironmentContext.getNumberOfSlots(),
                 shuffleEnvironmentContext.getTaskExecutorResourceId(),
                 shuffleEnvironmentContext.getEventPublisher(),
                 shuffleEnvironmentContext.getParentMetricGroup(),
@@ -86,12 +87,14 @@ public class NettyShuffleServiceFactory
     @VisibleForTesting
     static NettyShuffleEnvironment createNettyShuffleEnvironment(
             NettyShuffleEnvironmentConfiguration config,
+            int numberOfSlots,
             ResourceID taskExecutorResourceId,
             TaskEventPublisher taskEventPublisher,
             MetricGroup metricGroup,
             Executor ioExecutor) {
         return createNettyShuffleEnvironment(
                 config,
+                numberOfSlots,
                 taskExecutorResourceId,
                 taskEventPublisher,
                 new ResultPartitionManager(),
@@ -102,6 +105,7 @@ public class NettyShuffleServiceFactory
     @VisibleForTesting
     static NettyShuffleEnvironment createNettyShuffleEnvironment(
             NettyShuffleEnvironmentConfiguration config,
+            int numberOfSlots,
             ResourceID taskExecutorResourceId,
             TaskEventPublisher taskEventPublisher,
             ResultPartitionManager resultPartitionManager,
@@ -119,6 +123,7 @@ public class NettyShuffleServiceFactory
                         : new LocalConnectionManager();
         return createNettyShuffleEnvironment(
                 config,
+                numberOfSlots,
                 taskExecutorResourceId,
                 taskEventPublisher,
                 resultPartitionManager,
@@ -130,6 +135,7 @@ public class NettyShuffleServiceFactory
     @VisibleForTesting
     public static NettyShuffleEnvironment createNettyShuffleEnvironment(
             NettyShuffleEnvironmentConfiguration config,
+            int numberOfSlots,
             ResourceID taskExecutorResourceId,
             TaskEventPublisher taskEventPublisher,
             ResultPartitionManager resultPartitionManager,
@@ -171,7 +177,13 @@ public class NettyShuffleServiceFactory
         // TaskManager IO executor pool directly to avoid the potential side effects of execution
         // contention, for example, too long IO or waiting time leading to starvation or timeout
         ExecutorService batchShuffleReadIOExecutor =
-                Executors.newFixedThreadPool(10, new ExecutorThreadFactory("blocking-shuffle-io"));
+                Executors.newFixedThreadPool(
+                        Math.max(
+                                1,
+                                Math.min(
+                                        batchShuffleReadBufferPool.getMaxConcurrentRequests(),
+                                        2 * numberOfSlots)),
+                        new ExecutorThreadFactory("blocking-shuffle-io"));
 
         registerShuffleMetrics(metricGroup, networkBufferPool);
 

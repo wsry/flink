@@ -44,6 +44,8 @@ public class NettyShuffleEnvironmentBuilder {
     };
     private static final Duration DEFAULT_REQUEST_SEGMENTS_TIMEOUT = Duration.ofMillis(30000L);
 
+    private final int numberOfSlots = 1;
+
     private int bufferSize = DEFAULT_NETWORK_BUFFER_SIZE;
 
     private int numNetworkBuffers = DEFAULT_NUM_NETWORK_BUFFERS;
@@ -219,6 +221,7 @@ public class NettyShuffleEnvironmentBuilder {
                         debloatConfiguration,
                         maxNumberOfConnections,
                         connectionReuseEnabled),
+                numberOfSlots,
                 taskManagerLocation,
                 new TaskEventDispatcher(),
                 resultPartitionManager,
