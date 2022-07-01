@@ -171,7 +171,7 @@ public class NettyShuffleServiceFactory
         // dead lock or "insufficient network buffer" error
         BatchShuffleReadBufferPool batchShuffleReadBufferPool =
                 new BatchShuffleReadBufferPool(
-                        config.batchShuffleReadMemoryBytes(), config.networkBufferSize());
+                        config.batchShuffleReadMemoryBytes(), config.batchShuffleReadBufferSize());
 
         // we create a separated IO executor pool here for batch shuffle instead of reusing the
         // TaskManager IO executor pool directly to avoid the potential side effects of execution
