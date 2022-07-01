@@ -158,8 +158,7 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
         // one partition reader can consume at most Math.max(16M, numSubpartitions) (the expected
         // buffers per request is 8M) buffers for data read, which means larger parallelism, more
         // buffers. Currently, it is only an empirical strategy which can not be configured.
-        this.maxRequestedBuffers =
-                Math.max(2 * bufferPool.getNumBuffersPerRequest(), numSubpartitions);
+        this.maxRequestedBuffers = 2 * bufferPool.getNumBuffersPerRequest();
         this.bufferRequestTimeout = checkNotNull(bufferRequestTimeout);
 
         this.indexEntryBuf = ByteBuffer.allocateDirect(PartitionedFile.INDEX_ENTRY_SIZE);
