@@ -28,6 +28,7 @@ import org.apache.flink.runtime.io.network.buffer.CompositeBuffer;
 import org.apache.flink.runtime.io.network.buffer.NetworkBuffer;
 import org.apache.flink.util.FatalExitExceptionHandler;
 import org.apache.flink.util.IOUtils;
+import org.apache.flink.util.MathUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,8 +70,6 @@ import static org.apache.flink.util.Preconditions.checkState;
 class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
 
     private static final Logger LOG = LoggerFactory.getLogger(SortMergeResultPartitionReader.class);
-
-    private static final long MIN_READING_BUFFER_SIZE = (long) 1024 * 1024;
 
     /**
      * Default maximum time (5min) to wait when requesting read buffers from the buffer pool before
@@ -167,9 +166,20 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
 
     @Override
     public synchronized void run() {
+        List<ReadingRequest> readingRequests = computeReadingRequests();
+        if (readingRequests.isEmpty()) {
+            return;
+        }
+
+        int numBuffersToRequest = readingRequests.size();
+        for (ReadingRequest readingRequest : readingRequests) {
+            numBuffersToRequest += readingRequest.computeRequiredBuffers();
+        }
+
+        numBuffersToRequest = Math.min(bufferPool.getNumBuffersPerRequest(), numBuffersToRequest);
         Queue<MemorySegment> buffers;
         try {
-            buffers = allocateBuffers();
+            buffers = allocateBuffers(numBuffersToRequest);
         } catch (Throwable throwable) {
             // fail all pending subpartition readers immediately if any exception occurs
             failSubpartitionReaders(getAllSubpartitionViews(), throwable);
@@ -177,11 +187,6 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
             return;
         }
 
-        List<ReadingRequest> readingRequests = computeReadingRequests();
-        if (readingRequests.isEmpty()) {
-            releaseBuffers(buffers);
-            return;
-        }
         int numBuffersAllocated = buffers.size();
 
         Set<SortMergeSubpartitionView> finishedViews = readData(readingRequests, buffers);
@@ -193,10 +198,10 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
     }
 
     @VisibleForTesting
-    Queue<MemorySegment> allocateBuffers() throws Exception {
+    Queue<MemorySegment> allocateBuffers(int numBuffersToRequest) throws Exception {
         long timeoutTime = getBufferRequestTimeoutTime();
         do {
-            List<MemorySegment> buffers = bufferPool.requestBuffers();
+            List<MemorySegment> buffers = bufferPool.requestBuffers(numBuffersToRequest);
             if (!buffers.isEmpty()) {
                 return new ArrayDeque<>(buffers);
             }
@@ -244,10 +249,9 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
         ByteBuffer headerBuffer = BufferReaderWriterUtil.allocatedHeaderBuffer();
 
         for (ReadingRequest readingRequest : readingRequests) {
-            if ((long) buffers.size() * bufferPool.getBufferSize() < MIN_READING_BUFFER_SIZE) {
+            if (buffers.isEmpty()) {
                 break;
             }
-
             long requestedBytes = readingRequest.endOffset - readingRequest.startOffset;
             int bufferSize = bufferPool.getBufferSize();
             long maxRequiredBuffers =
@@ -677,13 +681,15 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
         }
     }
 
-    private static class ReadingRequest {
+    private class ReadingRequest {
 
         private final long startOffset;
 
         private final ArrayList<SortMergeSubpartitionView> views;
 
         private long endOffset;
+
+        private int numBuffersRequired;
 
         private ReadingRequest(
                 long startOffset, long endOffset, ArrayList<SortMergeSubpartitionView> views) {
@@ -698,6 +704,13 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
 
         void updateEndOffset(long newEndOffset) {
             endOffset = newEndOffset;
+        }
+
+        int computeRequiredBuffers() {
+            numBuffersRequired =
+                    MathUtils.checkedDownCast(
+                            (1 + (endOffset - startOffset) / bufferPool.getBufferSize()));
+            return numBuffersRequired;
         }
     }
 

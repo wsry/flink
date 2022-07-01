@@ -203,7 +203,13 @@ public class BatchShuffleReadBufferPool {
      * buffer pool.
      */
     public List<MemorySegment> requestBuffers() throws Exception {
-        List<MemorySegment> allocated = new ArrayList<>(numBuffersPerRequest);
+        return requestBuffers(numBuffersPerRequest);
+    }
+
+    public List<MemorySegment> requestBuffers(int numBuffersToRequest) throws Exception {
+        checkArgument(numBuffersToRequest <= numBuffersPerRequest);
+
+        List<MemorySegment> allocated = new ArrayList<>(numBuffersToRequest);
         synchronized (buffers) {
             checkState(!destroyed, "Buffer pool is already destroyed.");
 
@@ -212,7 +218,7 @@ public class BatchShuffleReadBufferPool {
             }
 
             Deadline deadline = Deadline.fromNow(WAITING_TIME);
-            while (buffers.size() < numBuffersPerRequest) {
+            while (buffers.size() < numBuffersToRequest) {
                 checkState(!destroyed, "Buffer pool is already destroyed.");
 
                 buffers.wait(WAITING_TIME.toMillis());
@@ -221,7 +227,7 @@ public class BatchShuffleReadBufferPool {
                 }
             }
 
-            while (allocated.size() < numBuffersPerRequest) {
+            while (allocated.size() < numBuffersToRequest) {
                 allocated.add(buffers.poll());
             }
             lastBufferOperationTimestamp = System.nanoTime();
