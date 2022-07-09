@@ -34,6 +34,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
@@ -379,7 +380,8 @@ public class DataBufferTest {
         BufferPool bufferPool = globalPool.createBufferPool(bufferPoolSize, bufferPoolSize);
 
         DataBuffer dataBuffer =
-                new SortBasedDataBuffer(bufferPool, 1, bufferSize, bufferPoolSize, null);
+                new SortBasedDataBuffer(
+                        new LinkedList<>(), bufferPool, 1, bufferSize, bufferPoolSize, null);
         dataBuffer.append(ByteBuffer.allocate(recordSize), 0, Buffer.DataType.DATA_BUFFER);
 
         assertEquals(bufferPoolSize, bufferPool.bestEffortGetNumOfUsedBuffers());
@@ -408,10 +410,20 @@ public class DataBufferTest {
 
         if (useHashBuffer) {
             return new HashBasedDataBuffer(
-                    bufferPool, numSubpartitions, bufferPoolSize, customReadOrder);
+                    new LinkedList<>(),
+                    bufferPool,
+                    numSubpartitions,
+                    bufferSize,
+                    bufferPoolSize,
+                    customReadOrder);
         } else {
             return new SortBasedDataBuffer(
-                    bufferPool, numSubpartitions, bufferSize, bufferPoolSize, customReadOrder);
+                    new LinkedList<>(),
+                    bufferPool,
+                    numSubpartitions,
+                    bufferSize,
+                    bufferPoolSize,
+                    customReadOrder);
         }
     }
 

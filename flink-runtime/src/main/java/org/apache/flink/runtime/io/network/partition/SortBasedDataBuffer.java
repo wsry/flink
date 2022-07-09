@@ -21,7 +21,7 @@ package org.apache.flink.runtime.io.network.partition;
 import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.core.memory.MemorySegmentFactory;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
-import org.apache.flink.runtime.io.network.buffer.BufferPool;
+import org.apache.flink.runtime.io.network.buffer.BufferRecycler;
 import org.apache.flink.runtime.io.network.buffer.NetworkBuffer;
 
 import javax.annotation.Nullable;
@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 
 import static org.apache.flink.runtime.io.network.buffer.Buffer.DataType;
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -58,8 +59,11 @@ public class SortBasedDataBuffer implements DataBuffer {
      */
     private static final int INDEX_ENTRY_SIZE = 4 + 4 + 8;
 
-    /** A buffer pool to request memory segments from. */
-    private final BufferPool bufferPool;
+    /** A list of {@link MemorySegment}s used to store data in memory. */
+    private final LinkedList<MemorySegment> freeSegments;
+
+    /** {@link BufferRecycler} used to recycle {@link #freeSegments}. */
+    private final BufferRecycler bufferRecycler;
 
     /** A segment list as a joint buffer which stores all records and index entries. */
     private final ArrayList<MemorySegment> segments = new ArrayList<>();
@@ -125,7 +129,8 @@ public class SortBasedDataBuffer implements DataBuffer {
     private int readOrderIndex = -1;
 
     public SortBasedDataBuffer(
-            BufferPool bufferPool,
+            LinkedList<MemorySegment> freeSegments,
+            BufferRecycler bufferRecycler,
             int numSubpartitions,
             int bufferSize,
             int numGuaranteedBuffers,
@@ -133,7 +138,8 @@ public class SortBasedDataBuffer implements DataBuffer {
         checkArgument(bufferSize > INDEX_ENTRY_SIZE, "Buffer size is too small.");
         checkArgument(numGuaranteedBuffers > 0, "No guaranteed buffers for sort.");
 
-        this.bufferPool = checkNotNull(bufferPool);
+        this.freeSegments = checkNotNull(freeSegments);
+        this.bufferRecycler = checkNotNull(bufferRecycler);
         this.bufferSize = bufferSize;
         this.numGuaranteedBuffers = numGuaranteedBuffers;
         this.firstIndexEntryAddresses = new long[numSubpartitions];
@@ -240,16 +246,16 @@ public class SortBasedDataBuffer implements DataBuffer {
             availableBytes = 0;
         }
 
+        if (availableBytes + (numGuaranteedBuffers - segments.size()) * (long) bufferSize
+                < numBytesRequired) {
+            return false;
+        }
+
         // allocate exactly enough buffers for the appended record
         do {
-            MemorySegment segment = requestBufferFromPool();
-            if (segment == null) {
-                // return false if we can not allocate enough buffers for the appended record
-                return false;
-            }
-
+            MemorySegment segment = freeSegments.poll();
             availableBytes += bufferSize;
-            addBuffer(segment);
+            addBuffer(checkNotNull(segment));
         } while (availableBytes < numBytesRequired);
 
         return true;
@@ -257,29 +263,16 @@ public class SortBasedDataBuffer implements DataBuffer {
 
     private void addBuffer(MemorySegment segment) {
         if (segment.size() != bufferSize) {
-            bufferPool.recycle(segment);
+            bufferRecycler.recycle(segment);
             throw new IllegalStateException("Illegal memory segment size.");
         }
 
         if (isReleased) {
-            bufferPool.recycle(segment);
+            bufferRecycler.recycle(segment);
             throw new IllegalStateException("Sort buffer is already released.");
         }
 
         segments.add(segment);
-    }
-
-    private MemorySegment requestBufferFromPool() throws IOException {
-        try {
-            // blocking request buffers if there is still guaranteed memory
-            if (segments.size() < numGuaranteedBuffers) {
-                return bufferPool.requestMemorySegmentBlocking();
-            }
-        } catch (InterruptedException e) {
-            throw new IOException("Interrupted while requesting buffer.");
-        }
-
-        return bufferPool.requestMemorySegment();
     }
 
     private void updateWriteSegmentIndexAndOffset(int numBytes) {
@@ -433,7 +426,7 @@ public class SortBasedDataBuffer implements DataBuffer {
         checkState(!hasRemaining(), "Still has remaining data.");
 
         for (MemorySegment segment : segments) {
-            bufferPool.recycle(segment);
+            bufferRecycler.recycle(segment);
         }
         segments.clear();
 
@@ -451,7 +444,6 @@ public class SortBasedDataBuffer implements DataBuffer {
 
     @Override
     public void finish() {
-        checkState(!isFull, "DataBuffer must not be full.");
         checkState(!isFinished, "DataBuffer is already finished.");
 
         isFinished = true;
@@ -474,7 +466,7 @@ public class SortBasedDataBuffer implements DataBuffer {
         isReleased = true;
 
         for (MemorySegment segment : segments) {
-            bufferPool.recycle(segment);
+            bufferRecycler.recycle(segment);
         }
         segments.clear();
     }
