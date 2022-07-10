@@ -70,8 +70,8 @@ public class BatchShuffleReadBufferPoolTest {
 
             assertEquals(totalBytes, bufferPool.getTotalBytes());
             assertEquals(totalBytes / bufferSize, bufferPool.getNumTotalBuffers());
-            assertTrue(bufferPool.getMaxBuffersPerRequest() <= bufferPool.getNumTotalBuffers());
-            assertTrue(bufferPool.getMaxBuffersPerRequest() > 0);
+            assertTrue(bufferPool.getNumBuffersPerRequest() <= bufferPool.getNumTotalBuffers());
+            assertTrue(bufferPool.getNumBuffersPerRequest() > 0);
         }
     }
 
@@ -82,7 +82,7 @@ public class BatchShuffleReadBufferPoolTest {
 
         try {
             buffers.addAll(bufferPool.requestBuffers());
-            assertEquals(bufferPool.getMaxBuffersPerRequest(), buffers.size());
+            assertEquals(bufferPool.getNumBuffersPerRequest(), buffers.size());
         } finally {
             bufferPool.recycle(buffers);
             bufferPool.destroy();

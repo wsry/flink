@@ -82,21 +82,21 @@ public final class BufferReaderWriterUtil {
             return null;
         }
 
-        final BufferHeader header = parseBufferHeader(memory);
+        final boolean isEvent = memory.getShort() == HEADER_VALUE_IS_EVENT;
+        final boolean isCompressed = memory.getShort() == BUFFER_IS_COMPRESSED;
+        final int size = memory.getInt();
 
-        memory.limit(memory.position() + header.getLength());
+        memory.limit(memory.position() + size);
         ByteBuffer buf = memory.slice();
         memory.position(memory.limit());
         memory.limit(memory.capacity());
 
         MemorySegment memorySegment = MemorySegmentFactory.wrapOffHeapMemory(buf);
 
+        Buffer.DataType dataType =
+                isEvent ? Buffer.DataType.EVENT_BUFFER : Buffer.DataType.DATA_BUFFER;
         return new NetworkBuffer(
-                memorySegment,
-                FreeingBufferRecycler.INSTANCE,
-                header.getDataType(),
-                header.isCompressed(),
-                header.getLength());
+                memorySegment, FreeingBufferRecycler.INSTANCE, dataType, isCompressed, size);
     }
 
     // ------------------------------------------------------------------------
@@ -147,16 +147,19 @@ public final class BufferReaderWriterUtil {
         }
         headerBuffer.flip();
 
-        final BufferHeader header = parseBufferHeader(headerBuffer);
+        final boolean isEvent = headerBuffer.getShort() == HEADER_VALUE_IS_EVENT;
+        final Buffer.DataType dataType =
+                isEvent ? Buffer.DataType.EVENT_BUFFER : Buffer.DataType.DATA_BUFFER;
+        final boolean isCompressed = headerBuffer.getShort() == BUFFER_IS_COMPRESSED;
+        final int size = headerBuffer.getInt();
 
         // the file region does not advance position. it must not, because it gets written
         // interleaved with these calls, which would completely mess up the reading.
         // so we advance the positions always and only here.
         final long position = channel.position();
-        channel.position(position + header.getLength());
+        channel.position(position + size);
 
-        return new FileRegionBuffer(
-                channel, position, header.getLength(), header.getDataType(), header.isCompressed());
+        return new FileRegionBuffer(channel, position, size, dataType, isCompressed);
     }
 
     @Nullable
@@ -174,11 +177,15 @@ public final class BufferReaderWriterUtil {
         headerBuffer.flip();
 
         final ByteBuffer targetBuf;
-        final BufferHeader header;
+        final boolean isEvent;
+        final boolean isCompressed;
+        final int size;
 
         try {
-            header = parseBufferHeader(headerBuffer);
-            targetBuf = memorySegment.wrap(0, header.getLength());
+            isEvent = headerBuffer.getShort() == HEADER_VALUE_IS_EVENT;
+            isCompressed = headerBuffer.getShort() == BUFFER_IS_COMPRESSED;
+            size = headerBuffer.getInt();
+            targetBuf = memorySegment.wrap(0, size);
         } catch (BufferUnderflowException | IllegalArgumentException e) {
             // buffer underflow if header buffer is undersized
             // IllegalArgumentException if size is outside memory segment size
@@ -188,19 +195,13 @@ public final class BufferReaderWriterUtil {
 
         readByteBufferFully(channel, targetBuf);
 
-        Buffer.DataType dataType = header.getDataType();
-        return new NetworkBuffer(
-                memorySegment, bufferRecycler, dataType, header.isCompressed(), header.getLength());
+        Buffer.DataType dataType =
+                isEvent ? Buffer.DataType.EVENT_BUFFER : Buffer.DataType.DATA_BUFFER;
+        return new NetworkBuffer(memorySegment, bufferRecycler, dataType, isCompressed, size);
     }
 
     static ByteBuffer allocatedHeaderBuffer() {
         ByteBuffer bb = ByteBuffer.allocateDirect(HEADER_LENGTH);
-        configureByteBuffer(bb);
-        return bb;
-    }
-
-    static ByteBuffer allocateIndexEntryBuffer() {
-        ByteBuffer bb = ByteBuffer.allocateDirect(PartitionedFile.INDEX_ENTRY_SIZE);
         configureByteBuffer(bb);
         return bb;
     }
@@ -262,18 +263,6 @@ public final class BufferReaderWriterUtil {
                 writeBuffer(channel, buffer);
             }
         }
-    }
-
-    static BufferHeader parseBufferHeader(ByteBuffer headerBuffer) {
-        configureByteBuffer(headerBuffer);
-
-        boolean isEvent = headerBuffer.getShort() == HEADER_VALUE_IS_EVENT;
-        boolean isCompressed = headerBuffer.getShort() == BUFFER_IS_COMPRESSED;
-        int length = headerBuffer.getInt();
-        return new BufferHeader(
-                isCompressed,
-                length,
-                isEvent ? Buffer.DataType.EVENT_BUFFER : Buffer.DataType.DATA_BUFFER);
     }
 
     private static void throwPrematureEndOfFile() throws IOException {

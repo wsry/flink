@@ -59,8 +59,8 @@ class PartitionedFileReader {
     /** Next file offset to be read. */
     private long nextOffsetToRead;
 
-    /** Number of remaining bytes in the current data region read. */
-    private long currentRegionRemainingBytes;
+    /** Number of remaining buffers in the current data region read. */
+    private int currentRegionRemainingBuffers;
 
     PartitionedFileReader(
             PartitionedFile partitionedFile,
@@ -81,12 +81,12 @@ class PartitionedFileReader {
     }
 
     private void moveToNextReadableRegion() throws IOException {
-        while (currentRegionRemainingBytes <= 0
+        while (currentRegionRemainingBuffers <= 0
                 && nextRegionToRead < partitionedFile.getNumRegions()) {
             partitionedFile.getIndexEntry(
                     indexFileChannel, indexEntryBuf, nextRegionToRead, targetSubpartition);
             nextOffsetToRead = indexEntryBuf.getLong();
-            currentRegionRemainingBytes = indexEntryBuf.getLong();
+            currentRegionRemainingBuffers = indexEntryBuf.getInt();
             ++nextRegionToRead;
         }
     }
@@ -103,21 +103,20 @@ class PartitionedFileReader {
      */
     @Nullable
     Buffer readCurrentRegion(MemorySegment target, BufferRecycler recycler) throws IOException {
-        if (currentRegionRemainingBytes == 0) {
+        if (currentRegionRemainingBuffers == 0) {
             return null;
         }
 
         dataFileChannel.position(nextOffsetToRead);
         Buffer buffer = readFromByteChannel(dataFileChannel, headerBuf, target, recycler);
-        long newOffset = dataFileChannel.position();
-        currentRegionRemainingBytes -= newOffset - nextOffsetToRead;
-        nextOffsetToRead = newOffset;
+        nextOffsetToRead = dataFileChannel.position();
+        --currentRegionRemainingBuffers;
         return buffer;
     }
 
     boolean hasRemaining() throws IOException {
         moveToNextReadableRegion();
-        return currentRegionRemainingBytes > 0;
+        return currentRegionRemainingBuffers > 0;
     }
 
     /** Gets read priority of this file reader. Smaller value indicates higher priority. */

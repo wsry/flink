@@ -108,8 +108,10 @@ public class SortMergeResultPartition extends ResultPartition {
      */
     private final BatchShuffleReadBufferPool readBufferPool;
 
-    /** Data reader for this result partition which schedules data read of all subpartitions. */
-    private final SortMergeResultPartitionReader resultPartitionReader;
+    /**
+     * Data read scheduler for this result partition which schedules data read of all subpartitions.
+     */
+    private final SortMergeResultPartitionReadScheduler readScheduler;
 
     /** All available network buffers can be used by this result partition for a data region. */
     private final LinkedList<MemorySegment> freeSegments = new LinkedList<>();
@@ -137,7 +139,6 @@ public class SortMergeResultPartition extends ResultPartition {
             int partitionIndex,
             ResultPartitionID partitionId,
             ResultPartitionType partitionType,
-            int networkBufferSize,
             int numSubpartitions,
             int numTargetKeyGroups,
             BatchShuffleReadBufferPool readBufferPool,
@@ -158,16 +159,16 @@ public class SortMergeResultPartition extends ResultPartition {
                 bufferCompressor,
                 bufferPoolFactory);
 
-        this.networkBufferSize = networkBufferSize;
         this.resultFileBasePath = checkNotNull(resultFileBasePath);
         this.readBufferPool = checkNotNull(readBufferPool);
+        this.networkBufferSize = readBufferPool.getBufferSize();
         // because IO scheduling will always try to read data in file offset order for better IO
         // performance, when writing data to file, we use a random subpartition order to avoid
         // reading the output of all upstream tasks in the same order, which is better for data
         // input balance of the downstream tasks
         this.subpartitionOrder = getRandomSubpartitionOrder(numSubpartitions);
-        this.resultPartitionReader =
-                new SortMergeResultPartitionReader(
+        this.readScheduler =
+                new SortMergeResultPartitionReadScheduler(
                         numSubpartitions, readBufferPool, readIOExecutor, lock);
     }
 
@@ -201,7 +202,7 @@ public class SortMergeResultPartition extends ResultPartition {
             }
 
             // delete the produced file only when no reader is reading now
-            resultPartitionReader
+            readScheduler
                     .release()
                     .thenRun(
                             () -> {
@@ -524,16 +525,30 @@ public class SortMergeResultPartition extends ResultPartition {
                 throw new PartitionNotFoundException(getPartitionId());
             }
 
-            return resultPartitionReader.createSubpartitionReader(
+            return readScheduler.createSubpartitionReader(
                     availabilityListener, subpartitionIndex, resultFile);
         }
     }
 
     @Override
-    public void flushAll() {}
+    public void flushAll() {
+        try {
+            flushUnicastDataBuffer();
+            flushBroadcastDataBuffer();
+        } catch (IOException e) {
+            LOG.error("Failed to flush the current sort buffer.", e);
+        }
+    }
 
     @Override
-    public void flush(int subpartitionIndex) {}
+    public void flush(int subpartitionIndex) {
+        try {
+            flushUnicastDataBuffer();
+            flushBroadcastDataBuffer();
+        } catch (IOException e) {
+            LOG.error("Failed to flush the current sort buffer.", e);
+        }
+    }
 
     @Override
     public CompletableFuture<?> getAvailableFuture() {
