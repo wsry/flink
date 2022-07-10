@@ -178,7 +178,6 @@ public class ResultPartitionFactory {
                                 partitionIndex,
                                 id,
                                 type,
-                                networkBufferSize,
                                 subpartitions.length,
                                 maxParallelism,
                                 batchShuffleReadBufferPool,
