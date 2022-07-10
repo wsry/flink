@@ -283,7 +283,9 @@ public class SortMergeResultPartition extends ResultPartition {
     private DataBuffer getUnicastDataBuffer() throws IOException {
         flushBroadcastDataBuffer();
 
-        if (unicastDataBuffer != null && !unicastDataBuffer.isFinished()) {
+        if (unicastDataBuffer != null
+                && !unicastDataBuffer.isFinished()
+                && !unicastDataBuffer.isReleased()) {
             return unicastDataBuffer;
         }
 
@@ -294,7 +296,9 @@ public class SortMergeResultPartition extends ResultPartition {
     private DataBuffer getBroadcastDataBuffer() throws IOException {
         flushUnicastDataBuffer();
 
-        if (broadcastDataBuffer != null && !broadcastDataBuffer.isFinished()) {
+        if (broadcastDataBuffer != null
+                && !broadcastDataBuffer.isFinished()
+                && !broadcastDataBuffer.isReleased()) {
             return broadcastDataBuffer;
         }
 
@@ -334,8 +338,8 @@ public class SortMergeResultPartition extends ResultPartition {
         }
 
         try {
-            if (freeSegments.size() < numRequiredBuffer) {
-                freeSegments.add(bufferPool.requestMemorySegmentBlocking());
+            while (freeSegments.size() < numRequiredBuffer) {
+                freeSegments.add(checkNotNull(bufferPool.requestMemorySegmentBlocking()));
             }
         } catch (InterruptedException exception) {
             throw new IOException("Failed to allocate buffers for result partition.", exception);
