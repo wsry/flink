@@ -74,7 +74,7 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
      * NUmber of data buffers can be read per IO request (128 KB by default). Reading too much data
      * per request may break the data process Pipeline.
      */
-    private static final int NUM_BUFFER_PER_READ = 4;
+    private static final int NUM_BUFFER_PER_READ = 8;
 
     /**
      * Default maximum time (5min) to wait when requesting read buffers from the buffer pool before
