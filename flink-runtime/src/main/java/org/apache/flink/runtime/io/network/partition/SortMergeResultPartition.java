@@ -349,6 +349,7 @@ public class SortMergeResultPartition extends ResultPartition {
             freeSegments.add(segment);
         }
 
+        useHashBuffer = false;
         int numWriteBuffers = 0;
         if (freeSegments.size() >= 2 * numSubpartitions) {
             useHashBuffer = true;
