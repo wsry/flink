@@ -223,7 +223,7 @@ public class SortMergeResultPartitionReaderTest extends TestLogger {
         SortMergeSubpartitionView subpartitionReader =
                 new SortMergeSubpartitionView(
                         new NoOpBufferAvailablityListener(),
-                        new SubpartitionReadingProgress(partitionedFile, indexFileChannel, 0));
+                        new SubpartitionReadingProgress(partitionedFile, 0));
         Thread readAndReleaseThread =
                 new Thread(
                         () -> {
@@ -283,7 +283,7 @@ public class SortMergeResultPartitionReaderTest extends TestLogger {
         SortMergeSubpartitionView subpartitionReader =
                 new SortMergeSubpartitionView(
                         new NoOpBufferAvailablityListener(),
-                        new SubpartitionReadingProgress(partitionedFile, indexFileChannel, 0));
+                        new SubpartitionReadingProgress(partitionedFile, 0));
 
         long startTimestamp = System.nanoTime();
         Queue<MemorySegment> allocatedBuffers =

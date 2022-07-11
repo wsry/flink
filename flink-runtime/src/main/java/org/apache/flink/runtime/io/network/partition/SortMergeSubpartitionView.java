@@ -26,8 +26,6 @@ import org.apache.flink.runtime.io.network.partition.ResultSubpartition.BufferAn
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -124,10 +122,6 @@ class SortMergeSubpartitionView
         if (notifyAvailable) {
             notifyDataAvailable();
         }
-    }
-
-    boolean updateReadingProgress(int numBytesRead, ByteBuffer indexEntryBuf) throws IOException {
-        return readingProgress.updateReadingProgress(numBytesRead, indexEntryBuf);
     }
 
     /** This method is called by the IO thread of {@link SortMergeResultPartitionReader}. */

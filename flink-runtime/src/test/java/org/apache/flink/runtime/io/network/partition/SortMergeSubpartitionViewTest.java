@@ -240,7 +240,7 @@ public class SortMergeSubpartitionViewTest extends TestLogger {
     private SortMergeSubpartitionView createSortMergeSubpartitionReader(
             BufferAvailabilityListener listener) throws Exception {
         return new SortMergeSubpartitionView(
-                listener, new SubpartitionReadingProgress(partitionedFile, indexFileChannel, 0));
+                listener, new SubpartitionReadingProgress(partitionedFile, 0));
     }
 
     private static FileChannel openFileChannel(Path path) throws IOException {

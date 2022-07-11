@@ -24,16 +24,12 @@ import java.nio.channels.FileChannel;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.Preconditions.checkState;
 
 /** Progress of reading subpartition data. */
 public class SubpartitionReadingProgress {
 
     /** Target {@link PartitionedFile} to read. */
     private final PartitionedFile partitionedFile;
-
-    /** Index file channel of the target {@link PartitionedFile}. */
-    private final FileChannel indexFileChannel;
 
     /** Target subpartition to read. */
     private final int targetSubpartition;
@@ -47,14 +43,10 @@ public class SubpartitionReadingProgress {
     /** Remaining bytes to read of current region. */
     private long currentRegionRemainingBytes;
 
-    public SubpartitionReadingProgress(
-            PartitionedFile partitionedFile, FileChannel indexFileChannel, int targetSubpartition) {
+    public SubpartitionReadingProgress(PartitionedFile partitionedFile, int targetSubpartition) {
         checkArgument(targetSubpartition >= 0, "Negative subpartition index.");
         this.targetSubpartition = targetSubpartition;
-
         this.partitionedFile = checkNotNull(partitionedFile);
-        this.indexFileChannel = checkNotNull(indexFileChannel);
-        checkState(indexFileChannel.isOpen(), "Index file channel is not opened.");
     }
 
     public int getNextRegionIndex() {
@@ -73,7 +65,9 @@ public class SubpartitionReadingProgress {
         return currentStartOffset + currentRegionRemainingBytes;
     }
 
-    boolean updateReadingProgress(long numBytesRead, ByteBuffer indexEntryBuf) throws IOException {
+    boolean updateReadingProgress(
+            long numBytesRead, ByteBuffer indexEntryBuf, FileChannel indexFileChannel)
+            throws IOException {
         currentRegionRemainingBytes -= numBytesRead;
         currentStartOffset += numBytesRead;
 
