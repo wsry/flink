@@ -71,10 +71,10 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
     private static final Logger LOG = LoggerFactory.getLogger(SortMergeResultPartitionReader.class);
 
     /**
-     * NUmber of data buffers can be read per IO request (128 KB by default). Reading too much data
+     * NUmber of data buffers can be read per IO request (256 KB by default). Reading too much data
      * per request may break the data process Pipeline.
      */
-    private static final int NUM_BUFFER_PER_READ = 4;
+    private static final int NUM_BUFFER_PER_READ = 8;
 
     /**
      * Default maximum time (5min) to wait when requesting read buffers from the buffer pool before
@@ -290,39 +290,23 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
         return byteBuffers;
     }
 
-    private void addBufferToSubpartitionViews(
-            long fileOffsetOfBuffer,
+    private void addBufferToSubpartitionView(
             CompositeBuffer compositeBuffer,
             ReadingRequest readingRequest,
             BufferHeader bufferHeader,
             Set<SortMergeSubpartitionView> finishedViews) {
-        for (int i = readingRequest.startViewIndex; i < readingRequest.views.size(); ++i) {
-            SortMergeSubpartitionView view = readingRequest.views.get(i);
-            if (view == null) {
-                continue;
-            }
-            try {
-                SubpartitionReadingProgress readingProgress = view.getReadingProgress();
-                int length = bufferHeader.getLength() + HEADER_LENGTH;
-                if (fileOffsetOfBuffer < readingProgress.getCurrentStartOffset()) {
-                    break;
-                }
+        SortMergeSubpartitionView subpartitionView = readingRequest.view;
+        try {
+            int length = bufferHeader.getLength() + HEADER_LENGTH;
 
-                if (fileOffsetOfBuffer + length > readingProgress.getCurrentEndOffset()) {
-                    readingRequest.updateCurrentViewIndex(i + 1);
-                    continue;
-                }
-
-                view.addBuffer(compositeBuffer.duplicate());
-                if (!view.updateReadingProgress(length, indexEntryBuf)) {
-                    // there is no resource to release for finished readers currently
-                    finishedViews.add(view);
-                }
-            } catch (Throwable throwable) {
-                readingRequest.views.set(i, null);
-                failSubpartitionViews(Collections.singletonList(view), throwable);
-                LOG.debug("Failed to read shuffle data.", throwable);
+            subpartitionView.addBuffer(compositeBuffer.duplicate());
+            if (!subpartitionView.updateReadingProgress(length, indexEntryBuf)) {
+                // there is no resource to release for finished readers currently
+                finishedViews.add(subpartitionView);
             }
+        } catch (Throwable throwable) {
+            failSubpartitionViews(Collections.singletonList(subpartitionView), throwable);
+            LOG.debug("Failed to read shuffle data.", throwable);
         }
     }
 
@@ -347,7 +331,6 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
     }
 
     private BufferAndHeader processBuffer(
-            long fileOffsetOfBuffer,
             ByteBuffer byteBuffer,
             MemorySegment segment,
             BufferHeader header,
@@ -381,14 +364,12 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                 byteBuffer.position(byteBuffer.position() + header.getLength());
             }
 
-            addBufferToSubpartitionViews(
-                    fileOffsetOfBuffer, targetBuffer, readingRequest, header, finishedViews);
-            fileOffsetOfBuffer += HEADER_LENGTH + header.getLength();
+            addBufferToSubpartitionView(targetBuffer, readingRequest, header, finishedViews);
             header = null;
             targetBuffer.recycleBuffer();
             targetBuffer = null;
         }
-        return new BufferAndHeader(targetBuffer, header, fileOffsetOfBuffer);
+        return new BufferAndHeader(targetBuffer, header);
     }
 
     private BufferAndHeader processBuffers(
@@ -410,7 +391,6 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
             ReferenceCountedRecycler recycler = new ReferenceCountedRecycler(segment);
             bufferAndHeader =
                     processBuffer(
-                            bufferAndHeader.fileOffsetOfBuffer,
                             byteBuffer,
                             segment,
                             bufferAndHeader.header,
@@ -423,12 +403,12 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
         return bufferAndHeader;
     }
 
-    private boolean setFileOffset(long offset, ReadingRequest readingRequest) {
+    private boolean setFileOffset(ReadingRequest readingRequest) {
         try {
-            dataFileChannel.position(offset);
+            dataFileChannel.position(readingRequest.startOffset);
             return true;
         } catch (Throwable throwable) {
-            failSubpartitionViews(readingRequest.views, throwable);
+            failSubpartitionViews(Collections.singletonList(readingRequest.view), throwable);
             LOG.error("Failed to read shuffle data.", throwable);
             return false;
         }
@@ -438,7 +418,7 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
         try {
             return dataFileChannel.read(byteBuffers);
         } catch (Throwable throwable) {
-            failSubpartitionViews(readingRequest.views, throwable);
+            failSubpartitionViews(Collections.singletonList(readingRequest.view), throwable);
             LOG.error("Failed to read shuffle data.", throwable);
             return 0;
         }
@@ -454,12 +434,11 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
                 break;
             }
 
-            long fileOffsetOfBuffer = readingRequest.startOffset;
-            if (!setFileOffset(fileOffsetOfBuffer, readingRequest)) {
+            if (!setFileOffset(readingRequest)) {
                 continue;
             }
 
-            BufferAndHeader bufferAndHeader = new BufferAndHeader(null, null, fileOffsetOfBuffer);
+            BufferAndHeader bufferAndHeader = new BufferAndHeader(null, null);
             long numRequestBytes = readingRequest.getRequestBytes();
 
             while (!buffers.isEmpty() && numRequestBytes > 0) {
@@ -577,31 +556,17 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
         return mergeSubpartitionReadings(subpartitionViewCandidates);
     }
 
+    /**
+     * We are not merging data reading of different subpartitions together currently because of an
+     * unresolved performance issue which we will solve in the future version.
+     */
     private List<ReadingRequest> mergeSubpartitionReadings(
             ArrayList<SortMergeSubpartitionView> subpartitionViewCandidates) {
         Collections.sort(subpartitionViewCandidates);
-        ArrayList<ReadingRequest> readingRequests = new ArrayList<>();
-        ReadingRequest currentReadingRequest = new ReadingRequest(0, new ArrayList<>());
-
-        int currentBuffersRequired = 0;
-        for (SortMergeSubpartitionView view : subpartitionViewCandidates) {
-            SubpartitionReadingProgress readingProgress = view.getReadingProgress();
-            if (currentReadingRequest.endOffset < readingProgress.getCurrentEndOffset()
-                    && bufferPool.getMaxBuffersPerRequest()
-                            < currentBuffersRequired + currentReadingRequest.maxBuffersRequired) {
-                break;
-            }
-
-            if (currentReadingRequest.endOffset < readingProgress.getCurrentStartOffset()) {
-                currentBuffersRequired += currentReadingRequest.maxBuffersRequired;
-                ReadingRequest readingRequest =
-                        new ReadingRequest(
-                                readingProgress.getCurrentStartOffset(),
-                                new ArrayList<>(subpartitionViewCandidates.size()));
-                readingRequests.add(readingRequest);
-                currentReadingRequest = readingRequest;
-            }
-            currentReadingRequest.addSubpartitionView(view);
+        ArrayList<ReadingRequest> readingRequests =
+                new ArrayList<>(subpartitionViewCandidates.size());
+        for (SortMergeSubpartitionView subpartitionView : subpartitionViewCandidates) {
+            readingRequests.add(new ReadingRequest(subpartitionView));
         }
         return readingRequests;
     }
@@ -753,35 +718,24 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
     private class ReadingRequest {
 
         private final long startOffset;
-        private final ArrayList<SortMergeSubpartitionView> views;
-        private long endOffset = -1;
-        private int maxBuffersRequired;
-        private int startViewIndex;
+        private final long endOffset;
+        private final SortMergeSubpartitionView view;
+        private final int maxBuffersRequired;
 
-        ReadingRequest(long startOffset, ArrayList<SortMergeSubpartitionView> views) {
-            this.startOffset = startOffset;
-            this.views = checkNotNull(views);
-        }
+        ReadingRequest(SortMergeSubpartitionView view) {
+            this.view = checkNotNull(view);
+            this.startOffset = view.getReadingProgress().getCurrentStartOffset();
+            this.endOffset = view.getReadingProgress().getCurrentEndOffset();
 
-        void addSubpartitionView(SortMergeSubpartitionView view) {
-            long newEndOffset = view.getReadingProgress().getCurrentEndOffset();
-            if (newEndOffset > endOffset) {
-                endOffset = newEndOffset;
-                long numRequestBytes = getRequestBytes();
-                maxBuffersRequired =
-                        MathUtils.checkedDownCast(
-                                numRequestBytes / bufferSize
-                                        + (numRequestBytes % bufferSize > 0 ? 1 : 0));
-            }
-            views.add(view);
+            long numRequestBytes = getRequestBytes();
+            this.maxBuffersRequired =
+                    MathUtils.checkedDownCast(
+                            numRequestBytes / bufferSize
+                                    + (numRequestBytes % bufferSize > 0 ? 1 : 0));
         }
 
         long getRequestBytes() {
             return endOffset - startOffset;
-        }
-
-        void updateCurrentViewIndex(int newViewIndex) {
-            startViewIndex = newViewIndex;
         }
     }
 
@@ -789,12 +743,10 @@ class SortMergeResultPartitionReader implements Runnable, BufferRecycler {
 
         private final CompositeBuffer buffer;
         private final BufferHeader header;
-        private final long fileOffsetOfBuffer;
 
-        BufferAndHeader(CompositeBuffer buffer, BufferHeader header, long fileOffsetOfBuffer) {
+        BufferAndHeader(CompositeBuffer buffer, BufferHeader header) {
             this.buffer = buffer;
             this.header = header;
-            this.fileOffsetOfBuffer = fileOffsetOfBuffer;
         }
     }
 
