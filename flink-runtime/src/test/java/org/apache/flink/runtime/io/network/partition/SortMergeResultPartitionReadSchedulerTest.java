@@ -41,7 +41,6 @@ import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -259,11 +258,8 @@ public class SortMergeResultPartitionReadSchedulerTest extends TestLogger {
                 readScheduler.createSubpartitionReader(
                         new NoOpBufferAvailablityListener(), 0, partitionedFile);
 
-        PriorityQueue<SortMergeSubpartitionReader> allReaders = new PriorityQueue<>();
-        allReaders.add(subpartitionReader);
-
         long startTimestamp = System.nanoTime();
-        Queue<MemorySegment> allocatedBuffers = readScheduler.allocateBuffers(allReaders);
+        Queue<MemorySegment> allocatedBuffers = readScheduler.allocateBuffers();
         long requestDuration = System.nanoTime() - startTimestamp;
 
         assertEquals(0, allocatedBuffers.size());
@@ -285,11 +281,8 @@ public class SortMergeResultPartitionReadSchedulerTest extends TestLogger {
         SortMergeSubpartitionReader subpartitionReader =
                 new SortMergeSubpartitionReader(new NoOpBufferAvailablityListener(), fileReader);
 
-        PriorityQueue<SortMergeSubpartitionReader> allReaders = new PriorityQueue<>();
-        allReaders.add(subpartitionReader);
-
         long startTimestamp = System.nanoTime();
-        Queue<MemorySegment> allocatedBuffers = readScheduler.allocateBuffers(allReaders);
+        Queue<MemorySegment> allocatedBuffers = readScheduler.allocateBuffers();
         long requestDuration = System.nanoTime() - startTimestamp;
 
         assertEquals(3, allocatedBuffers.size());
