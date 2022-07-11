@@ -54,7 +54,7 @@ public class BatchShuffleReadBufferPool {
      * Memory size in bytes can be allocated from this buffer pool for a single request (8M is for
      * better sequential read).
      */
-    private static final int NUM_BYTES_PER_REQUEST = 8 * 1024 * 1024;
+    private static final int NUM_BYTES_PER_REQUEST = 8 * 1024;
 
     /**
      * Wait for at most 2 seconds before return if there is no enough available buffers currently.
@@ -70,8 +70,8 @@ public class BatchShuffleReadBufferPool {
     /** Size of each buffer in bytes in this buffer pool. */
     private final int bufferSize;
 
-    /** The number of buffers to be returned for a single request. */
-    private final int numBuffersPerRequest;
+    /** The maximum number of buffers can be returned for a single request. */
+    private final int maxBuffersPerRequest;
 
     /** All requesters which need to request buffers from this pool currently. */
     private final Set<Object> bufferRequesters = ConcurrentHashMap.newKeySet();
@@ -109,7 +109,7 @@ public class BatchShuffleReadBufferPool {
         this.bufferSize = bufferSize;
 
         this.numTotalBuffers = (int) Math.min(totalBytes / bufferSize, Integer.MAX_VALUE);
-        this.numBuffersPerRequest =
+        this.maxBuffersPerRequest =
                 Math.min(numTotalBuffers, Math.max(1, NUM_BYTES_PER_REQUEST / bufferSize));
     }
 
@@ -130,12 +130,12 @@ public class BatchShuffleReadBufferPool {
         }
     }
 
-    public int getNumBuffersPerRequest() {
-        return numBuffersPerRequest;
+    public int getMaxBuffersPerRequest() {
+        return maxBuffersPerRequest;
     }
 
     public int getMaxConcurrentRequests() {
-        return numBuffersPerRequest > 0 ? numTotalBuffers / numBuffersPerRequest : 0;
+        return maxBuffersPerRequest > 0 ? numTotalBuffers / maxBuffersPerRequest : 0;
     }
 
     public int getBufferSize() {
@@ -199,11 +199,13 @@ public class BatchShuffleReadBufferPool {
     }
 
     /**
-     * Requests a collection of buffers (determined by {@link #numBuffersPerRequest}) from this
+     * Returns a collection of buffers (no more than by {@link #maxBuffersPerRequest}) from this
      * buffer pool.
      */
-    public List<MemorySegment> requestBuffers() throws Exception {
-        List<MemorySegment> allocated = new ArrayList<>(numBuffersPerRequest);
+    public List<MemorySegment> requestBuffers(int numBuffersToRequest) throws Exception {
+        numBuffersToRequest = Math.min(maxBuffersPerRequest, numBuffersToRequest);
+        List<MemorySegment> allocated = new ArrayList<>(numBuffersToRequest);
+
         synchronized (buffers) {
             checkState(!destroyed, "Buffer pool is already destroyed.");
 
@@ -212,7 +214,7 @@ public class BatchShuffleReadBufferPool {
             }
 
             Deadline deadline = Deadline.fromNow(WAITING_TIME);
-            while (buffers.size() < numBuffersPerRequest) {
+            while (buffers.size() < numBuffersToRequest) {
                 checkState(!destroyed, "Buffer pool is already destroyed.");
 
                 buffers.wait(WAITING_TIME.toMillis());
@@ -221,7 +223,7 @@ public class BatchShuffleReadBufferPool {
                 }
             }
 
-            while (allocated.size() < numBuffersPerRequest) {
+            while (allocated.size() < numBuffersToRequest) {
                 allocated.add(buffers.poll());
             }
             lastBufferOperationTimestamp = System.nanoTime();
@@ -259,7 +261,7 @@ public class BatchShuffleReadBufferPool {
 
             buffers.addAll(segments);
             lastBufferOperationTimestamp = System.nanoTime();
-            if (buffers.size() >= numBuffersPerRequest) {
+            if (buffers.size() >= maxBuffersPerRequest) {
                 buffers.notifyAll();
             }
         }
@@ -285,5 +287,10 @@ public class BatchShuffleReadBufferPool {
         synchronized (buffers) {
             return destroyed;
         }
+    }
+
+    @VisibleForTesting
+    public List<MemorySegment> requestBuffers() throws Exception {
+        return requestBuffers(maxBuffersPerRequest);
     }
 }

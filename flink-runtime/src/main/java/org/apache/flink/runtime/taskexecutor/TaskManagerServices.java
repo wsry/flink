@@ -415,7 +415,9 @@ public class TaskManagerServices {
                         taskManagerServicesConfiguration.getBindAddress(),
                         taskEventDispatcher,
                         taskManagerMetricGroup,
-                        ioExecutor);
+                        ioExecutor,
+                        taskManagerServicesConfiguration.getNumberOfSlots(),
+                        taskManagerServicesConfiguration.getTmpDirPaths());
 
         return ShuffleServiceLoader.loadShuffleServiceFactory(
                         taskManagerServicesConfiguration.getConfiguration())

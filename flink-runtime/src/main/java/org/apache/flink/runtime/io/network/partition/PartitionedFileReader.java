@@ -59,8 +59,8 @@ class PartitionedFileReader {
     /** Next file offset to be read. */
     private long nextOffsetToRead;
 
-    /** Number of remaining buffers in the current data region read. */
-    private int currentRegionRemainingBuffers;
+    /** Number of remaining bytes in the current data region read. */
+    private long currentRegionRemainingBytes;
 
     PartitionedFileReader(
             PartitionedFile partitionedFile,
@@ -81,12 +81,12 @@ class PartitionedFileReader {
     }
 
     private void moveToNextReadableRegion() throws IOException {
-        while (currentRegionRemainingBuffers <= 0
+        while (currentRegionRemainingBytes <= 0
                 && nextRegionToRead < partitionedFile.getNumRegions()) {
             partitionedFile.getIndexEntry(
                     indexFileChannel, indexEntryBuf, nextRegionToRead, targetSubpartition);
             nextOffsetToRead = indexEntryBuf.getLong();
-            currentRegionRemainingBuffers = indexEntryBuf.getInt();
+            currentRegionRemainingBytes = indexEntryBuf.getLong();
             ++nextRegionToRead;
         }
     }
@@ -103,20 +103,21 @@ class PartitionedFileReader {
      */
     @Nullable
     Buffer readCurrentRegion(MemorySegment target, BufferRecycler recycler) throws IOException {
-        if (currentRegionRemainingBuffers == 0) {
+        if (currentRegionRemainingBytes == 0) {
             return null;
         }
 
         dataFileChannel.position(nextOffsetToRead);
         Buffer buffer = readFromByteChannel(dataFileChannel, headerBuf, target, recycler);
-        nextOffsetToRead = dataFileChannel.position();
-        --currentRegionRemainingBuffers;
+        long newOffset = dataFileChannel.position();
+        currentRegionRemainingBytes -= newOffset - nextOffsetToRead;
+        nextOffsetToRead = newOffset;
         return buffer;
     }
 
     boolean hasRemaining() throws IOException {
         moveToNextReadableRegion();
-        return currentRegionRemainingBuffers > 0;
+        return currentRegionRemainingBytes > 0;
     }
 
     /** Gets read priority of this file reader. Smaller value indicates higher priority. */

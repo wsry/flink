@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,8 +38,8 @@ import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** Subpartition data reader for {@link SortMergeResultPartition}. */
-class SortMergeSubpartitionReader
-        implements ResultSubpartitionView, Comparable<SortMergeSubpartitionReader> {
+class SortMergeSubpartitionView
+        implements ResultSubpartitionView, Comparable<SortMergeSubpartitionView> {
 
     private final Object lock = new Object();
 
@@ -48,12 +49,12 @@ class SortMergeSubpartitionReader
     /** Listener to notify when data is available. */
     private final BufferAvailabilityListener availabilityListener;
 
+    /** Data reading progress of this subpartition. */
+    private final SubpartitionReadingProgress readingProgress;
+
     /** Buffers already read which can be consumed by netty thread. */
     @GuardedBy("lock")
     private final Queue<Buffer> buffersRead = new ArrayDeque<>();
-
-    /** File reader used to read buffer from. */
-    private final PartitionedFileReader fileReader;
 
     /** Number of remaining non-event buffers in the buffer queue. */
     @GuardedBy("lock")
@@ -70,12 +71,10 @@ class SortMergeSubpartitionReader
     /** Sequence number of the next buffer to be sent to the consumer. */
     private int sequenceNumber;
 
-    private long totalBuffersSize;
-
-    SortMergeSubpartitionReader(
-            BufferAvailabilityListener listener, PartitionedFileReader fileReader) {
+    SortMergeSubpartitionView(
+            BufferAvailabilityListener listener, SubpartitionReadingProgress readingProgress) {
         this.availabilityListener = checkNotNull(listener);
-        this.fileReader = checkNotNull(fileReader);
+        this.readingProgress = checkNotNull(readingProgress);
     }
 
     @Nullable
@@ -90,7 +89,6 @@ class SortMergeSubpartitionReader
             if (buffer.isBuffer()) {
                 --dataBufferBacklog;
             }
-            totalBuffersSize -= buffer.getSize();
 
             Buffer lookAhead = buffersRead.peek();
             return BufferAndBacklog.fromBufferAndLookahead(
@@ -101,7 +99,7 @@ class SortMergeSubpartitionReader
         }
     }
 
-    private void addBuffer(Buffer buffer) {
+    void addBuffer(Buffer buffer) {
         boolean notifyAvailable = false;
         boolean needRecycleBuffer = false;
 
@@ -115,7 +113,6 @@ class SortMergeSubpartitionReader
                 if (buffer.isBuffer()) {
                     ++dataBufferBacklog;
                 }
-                totalBuffersSize += buffer.getSize();
             }
         }
 
@@ -129,24 +126,17 @@ class SortMergeSubpartitionReader
         }
     }
 
-    /** This method is called by the IO thread of {@link SortMergeResultPartitionReadScheduler}. */
-    boolean readBuffers(Queue<MemorySegment> buffers, BufferRecycler recycler) throws IOException {
-        while (!buffers.isEmpty()) {
-            MemorySegment segment = buffers.poll();
+    boolean updateReadingProgress(int numBytesRead, ByteBuffer indexEntryBuf) throws IOException {
+        return readingProgress.updateReadingProgress(numBytesRead, indexEntryBuf);
+    }
 
-            Buffer buffer;
-            try {
-                if ((buffer = fileReader.readCurrentRegion(segment, recycler)) == null) {
-                    buffers.add(segment);
-                    break;
-                }
-            } catch (Throwable throwable) {
-                buffers.add(segment);
-                throw throwable;
-            }
-            addBuffer(buffer);
-        }
-        return fileReader.hasRemaining();
+    /** This method is called by the IO thread of {@link SortMergeResultPartitionReader}. */
+    boolean readBuffers(Queue<MemorySegment> buffers, BufferRecycler recycler) {
+        return false;
+    }
+
+    SubpartitionReadingProgress getReadingProgress() {
+        return readingProgress;
     }
 
     CompletableFuture<?> getReleaseFuture() {
@@ -167,9 +157,9 @@ class SortMergeSubpartitionReader
     }
 
     @Override
-    public int compareTo(SortMergeSubpartitionReader that) {
-        long thisPriority = fileReader.getPriority();
-        long thatPriority = that.fileReader.getPriority();
+    public int compareTo(SortMergeSubpartitionView that) {
+        long thisPriority = readingProgress.getCurrentStartOffset();
+        long thatPriority = that.readingProgress.getCurrentStartOffset();
 
         if (thisPriority == thatPriority) {
             return 0;

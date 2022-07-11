@@ -38,6 +38,7 @@ public class NettyShuffleEnvironmentBuilder {
 
     private static final int DEFAULT_NETWORK_BUFFER_SIZE = 32 << 10;
     private static final int DEFAULT_NUM_NETWORK_BUFFERS = 1024;
+    private static final int DEFAULT_NUM_SLOTS = 1;
 
     private static final String[] DEFAULT_TEMP_DIRS = {
         EnvironmentInformation.getTemporaryFileDirectory()
@@ -222,6 +223,8 @@ public class NettyShuffleEnvironmentBuilder {
                 new TaskEventDispatcher(),
                 resultPartitionManager,
                 metricGroup,
-                ioExecutor);
+                ioExecutor,
+                DEFAULT_NUM_SLOTS,
+                DEFAULT_TEMP_DIRS.length);
     }
 }

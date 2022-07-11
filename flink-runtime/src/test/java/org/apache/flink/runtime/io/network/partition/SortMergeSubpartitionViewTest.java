@@ -49,8 +49,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-/** Tests for {@link SortMergeSubpartitionReader}. */
-public class SortMergeSubpartitionReaderTest extends TestLogger {
+/** Tests for {@link SortMergeSubpartitionView}. */
+public class SortMergeSubpartitionViewTest extends TestLogger {
 
     private static final int bufferSize = 1024;
 
@@ -94,8 +94,7 @@ public class SortMergeSubpartitionReaderTest extends TestLogger {
     @Test
     public void testReadBuffers() throws Exception {
         CountingAvailabilityListener listener = new CountingAvailabilityListener();
-        SortMergeSubpartitionReader subpartitionReader =
-                createSortMergeSubpartitionReader(listener);
+        SortMergeSubpartitionView subpartitionReader = createSortMergeSubpartitionReader(listener);
 
         assertEquals(0, listener.numNotifications);
         assertEquals(0, subpartitionReader.unsynchronizedGetNumberOfQueuedBuffers());
@@ -130,7 +129,7 @@ public class SortMergeSubpartitionReaderTest extends TestLogger {
 
     @Test
     public void testPollBuffers() throws Exception {
-        SortMergeSubpartitionReader subpartitionReader =
+        SortMergeSubpartitionView subpartitionReader =
                 createSortMergeSubpartitionReader(new CountingAvailabilityListener());
 
         assertNull(subpartitionReader.getNextBuffer());
@@ -161,7 +160,7 @@ public class SortMergeSubpartitionReaderTest extends TestLogger {
 
         try {
             CountingAvailabilityListener listener = new CountingAvailabilityListener();
-            SortMergeSubpartitionReader subpartitionReader =
+            SortMergeSubpartitionView subpartitionReader =
                     createSortMergeSubpartitionReader(listener);
 
             subpartitionReader.readBuffers(segments, segments::add);
@@ -188,7 +187,7 @@ public class SortMergeSubpartitionReaderTest extends TestLogger {
 
         try {
             CountingAvailabilityListener listener = new CountingAvailabilityListener();
-            SortMergeSubpartitionReader subpartitionReader =
+            SortMergeSubpartitionView subpartitionReader =
                     createSortMergeSubpartitionReader(listener);
 
             subpartitionReader.readBuffers(segments, segments::add);
@@ -214,7 +213,7 @@ public class SortMergeSubpartitionReaderTest extends TestLogger {
         Queue<MemorySegment> segments = createsMemorySegments(numSegments);
 
         try {
-            SortMergeSubpartitionReader subpartitionReader =
+            SortMergeSubpartitionView subpartitionReader =
                     createSortMergeSubpartitionReader(new CountingAvailabilityListener());
 
             subpartitionReader.readBuffers(segments, segments::add);
@@ -227,7 +226,7 @@ public class SortMergeSubpartitionReaderTest extends TestLogger {
 
     @Test
     public void testPollBuffersAfterReleased() throws Exception {
-        SortMergeSubpartitionReader subpartitionReader =
+        SortMergeSubpartitionView subpartitionReader =
                 createSortMergeSubpartitionReader(new CountingAvailabilityListener());
 
         Queue<MemorySegment> segments = createsMemorySegments(numBuffersPerSubpartition);
@@ -238,12 +237,10 @@ public class SortMergeSubpartitionReaderTest extends TestLogger {
         assertNull(subpartitionReader.getNextBuffer());
     }
 
-    private SortMergeSubpartitionReader createSortMergeSubpartitionReader(
+    private SortMergeSubpartitionView createSortMergeSubpartitionReader(
             BufferAvailabilityListener listener) throws Exception {
-        PartitionedFileReader fileReader =
-                new PartitionedFileReader(partitionedFile, 0, dataFileChannel, indexFileChannel);
-        assertTrue(fileReader.hasRemaining());
-        return new SortMergeSubpartitionReader(listener, fileReader);
+        return new SortMergeSubpartitionView(
+                listener, new SubpartitionReadingProgress(partitionedFile, indexFileChannel, 0));
     }
 
     private static FileChannel openFileChannel(Path path) throws IOException {

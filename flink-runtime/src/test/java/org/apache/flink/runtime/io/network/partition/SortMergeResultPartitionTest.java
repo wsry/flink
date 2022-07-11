@@ -27,7 +27,7 @@ import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.api.serialization.EventSerializer;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferPool;
-import org.apache.flink.runtime.io.network.buffer.NetworkBuffer;
+import org.apache.flink.runtime.io.network.buffer.CompositeBuffer;
 import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
 import org.apache.flink.util.TestLogger;
 
@@ -50,7 +50,7 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
+import java.util.function.Function;
 
 import static org.apache.flink.runtime.io.network.buffer.Buffer.DataType;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -178,10 +178,9 @@ public class SortMergeResultPartitionTest extends TestLogger {
                     numBytesRead[subpartition] += numBytes;
 
                     MemorySegment segment = MemorySegmentFactory.allocateUnpooledSegment(numBytes);
-                    segment.put(0, buffer.getNioBufferReadable(), numBytes);
-                    buffersRead[subpartition].add(
-                            new NetworkBuffer(
-                                    segment, (buf) -> {}, buffer.getDataType(), numBytes));
+                    Buffer retBuffer = ((CompositeBuffer) buffer).getFullBuffer(segment);
+                    buffersRead[subpartition].add(retBuffer);
+                    return retBuffer;
                 });
         DataBufferTest.checkWriteReadResult(
                 numSubpartitions, numBytesWritten, numBytesRead, dataWritten, buffersRead);
@@ -205,7 +204,7 @@ public class SortMergeResultPartitionTest extends TestLogger {
     }
 
     private long readData(
-            ResultSubpartitionView[] views, Consumer<BufferWithChannel> bufferProcessor)
+            ResultSubpartitionView[] views, Function<BufferWithChannel, Buffer> bufferProcessor)
             throws Exception {
         int dataSize = 0;
         int numEndOfPartitionEvents = 0;
@@ -217,9 +216,8 @@ public class SortMergeResultPartitionTest extends TestLogger {
                 ResultSubpartition.BufferAndBacklog bufferAndBacklog = view.getNextBuffer();
                 while (bufferAndBacklog != null) {
                     Buffer buffer = bufferAndBacklog.buffer();
-                    bufferProcessor.accept(new BufferWithChannel(buffer, subpartition));
+                    buffer = bufferProcessor.apply(new BufferWithChannel(buffer, subpartition));
                     dataSize += buffer.readableBytes();
-                    buffer.recycleBuffer();
 
                     if (!buffer.isBuffer()) {
                         ++numEndOfPartitionEvents;
@@ -268,6 +266,7 @@ public class SortMergeResultPartitionTest extends TestLogger {
                     if (buffer.isBuffer()) {
                         recordRead.put(buffer.getNioBufferReadable());
                     }
+                    return buffer;
                 });
         recordWritten.rewind();
         recordRead.flip();
@@ -302,7 +301,7 @@ public class SortMergeResultPartitionTest extends TestLogger {
         }
 
         ResultSubpartitionView[] views = createSubpartitionViews(partition, numSubpartitions);
-        long dataRead = readData(views, (ignored) -> {});
+        long dataRead = readData(views, (ignored) -> null);
         assertEquals(dataSize, dataRead);
     }
 
@@ -492,6 +491,7 @@ public class SortMergeResultPartitionTest extends TestLogger {
                         0,
                         new ResultPartitionID(),
                         ResultPartitionType.BLOCKING,
+                        bufferSize,
                         numSubpartitions,
                         numSubpartitions,
                         readBufferPool,
