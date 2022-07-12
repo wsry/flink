@@ -73,9 +73,6 @@ public class HashBasedDataBuffer implements DataBuffer {
     /** Total number of records already appended to this sort buffer. */
     private long numTotalRecords;
 
-    /** Whether this sort buffer is full and ready to read data from. */
-    private boolean isFull;
-
     /** Whether this sort buffer is finished. One can only read a finished sort buffer. */
     private boolean isFinished;
 
@@ -145,7 +142,6 @@ public class HashBasedDataBuffer implements DataBuffer {
     public boolean append(ByteBuffer source, int targetChannel, Buffer.DataType dataType)
             throws IOException {
         checkArgument(source.hasRemaining(), "Cannot append empty data.");
-        checkState(!isFull, "Sort buffer is already full.");
         checkState(!isFinished, "Sort buffer is already finished.");
         checkState(!isReleased, "Sort buffer is already released.");
 
@@ -156,12 +152,12 @@ public class HashBasedDataBuffer implements DataBuffer {
             writeEvent(source, targetChannel, dataType);
         }
 
-        isFull = source.hasRemaining();
-        if (!isFull) {
-            ++numTotalRecords;
+        if (source.hasRemaining()) {
+            return true;
         }
+        ++numTotalRecords;
         numTotalBytes += totalBytes - source.remaining();
-        return isFull;
+        return false;
     }
 
     private void writeEvent(ByteBuffer source, int targetChannel, Buffer.DataType dataType) {
@@ -211,7 +207,7 @@ public class HashBasedDataBuffer implements DataBuffer {
 
     @Override
     public BufferWithChannel getNextBuffer(MemorySegment transitBuffer) {
-        checkState(isFull, "Sort buffer is not ready to be read.");
+        checkState(isFinished, "Sort buffer is not ready to be read.");
         checkState(!isReleased, "Sort buffer is already released.");
 
         BufferWithChannel buffer = null;
@@ -257,7 +253,6 @@ public class HashBasedDataBuffer implements DataBuffer {
         checkState(!isFinished, "Sort buffer has been finished.");
         checkState(!isReleased, "Sort buffer has been released.");
 
-        isFull = false;
         readOrderIndex = 0;
     }
 
@@ -265,7 +260,6 @@ public class HashBasedDataBuffer implements DataBuffer {
     public void finish() {
         checkState(!isFinished, "DataBuffer is already finished.");
 
-        isFull = true;
         isFinished = true;
         for (int channel = 0; channel < builders.length; ++channel) {
             BufferBuilder builder = builders[channel];

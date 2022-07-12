@@ -93,9 +93,6 @@ public class SortBasedDataBuffer implements DataBuffer {
     /** Total number of bytes already read from this sort buffer. */
     private long numTotalBytesRead;
 
-    /** Whether this sort buffer is full and ready to read data from. */
-    private boolean isFull;
-
     /** Whether this sort buffer is finished. One can only read a finished sort buffer. */
     private boolean isFinished;
 
@@ -168,7 +165,6 @@ public class SortBasedDataBuffer implements DataBuffer {
     public boolean append(ByteBuffer source, int targetChannel, DataType dataType)
             throws IOException {
         checkArgument(source.hasRemaining(), "Cannot append empty data.");
-        checkState(!isFull, "Sort buffer is already full.");
         checkState(!isFinished, "Sort buffer is already finished.");
         checkState(!isReleased, "Sort buffer is already released.");
 
@@ -176,11 +172,6 @@ public class SortBasedDataBuffer implements DataBuffer {
 
         // return true directly if it can not allocate enough buffers for the given record
         if (!allocateBuffersForRecord(totalBytes)) {
-            isFull = true;
-            if (hasRemaining()) {
-                // prepare for reading
-                updateReadChannelAndIndexEntryAddress();
-            }
             return true;
         }
 
@@ -287,7 +278,7 @@ public class SortBasedDataBuffer implements DataBuffer {
 
     @Override
     public BufferWithChannel getNextBuffer(MemorySegment transitBuffer) {
-        checkState(isFull, "Sort buffer is not ready to be read.");
+        checkState(isFinished, "Sort buffer is not ready to be read.");
         checkState(!isReleased, "Sort buffer is already released.");
 
         if (!hasRemaining()) {
@@ -434,7 +425,6 @@ public class SortBasedDataBuffer implements DataBuffer {
         Arrays.fill(firstIndexEntryAddresses, -1L);
         Arrays.fill(lastIndexEntryAddresses, -1L);
 
-        isFull = false;
         writeSegmentIndex = 0;
         writeSegmentOffset = 0;
         readIndexEntryAddress = 0;
@@ -449,7 +439,6 @@ public class SortBasedDataBuffer implements DataBuffer {
         isFinished = true;
 
         // prepare for reading
-        isFull = true;
         updateReadChannelAndIndexEntryAddress();
     }
 
