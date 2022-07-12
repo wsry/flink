@@ -122,6 +122,10 @@ public class CompositeBuffer implements Buffer {
         checkState(!partialBuffers.isEmpty());
         checkState(currentLength <= segment.size());
 
+        if (partialBuffers.size() == 1) {
+            return partialBuffers.get(0);
+        }
+
         int offset = 0;
         for (Buffer buffer : partialBuffers) {
             segment.put(offset, buffer.getNioBufferReadable(), buffer.readableBytes());
@@ -137,6 +141,8 @@ public class CompositeBuffer implements Buffer {
     }
 
     public void addPartialBuffer(Buffer buffer) {
+        buffer.setDataType(dataType);
+        buffer.setCompressed(isCompressed);
         partialBuffers.add(buffer);
         currentLength += buffer.readableBytes();
         checkState(currentLength <= length);

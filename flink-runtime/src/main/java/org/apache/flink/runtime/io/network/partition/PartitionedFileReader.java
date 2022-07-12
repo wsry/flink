@@ -161,10 +161,19 @@ class PartitionedFileReader {
                 }
             }
         } finally {
+            if (headerBuf.position() > 0) {
+                nextOffsetToRead -= headerBuf.position();
+                currentRegionRemainingBytes += headerBuf.position();
+                headerBuf.clear();
+            }
+            if (partialBuffer.header != null) {
+                nextOffsetToRead -= HEADER_LENGTH;
+                currentRegionRemainingBytes += HEADER_LENGTH;
+            }
             if (partialBuffer.buffer != null) {
-                partialBuffer.buffer.recycleBuffer();
-                currentRegionRemainingBytes += partialBuffer.buffer.readableBytes();
                 nextOffsetToRead -= partialBuffer.buffer.readableBytes();
+                currentRegionRemainingBytes += partialBuffer.buffer.readableBytes();
+                partialBuffer.buffer.recycleBuffer();
             }
         }
         return hasRemaining();
@@ -199,9 +208,11 @@ class PartitionedFileReader {
                         buffer.readOnlySlice(byteBuffer.position(), targetBuffer.missingLength()));
                 byteBuffer.position(position);
             } else if (byteBuffer.remaining() < header.getLength()) {
-                targetBuffer = new CompositeBuffer(header);
-                targetBuffer.addPartialBuffer(
-                        buffer.readOnlySlice(byteBuffer.position(), byteBuffer.remaining()));
+                if (byteBuffer.hasRemaining()) {
+                    targetBuffer = new CompositeBuffer(header);
+                    targetBuffer.addPartialBuffer(
+                            buffer.readOnlySlice(byteBuffer.position(), byteBuffer.remaining()));
+                }
                 break;
             } else {
                 targetBuffer = new CompositeBuffer(header);
