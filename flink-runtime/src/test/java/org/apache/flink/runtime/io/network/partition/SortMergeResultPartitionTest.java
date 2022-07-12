@@ -27,7 +27,7 @@ import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.api.serialization.EventSerializer;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferPool;
-import org.apache.flink.runtime.io.network.buffer.NetworkBuffer;
+import org.apache.flink.runtime.io.network.buffer.CompositeBuffer;
 import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
 import org.apache.flink.util.TestLogger;
 
@@ -178,10 +178,8 @@ public class SortMergeResultPartitionTest extends TestLogger {
                     numBytesRead[subpartition] += numBytes;
 
                     MemorySegment segment = MemorySegmentFactory.allocateUnpooledSegment(numBytes);
-                    segment.put(0, buffer.getNioBufferReadable(), numBytes);
                     buffersRead[subpartition].add(
-                            new NetworkBuffer(
-                                    segment, (buf) -> {}, buffer.getDataType(), numBytes));
+                            ((CompositeBuffer) buffer).getFullBufferData(segment));
                 });
         DataBufferTest.checkWriteReadResult(
                 numSubpartitions, numBytesWritten, numBytesRead, dataWritten, buffersRead);
@@ -219,7 +217,6 @@ public class SortMergeResultPartitionTest extends TestLogger {
                     Buffer buffer = bufferAndBacklog.buffer();
                     bufferProcessor.accept(new BufferWithChannel(buffer, subpartition));
                     dataSize += buffer.readableBytes();
-                    buffer.recycleBuffer();
 
                     if (!buffer.isBuffer()) {
                         ++numEndOfPartitionEvents;
