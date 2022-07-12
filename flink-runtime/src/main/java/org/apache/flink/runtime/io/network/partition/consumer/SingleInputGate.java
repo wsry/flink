@@ -61,7 +61,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -338,10 +337,7 @@ public class SingleInputGate extends IndexedInputGate {
     }
 
     private void internalRequestPartitions() {
-        // randomly shuffle partition requests for better upstream load balance in batch scenario
-        ArrayList<InputChannel> channels = new ArrayList<>(inputChannels.values());
-        Collections.shuffle(channels);
-        for (InputChannel inputChannel : channels) {
+        for (InputChannel inputChannel : inputChannels.values()) {
             try {
                 inputChannel.requestSubpartition();
             } catch (Throwable t) {
