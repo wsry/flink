@@ -201,20 +201,22 @@ class PartitionedFileReader {
                 break;
             }
 
-            buffer.retainBuffer();
             if (targetBuffer != null) {
+                buffer.retainBuffer();
                 int position = byteBuffer.position() + targetBuffer.missingLength();
                 targetBuffer.addPartialBuffer(
                         buffer.readOnlySlice(byteBuffer.position(), targetBuffer.missingLength()));
                 byteBuffer.position(position);
             } else if (byteBuffer.remaining() < header.getLength()) {
                 if (byteBuffer.hasRemaining()) {
+                    buffer.retainBuffer();
                     targetBuffer = new CompositeBuffer(header);
                     targetBuffer.addPartialBuffer(
                             buffer.readOnlySlice(byteBuffer.position(), byteBuffer.remaining()));
                 }
                 break;
             } else {
+                buffer.retainBuffer();
                 targetBuffer = new CompositeBuffer(header);
                 targetBuffer.addPartialBuffer(
                         buffer.readOnlySlice(byteBuffer.position(), header.getLength()));
