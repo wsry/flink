@@ -178,8 +178,7 @@ public class SortMergeResultPartitionTest extends TestLogger {
                     numBytesRead[subpartition] += numBytes;
 
                     MemorySegment segment = MemorySegmentFactory.allocateUnpooledSegment(numBytes);
-                    buffersRead[subpartition].add(
-                            ((CompositeBuffer) buffer).getFullBuffer(segment));
+                    buffersRead[subpartition].add(((CompositeBuffer) buffer).copyInto(segment));
                 });
         DataBufferTest.checkWriteReadResult(
                 numSubpartitions, numBytesWritten, numBytesRead, dataWritten, buffersRead);

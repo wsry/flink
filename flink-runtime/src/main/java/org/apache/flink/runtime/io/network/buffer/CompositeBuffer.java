@@ -118,13 +118,9 @@ public class CompositeBuffer implements Buffer {
         return partialBuffers.size();
     }
 
-    public Buffer getFullBuffer(MemorySegment segment) {
+    public Buffer copyInto(MemorySegment segment) {
         checkState(!partialBuffers.isEmpty());
         checkState(currentLength <= segment.size());
-
-        if (partialBuffers.size() == 1) {
-            return partialBuffers.get(0);
-        }
 
         int offset = 0;
         for (Buffer buffer : partialBuffers) {
@@ -141,8 +137,6 @@ public class CompositeBuffer implements Buffer {
     }
 
     public void addPartialBuffer(Buffer buffer) {
-        buffer.setDataType(dataType);
-        buffer.setCompressed(isCompressed);
         partialBuffers.add(buffer);
         currentLength += buffer.readableBytes();
         checkState(currentLength <= length);

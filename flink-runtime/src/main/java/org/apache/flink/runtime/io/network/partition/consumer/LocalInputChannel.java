@@ -243,7 +243,7 @@ public class LocalInputChannel extends InputChannel implements BufferAvailabilit
         }
 
         if (buffer instanceof CompositeBuffer) {
-            buffer = ((CompositeBuffer) buffer).getFullBuffer(inputGate.getUnpooledSegment());
+            buffer = ((CompositeBuffer) buffer).copyInto(inputGate.getUnpooledSegment());
         }
 
         numBytesIn.inc(buffer.readableBytes());
