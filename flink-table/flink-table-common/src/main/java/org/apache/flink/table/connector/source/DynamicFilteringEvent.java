@@ -16,12 +16,24 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.connector.source.abilities;
+package org.apache.flink.table.connector.source;
 
-import java.util.List;
+import org.apache.flink.api.connector.source.SourceEvent;
 
-/** SupportsDynamicPartitionPruning. */
-public interface SupportsDynamicPartitionPruning {
+/** DynamicFilteringEvent. */
+public class DynamicFilteringEvent implements SourceEvent {
+    private final DynamicFilteringData data;
 
-    void applyDynamicPartitionPruning(List<String> partitionKeys);
+    public DynamicFilteringEvent(DynamicFilteringData data) {
+        this.data = data;
+    }
+
+    public DynamicFilteringData getData() {
+        return data;
+    }
+
+    @Override
+    public String toString() {
+        return "DynamicFilteringEvent{" + "data=" + data + '}';
+    }
 }

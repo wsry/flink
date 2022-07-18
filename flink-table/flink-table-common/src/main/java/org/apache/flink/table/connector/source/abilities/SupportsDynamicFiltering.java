@@ -16,22 +16,22 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.connector.source;
+package org.apache.flink.table.connector.source.abilities;
 
-import org.apache.flink.types.Row;
+import org.apache.flink.table.connector.source.ScanTableSource;
 
-import java.io.Serializable;
 import java.util.List;
 
-/** PartitionData. */
-public class PartitionData implements Serializable {
-    private final List<Row> partitions;
+/**
+ * Push dynamic filter into {@link ScanTableSource}, the table source can filter the partitions or
+ * the input data in runtime to reduce scan I/O.
+ */
+public interface SupportsDynamicFiltering {
 
-    public PartitionData(List<Row> partitions) {
-        this.partitions = partitions;
-    }
-
-    public boolean contains(Row partition) {
-        return partitions.contains(partition);
-    }
+    /**
+     * apply the candidate filter fields into the table source, and return the accepted fields. The
+     * data corresponding the filter fields will be provided in runtime, which can be used to filter
+     * partitions and input data.
+     */
+    List<String> applyDynamicFiltering(List<String> candidateFilterFields);
 }

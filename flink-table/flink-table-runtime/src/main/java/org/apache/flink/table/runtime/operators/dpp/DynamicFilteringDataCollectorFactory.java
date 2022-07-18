@@ -21,41 +21,49 @@ package org.apache.flink.table.runtime.operators.dpp;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEventDispatcher;
+import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.CoordinatedOperatorFactory;
-import org.apache.flink.streaming.api.operators.SimpleUdfStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
-import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.types.logical.RowType;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
-/** DynamicPartitionSinkFactory. */
-public class DynamicPartitionSinkFactory extends SimpleUdfStreamOperatorFactory<Object>
+/** DynamicFilteringDataCollectorFactory. */
+public class DynamicFilteringDataCollectorFactory extends AbstractStreamOperatorFactory<Object>
         implements CoordinatedOperatorFactory<Object> {
 
-    private final transient CompletableFuture<byte[]> sourceOperatorIdFuture;
-    private OperatorID sourceOperatorId;
-    private final DynamicPartitionOperator operator;
+    private final List<String> dynamicFilteringDataListenerIDs;
+    private final RowType dynamicFilteringFieldType;
+    private final List<Integer> dynamicFilteringFieldIndices;
+    private final long threshold;
 
-    public DynamicPartitionSinkFactory(
-            CompletableFuture<byte[]> sourceOperatorIdFuture,
-            RowType partitionFieldType,
-            List<Integer> partitionFieldIndices) {
-        super(new DynamicPartitionOperator(partitionFieldType, partitionFieldIndices));
-        this.operator = (DynamicPartitionOperator) getOperator();
-        this.sourceOperatorIdFuture = sourceOperatorIdFuture;
+    public DynamicFilteringDataCollectorFactory(
+            List<String> dynamicFilteringDataListenerIDs,
+            RowType dynamicFilteringFieldType,
+            List<Integer> dynamicFilteringFieldIndices,
+            long threshold) {
+        this.dynamicFilteringDataListenerIDs = dynamicFilteringDataListenerIDs;
+        this.dynamicFilteringFieldType = dynamicFilteringFieldType;
+        this.dynamicFilteringFieldIndices = dynamicFilteringFieldIndices;
+        this.threshold = threshold;
     }
 
     @Override
     public <T extends StreamOperator<Object>> T createStreamOperator(
             StreamOperatorParameters<Object> parameters) {
+        final OperatorID operatorId = parameters.getStreamConfig().getOperatorID();
         final OperatorEventDispatcher eventDispatcher = parameters.getOperatorEventDispatcher();
-        if (sourceOperatorId == null) {
-            throw new TableException("sourceOperatorId is empty");
-        }
-        operator.setOperatorEventGateway(eventDispatcher.getOperatorEventGateway(sourceOperatorId));
+        OperatorEventGateway operatorEventGateway =
+                eventDispatcher.getOperatorEventGateway(operatorId);
+
+        DynamicFilteringDataCollectorOperator operator =
+                new DynamicFilteringDataCollectorOperator(
+                        dynamicFilteringFieldType,
+                        dynamicFilteringFieldIndices,
+                        threshold,
+                        operatorEventGateway);
 
         operator.setup(
                 parameters.getContainingTask(),
@@ -69,14 +77,16 @@ public class DynamicPartitionSinkFactory extends SimpleUdfStreamOperatorFactory<
         return castedOperator;
     }
 
+    @SuppressWarnings("rawtypes")
+    @Override
+    public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
+        return DynamicFilteringDataCollectorOperator.class;
+    }
+
     @Override
     public OperatorCoordinator.Provider getCoordinatorProvider(
             String operatorName, OperatorID operatorID) {
-        byte[] sourceOperatorIdBytes = sourceOperatorIdFuture.getNow(null);
-        if (sourceOperatorIdBytes == null) {
-            throw new TableException("sourceOperatorId is empty");
-        }
-        sourceOperatorId = new OperatorID(sourceOperatorIdBytes);
-        return new DynamicPartitionSinkOperatorCoordinator.Provider(operatorID);
+        return new DynamicFilteringDataCollectorOperatorCoordinator.Provider(
+                operatorID, dynamicFilteringDataListenerIDs);
     }
 }

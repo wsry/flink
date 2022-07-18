@@ -29,7 +29,8 @@ import org.apache.flink.connector.file.src.assigners.FileSplitAssigner;
 import org.apache.flink.connector.file.src.enumerate.DynamicFileEnumerator;
 import org.apache.flink.connector.file.src.enumerate.FileEnumerator;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.table.connector.source.DynamicPartitionEvent;
+import org.apache.flink.table.connector.source.DynamicFilteringData;
+import org.apache.flink.table.connector.source.DynamicFilteringEvent;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.slf4j.Logger;
@@ -40,11 +41,10 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -70,12 +70,7 @@ public class DynamicFileSplitEnumerator<SplitT extends FileSourceSplit>
 
     private final FileSplitAssigner.Provider splitAssignerFactory;
     private transient FileSplitAssigner splitAssigner;
-
-    /** the buffer the requests before the partition data is received. */
-    private final LinkedHashMap<Integer, String> readersAwaitingSplit;
-
-    /** A flag which indicates whether the PartitionData is received. */
-    private transient boolean partitionDataReceived;
+    private final Set<SplitT> assignedSplits;
 
     // ------------------------------------------------------------------------
 
@@ -86,8 +81,7 @@ public class DynamicFileSplitEnumerator<SplitT extends FileSourceSplit>
         this.context = checkNotNull(context);
         this.splitAssignerFactory = checkNotNull(splitAssignerFactory);
         this.fileEnumeratorFactory = checkNotNull(fileEnumeratorFactory);
-        this.partitionDataReceived = false;
-        this.readersAwaitingSplit = new LinkedHashMap<>();
+        this.assignedSplits = new HashSet<>();
     }
 
     @Override
@@ -107,13 +101,12 @@ public class DynamicFileSplitEnumerator<SplitT extends FileSourceSplit>
 
     @Override
     public void handleSplitRequest(int subtask, @Nullable String hostname) {
-        if (!partitionDataReceived) {
-            readersAwaitingSplit.put(subtask, hostname);
-            return;
-        }
         if (!context.registeredReaders().containsKey(subtask)) {
             // reader failed between sending the request and now. skip this request.
             return;
+        }
+        if (splitAssigner == null) {
+            createSplitAssigner(null);
         }
 
         if (LOG.isInfoEnabled()) {
@@ -122,10 +115,11 @@ public class DynamicFileSplitEnumerator<SplitT extends FileSourceSplit>
             LOG.info("Subtask {} {} is requesting a file source split", subtask, hostInfo);
         }
 
-        final Optional<FileSourceSplit> nextSplit = splitAssigner.getNext(hostname);
+        final Optional<FileSourceSplit> nextSplit = getNextSplit(hostname);
         if (nextSplit.isPresent()) {
             final FileSourceSplit split = nextSplit.get();
             context.assignSplit((SplitT) split, subtask);
+            assignedSplits.add((SplitT) split);
             LOG.info("Assigned split to subtask {} : {}", subtask, split);
         } else {
             context.signalNoMoreSplits(subtask);
@@ -133,25 +127,42 @@ public class DynamicFileSplitEnumerator<SplitT extends FileSourceSplit>
         }
     }
 
+    private Optional<FileSourceSplit> getNextSplit(String hostname) {
+        do {
+            final Optional<FileSourceSplit> nextSplit = splitAssigner.getNext(hostname);
+            if (nextSplit.isPresent()) {
+                // ignore the split if it has been assigned
+                if (!assignedSplits.contains(nextSplit.get())) {
+                    return nextSplit;
+                }
+            } else {
+                return nextSplit;
+            }
+        } while (true);
+    }
+
     @Override
     public void handleSourceEvent(int subtaskId, SourceEvent sourceEvent) {
-        if (sourceEvent instanceof DynamicPartitionEvent) {
-            LOG.info("Received DynamicPartitionEvent: {}", subtaskId);
-            DynamicFileEnumerator fileEnumerator = fileEnumeratorFactory.create();
-            fileEnumerator.setPartitionData(((DynamicPartitionEvent) sourceEvent).getData());
-
-            Collection<FileSourceSplit> splits;
-            try {
-                splits = fileEnumerator.enumerateSplits(new Path[1], context.currentParallelism());
-            } catch (IOException e) {
-                throw new FlinkRuntimeException("Could not enumerate file splits", e);
-            }
-            splitAssigner = splitAssignerFactory.create(splits);
-            this.partitionDataReceived = true;
-            assignAwaitingRequests();
+        if (sourceEvent instanceof DynamicFilteringEvent) {
+            LOG.info("Received DynamicFilteringEvent: {}", subtaskId);
+            createSplitAssigner(((DynamicFilteringEvent) sourceEvent).getData());
         } else {
             LOG.error("Received unrecognized event: {}", sourceEvent);
         }
+    }
+
+    private void createSplitAssigner(@Nullable DynamicFilteringData dynamicFilteringData) {
+        DynamicFileEnumerator fileEnumerator = fileEnumeratorFactory.create();
+        if (dynamicFilteringData != null) {
+            fileEnumerator.setDynamicFilteringData(dynamicFilteringData);
+        }
+        Collection<FileSourceSplit> splits;
+        try {
+            splits = fileEnumerator.enumerateSplits(new Path[1], context.currentParallelism());
+        } catch (IOException e) {
+            throw new FlinkRuntimeException("Could not enumerate file splits", e);
+        }
+        splitAssigner = splitAssignerFactory.create(splits);
     }
 
     @Override
@@ -165,6 +176,7 @@ public class DynamicFileSplitEnumerator<SplitT extends FileSourceSplit>
 
     @Override
     public PendingSplitsCheckpoint<SplitT> snapshotState(long checkpointId) {
+        // TODO store assignedSplits ?
         List<SplitT> fileSplits = new ArrayList<>();
         if (splitAssigner != null) {
             for (FileSourceSplit split : splitAssigner.remainingSplits()) {
@@ -172,25 +184,5 @@ public class DynamicFileSplitEnumerator<SplitT extends FileSourceSplit>
             }
         }
         return PendingSplitsCheckpoint.fromCollectionSnapshot(fileSplits);
-    }
-
-    private void assignAwaitingRequests() {
-        final Iterator<Map.Entry<Integer, String>> awaitingReader =
-                readersAwaitingSplit.entrySet().iterator();
-
-        while (awaitingReader.hasNext()) {
-            final Map.Entry<Integer, String> nextAwaiting = awaitingReader.next();
-
-            // if the reader that requested another split has failed in the meantime, remove
-            // it from the list of waiting readers
-            if (!context.registeredReaders().containsKey(nextAwaiting.getKey())) {
-                awaitingReader.remove();
-                continue;
-            }
-
-            final String hostname = nextAwaiting.getValue();
-            final int awaitingSubtask = nextAwaiting.getKey();
-            handleSplitRequest(awaitingSubtask, hostname);
-        }
     }
 }

@@ -21,18 +21,27 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandler;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.runtime.operators.coordination.CoordinatorStore;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 
 import javax.annotation.Nullable;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-/** DynamicPartitionSinkOperatorCoordinator. */
-public class DynamicPartitionSinkOperatorCoordinator
+/** DynamicFilteringDataCollectorOperatorCoordinator. */
+public class DynamicFilteringDataCollectorOperatorCoordinator
         implements OperatorCoordinator, CoordinationRequestHandler {
 
-    public DynamicPartitionSinkOperatorCoordinator() {}
+    private final CoordinatorStore coordinatorStore;
+    private final List<String> dynamicFilteringDataListenerIDs;
+
+    public DynamicFilteringDataCollectorOperatorCoordinator(
+            Context context, List<String> dynamicFilteringDataListenerIDs) {
+        this.coordinatorStore = context.getCoordinatorStore();
+        this.dynamicFilteringDataListenerIDs = dynamicFilteringDataListenerIDs;
+    }
 
     @Override
     public void start() throws Exception {}
@@ -41,12 +50,21 @@ public class DynamicPartitionSinkOperatorCoordinator
     public void close() throws Exception {}
 
     @Override
-    public void handleEventFromOperator(int subtask, OperatorEvent event) throws Exception {}
+    public void handleEventFromOperator(int subtask, OperatorEvent event) throws Exception {
+        for (String listenerID : dynamicFilteringDataListenerIDs) {
+            // push event
+            OperatorCoordinator listener = (OperatorCoordinator) coordinatorStore.get(listenerID);
+            if (listener == null) {
+                throw new IllegalStateException("Dynamic filtering data listener missing");
+            }
+            listener.handleEventFromOperator(0, event);
+        }
+    }
 
     @Override
     public CompletableFuture<CoordinationResponse> handleCoordinationRequest(
             CoordinationRequest request) {
-        return new CompletableFuture<>();
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -75,24 +93,26 @@ public class DynamicPartitionSinkOperatorCoordinator
     public void resetToCheckpoint(long checkpointId, @Nullable byte[] checkpointData)
             throws Exception {}
 
-    /** Provider for {@link DynamicPartitionSinkOperatorCoordinator}. */
+    /** Provider for {@link DynamicFilteringDataCollectorOperatorCoordinator}. */
     public static class Provider implements OperatorCoordinator.Provider {
 
-        private final OperatorID operatorId;
+        private final OperatorID operatorID;
+        private final List<String> dynamicFilteringDataListenerIDs;
 
-        public Provider(OperatorID operatorId) {
-            this.operatorId = operatorId;
+        public Provider(OperatorID operatorID, List<String> dynamicFilteringDataListenerIDs) {
+            this.operatorID = operatorID;
+            this.dynamicFilteringDataListenerIDs = dynamicFilteringDataListenerIDs;
         }
 
         @Override
         public OperatorID getOperatorId() {
-            return operatorId;
+            return operatorID;
         }
 
         @Override
         public OperatorCoordinator create(Context context) {
-            // we do not send operator event so we don't need a context
-            return new DynamicPartitionSinkOperatorCoordinator();
+            return new DynamicFilteringDataCollectorOperatorCoordinator(
+                    context, dynamicFilteringDataListenerIDs);
         }
     }
 }

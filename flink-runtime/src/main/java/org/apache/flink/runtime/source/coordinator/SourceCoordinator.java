@@ -111,6 +111,8 @@ public class SourceCoordinator<SplitT extends SourceSplit, EnumChkT>
     /** A flag marking whether the coordinator has started. */
     private boolean started;
 
+    private String coordinatorListeningID;
+
     public SourceCoordinator(
             String operatorName,
             Source<?, SplitT, EnumChkT> source,
@@ -214,6 +216,8 @@ public class SourceCoordinator<SplitT extends SourceSplit, EnumChkT>
         // We rely on the single-threaded coordinator executor to guarantee
         // the other methods are invoked after the enumerator has started.
         runInEventLoop(() -> enumerator.start(), "starting the SplitEnumerator.");
+
+        coordinatorStore.putIfAbsent(coordinatorListeningID, this);
     }
 
     @Override
@@ -421,6 +425,10 @@ public class SourceCoordinator<SplitT extends SourceSplit, EnumChkT>
                         context.failJob(t);
                     }
                 });
+    }
+
+    public void setCoordinatorListeningID(String coordinatorListeningID) {
+        this.coordinatorListeningID = coordinatorListeningID;
     }
 
     // ---------------------------------------------------

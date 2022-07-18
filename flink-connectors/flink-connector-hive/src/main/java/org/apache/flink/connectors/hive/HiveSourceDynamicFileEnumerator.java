@@ -21,8 +21,12 @@ package org.apache.flink.connectors.hive;
 import org.apache.flink.connector.file.src.FileSourceSplit;
 import org.apache.flink.connector.file.src.enumerate.DynamicFileEnumerator;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.table.connector.source.PartitionData;
-import org.apache.flink.types.Row;
+import org.apache.flink.table.connector.source.DynamicFilteringData;
+import org.apache.flink.table.data.GenericRowData;
+import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.data.StringData;
+import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.util.Preconditions;
 
 import org.apache.hadoop.mapred.JobConf;
 import org.slf4j.Logger;
@@ -32,6 +36,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import static org.apache.flink.connectors.hive.HiveSourceFileEnumerator.createInputSplits;
 
@@ -63,23 +68,53 @@ public class HiveSourceDynamicFileEnumerator implements DynamicFileEnumerator {
         this.jobConf = jobConf;
     }
 
-    public void setPartitionData(PartitionData partitionData) {
-        LOG.info("Table: {}, Partition Data: {}", table, partitionData);
-        finalPartitions = new ArrayList<>();
-        for (HiveTablePartition partition : allPartitions) {
-            Object[] values =
-                    dynamicPartitionKeys.stream()
-                            .map(k -> partition.getPartitionSpec().get(k))
-                            .toArray(String[]::new);
-            if (partitionData.contains(Row.of(values))) {
-                finalPartitions.add(partition);
+    public void setDynamicFilteringData(DynamicFilteringData data) {
+        LOG.info("Table: {}, DynamicFilteringData: {}", table, data);
+        try {
+            finalPartitions = new ArrayList<>();
+            Optional<List<RowData>> receivedDataOpt = data.getData();
+            if (!receivedDataOpt.isPresent()) {
+                finalPartitions = allPartitions;
+                return;
+            }
+            RowType rowType = data.getRowType();
+            for (HiveTablePartition partition : allPartitions) {
+                RowData rowData = createRowData(rowType, partition);
+                if (data.contains(rowData)) {
+                    finalPartitions.add(partition);
+                }
+            }
+            LOG.info(
+                    "Table: {}, Original partition number: {}, Remaining partition number: {}",
+                    table,
+                    allPartitions.size(),
+                    finalPartitions.size());
+        } catch (Exception e) {
+            LOG.error("Failed to set partition data, will use all partitions", e);
+            finalPartitions = allPartitions;
+        }
+    }
+
+    private RowData createRowData(RowType rowType, HiveTablePartition partition) {
+        Preconditions.checkArgument(rowType.getFieldCount() == dynamicPartitionKeys.size());
+        GenericRowData rowData = new GenericRowData(rowType.getFieldCount());
+        for (int i = 0; i < rowType.getFieldCount(); ++i) {
+            String value = partition.getPartitionSpec().get(dynamicPartitionKeys.get(i));
+            switch (rowType.getTypeAt(i).getTypeRoot()) {
+                case INTEGER:
+                    rowData.setField(i, Integer.valueOf(value));
+                    break;
+                case BIGINT:
+                    rowData.setField(i, Long.valueOf(value));
+                    break;
+                case VARCHAR:
+                    rowData.setField(i, StringData.fromString(value));
+                    break;
+                default:
+                    throw new UnsupportedOperationException();
             }
         }
-        LOG.info(
-                "Table: {}, Original partition number: {}, Remaining partition number: {}",
-                table,
-                allPartitions.size(),
-                finalPartitions.size());
+        return rowData;
     }
 
     @Override

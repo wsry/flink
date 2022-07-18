@@ -18,38 +18,37 @@
 
 package org.apache.flink.table.planner.plan.rules.physical.batch;
 
-import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchPhysicalCalc;
-import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchPhysicalExchange;
+import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchPhysicalDynamicFilteringTableSourceScan;
 import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchPhysicalJoinBase;
+import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchPhysicalRel;
 import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchPhysicalTableSourceScan;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelRule;
-import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 
 import java.util.Arrays;
 
-/** DynamicPartitionPruningRule2. */
-public class DynamicPartitionPruningRule2 extends DynamicPartitionPruningRuleBase {
+/** DynamicFilteringRule2. */
+public class DynamicFilteringRule2 extends DynamicFilteringRuleBase {
 
     public static final RelOptRule FACT_IN_LEFT =
-            DynamicPartitionPruningRule2.Config.EMPTY
-                    .withDescription("DynamicPartitionPruningRule2:factInLeft")
+            DynamicFilteringRule2.Config.EMPTY
+                    .withDescription("DynamicFilteringRule2:factInLeft")
                     .as(Config.class)
                     .factInLeft()
                     .toRule();
 
-    public DynamicPartitionPruningRule2(RelRule.Config config) {
+    public DynamicFilteringRule2(RelRule.Config config) {
         super(config);
     }
 
     /** Config. */
     public interface Config extends RelRule.Config {
         @Override
-        default DynamicPartitionPruningRule2 toRule() {
-            return new DynamicPartitionPruningRule2(this);
+        default DynamicFilteringRule2 toRule() {
+            return new DynamicFilteringRule2(this);
         }
 
         default Config factInLeft() {
@@ -63,18 +62,8 @@ public class DynamicPartitionPruningRule2 extends DynamicPartitionPruningRuleBas
                                                                                     .class)
                                                                     .noInputs(),
                                                     r ->
-                                                            r.operand(BatchPhysicalExchange.class)
-                                                                    .oneInput(
-                                                                            e ->
-                                                                                    e.operand(
-                                                                                                    BatchPhysicalCalc
-                                                                                                            .class)
-                                                                                            .oneInput(
-                                                                                                    c ->
-                                                                                                            c.operand(
-                                                                                                                            BatchPhysicalTableSourceScan
-                                                                                                                                    .class)
-                                                                                                                    .noInputs()))))
+                                                            r.operand(BatchPhysicalRel.class)
+                                                                    .anyInputs()))
                     .as(Config.class);
         }
     }
@@ -82,19 +71,19 @@ public class DynamicPartitionPruningRule2 extends DynamicPartitionPruningRuleBas
     @Override
     public boolean matches(RelOptRuleCall call) {
         final BatchPhysicalJoinBase join = call.rel(0);
-        final BatchPhysicalCalc calc = call.rel(3);
+        final BatchPhysicalRel dimSide = call.rel(2);
         final BatchPhysicalTableSourceScan factScan = call.rel(1);
-        return doMatches(join, calc, factScan, true);
+        return doMatches(join, dimSide, factScan, true);
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
         final BatchPhysicalJoinBase join = call.rel(0);
+        final BatchPhysicalRel dimSide = call.rel(2);
         final BatchPhysicalTableSourceScan factScan = call.rel(1);
-        final RelNode dimSide = call.rel(2);
 
-        final BatchPhysicalTableSourceScan newFactScan =
-                createNewTableSourceScan(factScan, dimSide.getInput(0), join, true);
+        final BatchPhysicalDynamicFilteringTableSourceScan newFactScan =
+                createDynamicFilteringTableSourceScan(factScan, dimSide, join, true);
         final Join newJoin = join.copy(join.getTraitSet(), Arrays.asList(newFactScan, dimSide));
         call.transformTo(newJoin);
     }

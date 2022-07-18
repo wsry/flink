@@ -18,41 +18,42 @@
 
 package org.apache.flink.table.planner.plan.rules.physical.batch;
 
-import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchPhysicalCalc;
+import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchPhysicalDynamicFilteringTableSourceScan;
 import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchPhysicalExchange;
 import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchPhysicalJoinBase;
+import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchPhysicalRel;
 import org.apache.flink.table.planner.plan.nodes.physical.batch.BatchPhysicalTableSourceScan;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelRule;
-import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 
 import java.util.Arrays;
+import java.util.Collections;
 
-/** DynamicPartitionPruningRule1. */
-public class DynamicPartitionPruningRule1 extends DynamicPartitionPruningRuleBase {
+/** DynamicFilteringRule4. */
+public class DynamicFilteringRule4 extends DynamicFilteringRuleBase {
 
-    public static final RelOptRule FACT_IN_RIGHT =
-            DynamicPartitionPruningRule1.Config.EMPTY
-                    .withDescription("DynamicPartitionPruningRule1:factInRight")
+    public static final RelOptRule FACT_IN_LEFT =
+            DynamicFilteringRule4.Config.EMPTY
+                    .withDescription("DynamicFilteringRule4:factInLeft")
                     .as(Config.class)
-                    .factInRight()
+                    .factInLeft()
                     .toRule();
 
-    public DynamicPartitionPruningRule1(RelRule.Config config) {
+    public DynamicFilteringRule4(RelRule.Config config) {
         super(config);
     }
 
     /** Config. */
     public interface Config extends RelRule.Config {
         @Override
-        default DynamicPartitionPruningRule1 toRule() {
-            return new DynamicPartitionPruningRule1(this);
+        default DynamicFilteringRule4 toRule() {
+            return new DynamicFilteringRule4(this);
         }
 
-        default Config factInRight() {
+        default Config factInLeft() {
             return withOperandSupplier(
                             b0 ->
                                     b0.operand(BatchPhysicalJoinBase.class)
@@ -62,19 +63,12 @@ public class DynamicPartitionPruningRule1 extends DynamicPartitionPruningRuleBas
                                                                     .oneInput(
                                                                             e ->
                                                                                     e.operand(
-                                                                                                    BatchPhysicalCalc
+                                                                                                    BatchPhysicalTableSourceScan
                                                                                                             .class)
-                                                                                            .oneInput(
-                                                                                                    c ->
-                                                                                                            c.operand(
-                                                                                                                            BatchPhysicalTableSourceScan
-                                                                                                                                    .class)
-                                                                                                                    .noInputs())),
+                                                                                            .noInputs()),
                                                     r ->
-                                                            r.operand(
-                                                                            BatchPhysicalTableSourceScan
-                                                                                    .class)
-                                                                    .noInputs()))
+                                                            r.operand(BatchPhysicalRel.class)
+                                                                    .anyInputs()))
                     .as(Config.class);
         }
     }
@@ -82,20 +76,25 @@ public class DynamicPartitionPruningRule1 extends DynamicPartitionPruningRuleBas
     @Override
     public boolean matches(RelOptRuleCall call) {
         final BatchPhysicalJoinBase join = call.rel(0);
-        final BatchPhysicalCalc calc = call.rel(2);
-        final BatchPhysicalTableSourceScan factScan = call.rel(4);
-        return doMatches(join, calc, factScan, false);
+        final BatchPhysicalRel dimSide = call.rel(3);
+        final BatchPhysicalTableSourceScan factScan = call.rel(2);
+        return doMatches(join, dimSide, factScan, true);
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
         final BatchPhysicalJoinBase join = call.rel(0);
-        final BatchPhysicalTableSourceScan factScan = call.rel(4);
-        final RelNode dimSide = call.rel(1);
+        final BatchPhysicalRel dimSide = call.rel(3);
+        final BatchPhysicalExchange exchange = call.rel(1);
+        final BatchPhysicalTableSourceScan factScan = call.rel(2);
 
-        final BatchPhysicalTableSourceScan newFactScan =
-                createNewTableSourceScan(factScan, dimSide.getInput(0), join, false);
-        final Join newJoin = join.copy(join.getTraitSet(), Arrays.asList(dimSide, newFactScan));
+        final BatchPhysicalDynamicFilteringTableSourceScan newFactScan =
+                createDynamicFilteringTableSourceScan(factScan, dimSide, join, true);
+        final BatchPhysicalExchange newExchange =
+                (BatchPhysicalExchange)
+                        exchange.copy(
+                                exchange.getTraitSet(), Collections.singletonList(newFactScan));
+        final Join newJoin = join.copy(join.getTraitSet(), Arrays.asList(newExchange, dimSide));
         call.transformTo(newJoin);
     }
 }

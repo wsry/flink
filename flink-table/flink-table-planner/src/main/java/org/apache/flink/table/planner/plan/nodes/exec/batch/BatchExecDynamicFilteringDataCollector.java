@@ -18,9 +18,12 @@
 
 package org.apache.flink.table.planner.plan.nodes.exec.batch;
 
+import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.dag.Transformation;
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
+import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.planner.delegation.PlannerBase;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecEdge;
@@ -29,25 +32,32 @@ import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeConfig;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeContext;
 import org.apache.flink.table.planner.plan.nodes.exec.InputProperty;
 import org.apache.flink.table.planner.plan.nodes.exec.utils.ExecNodeUtil;
-import org.apache.flink.table.runtime.operators.dpp.DynamicPartitionSinkFactory;
+import org.apache.flink.table.runtime.operators.dpp.DynamicFilteringDataCollectorFactory;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
+import static org.apache.flink.configuration.ConfigOptions.key;
 import static org.apache.flink.util.Preconditions.checkArgument;
 
-/** BatchExecDynamicPartitionSink. */
-public class BatchExecDynamicPartitionCollector extends ExecNodeBase<Object>
+/** BatchExecDynamicFilteringCollector. */
+public class BatchExecDynamicFilteringDataCollector extends ExecNodeBase<Object>
         implements BatchExecNode<Object> {
 
-    private final List<Integer> partitionFields;
-    private transient CompletableFuture<byte[]> sourceOperatorIdFuture;
+    @Experimental
+    public static final ConfigOption<MemorySize> TABLE_EXEC_DYNAMIC_FILTERING_THRESHOLD =
+            key("table.exec.dynamic-filtering.threshold")
+                    .memoryType()
+                    .defaultValue(MemorySize.parse("32 mb"));
 
-    public BatchExecDynamicPartitionCollector(
-            List<Integer> partitionFields,
+    private final List<Integer> dynamicFilteringFieldIndices;
+    private final List<String> dynamicFilteringDataListenerIDs;
+
+    public BatchExecDynamicFilteringDataCollector(
+            List<Integer> dynamicFilteringFieldIndices,
             ReadableConfig tableConfig,
             InputProperty inputProperty,
             RowType outputType,
@@ -59,12 +69,9 @@ public class BatchExecDynamicPartitionCollector extends ExecNodeBase<Object>
                 Collections.singletonList(inputProperty),
                 outputType,
                 description);
-        this.partitionFields = partitionFields;
-        checkArgument(outputType.getFieldCount() == partitionFields.size());
-    }
-
-    public void setSourceOperatorIdFuture(CompletableFuture<byte[]> sourceOperatorIdFuture) {
-        this.sourceOperatorIdFuture = sourceOperatorIdFuture;
+        this.dynamicFilteringFieldIndices = dynamicFilteringFieldIndices;
+        checkArgument(outputType.getFieldCount() == dynamicFilteringFieldIndices.size());
+        this.dynamicFilteringDataListenerIDs = new ArrayList<>();
     }
 
     @Override
@@ -74,9 +81,12 @@ public class BatchExecDynamicPartitionCollector extends ExecNodeBase<Object>
         final ExecEdge inputEdge = getInputEdges().get(0);
         final Transformation<RowData> inputTransform =
                 (Transformation<RowData>) inputEdge.translateToPlan(planner);
-        SimpleOperatorFactory<Object> factory =
-                new DynamicPartitionSinkFactory(
-                        sourceOperatorIdFuture, (RowType) getOutputType(), partitionFields);
+        StreamOperatorFactory<Object> factory =
+                new DynamicFilteringDataCollectorFactory(
+                        dynamicFilteringDataListenerIDs,
+                        (RowType) getOutputType(),
+                        dynamicFilteringFieldIndices,
+                        config.get(TABLE_EXEC_DYNAMIC_FILTERING_THRESHOLD).getBytes());
 
         return ExecNodeUtil.createOneInputTransformation(
                 inputTransform,
@@ -85,5 +95,9 @@ public class BatchExecDynamicPartitionCollector extends ExecNodeBase<Object>
                 factory,
                 InternalTypeInfo.of(getOutputType()),
                 1); // parallelism should always be 1
+    }
+
+    public void registerDynamicFilteringDataListenerID(String id) {
+        this.dynamicFilteringDataListenerIDs.add(id);
     }
 }

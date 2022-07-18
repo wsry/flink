@@ -18,23 +18,27 @@
 
 package org.apache.flink.table.runtime.operators.dpp;
 
-import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
-import org.apache.flink.streaming.api.operators.StreamSink;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
+import org.apache.flink.streaming.api.operators.ChainingStrategy;
+import org.apache.flink.streaming.api.operators.StreamOperator;
+import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.types.logical.RowType;
 
-import java.util.List;
+public class DppFilterOperatorFactory extends AbstractStreamOperatorFactory<RowData> {
 
-/** DynamicPartitionOperator. */
-public class DynamicPartitionOperator extends StreamSink<RowData> {
-
-    public DynamicPartitionOperator(
-            RowType partitionFieldType, List<Integer> partitionFieldIndices) {
-        super(new DynamicPartitionFunction(partitionFieldType, partitionFieldIndices));
+    @Override
+    public <T extends StreamOperator<RowData>> T createStreamOperator(
+            StreamOperatorParameters<RowData> parameters) {
+        return (T) new DppFilterOperator(parameters, 2);
     }
 
-    public void setOperatorEventGateway(OperatorEventGateway operatorEventGateway) {
-        ((DynamicPartitionFunction) getUserFunction())
-                .setOperatorEventGateway(operatorEventGateway);
+    @Override
+    public ChainingStrategy getChainingStrategy() {
+        return ChainingStrategy.HEAD_WITH_SOURCES;
+    }
+
+    @Override
+    public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
+        return DppFilterOperator.class;
     }
 }

@@ -19,37 +19,47 @@ package org.apache.flink.table.planner.plan.nodes.physical.batch
 
 import org.apache.flink.table.planner.calcite.FlinkTypeFactory
 import org.apache.flink.table.planner.plan.nodes.exec.{ExecNode, InputProperty}
-import org.apache.flink.table.planner.plan.nodes.exec.batch.BatchExecDynamicPartitionCollector
+import org.apache.flink.table.planner.plan.nodes.exec.batch.BatchExecDynamicFilteringDataCollector
 import org.apache.flink.table.planner.utils.JavaScalaConversionUtil
 import org.apache.flink.table.planner.utils.ShortcutUtils.unwrapTableConfig
 
 import org.apache.calcite.plan.{RelOptCluster, RelTraitSet}
 import org.apache.calcite.rel.`type`.RelDataType
-import org.apache.calcite.rel.{RelNode, SingleRel}
+import org.apache.calcite.rel.{RelNode, RelWriter, SingleRel}
 
-class BatchPhysicalDynamicPartitionCollector(
+class BatchPhysicalDynamicFilteringDataCollector(
     cluster: RelOptCluster,
     traitSet: RelTraitSet,
     input: RelNode,
     outputType: RelDataType,
-    val partitionFields: Array[Int]
+    val dynamicFilteringFieldIndices: Array[Int]
 ) extends SingleRel(cluster, traitSet, input)
   with BatchPhysicalRel {
 
   override def deriveRowType(): RelDataType = outputType
 
   override def copy(traitSet: RelTraitSet, inputs: java.util.List[RelNode]): RelNode = {
-    new BatchPhysicalDynamicPartitionCollector(
+    new BatchPhysicalDynamicFilteringDataCollector(
       cluster,
       traitSet,
       inputs.get(0),
       outputType,
-      partitionFields)
+      dynamicFilteringFieldIndices)
+  }
+
+  override def explainTerms(pw: RelWriter): RelWriter = {
+    super
+      .explainTerms(pw)
+      .item(
+        "dynamicFilteringFieldIndices",
+        dynamicFilteringFieldIndices
+          .map(i => getInput.getRowType.getFieldNames.get(i))
+          .mkString(","))
   }
 
   override def translateToExecNode(): ExecNode[_] = {
-    new BatchExecDynamicPartitionCollector(
-      JavaScalaConversionUtil.toJava(partitionFields.map(i => Integer.valueOf(i))),
+    new BatchExecDynamicFilteringDataCollector(
+      JavaScalaConversionUtil.toJava(dynamicFilteringFieldIndices.map(i => Integer.valueOf(i))),
       unwrapTableConfig(this),
       InputProperty.DEFAULT,
       FlinkTypeFactory.toLogicalRowType(getRowType),

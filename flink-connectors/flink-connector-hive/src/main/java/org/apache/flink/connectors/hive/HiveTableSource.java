@@ -44,7 +44,7 @@ import org.apache.flink.table.connector.ProviderContext;
 import org.apache.flink.table.connector.source.DataStreamScanProvider;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.abilities.SupportsDynamicPartitionPruning;
+import org.apache.flink.table.connector.source.abilities.SupportsDynamicFiltering;
 import org.apache.flink.table.connector.source.abilities.SupportsLimitPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsPartitionPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsProjectionPushDown;
@@ -61,6 +61,7 @@ import org.apache.thrift.TException;
 import javax.annotation.Nullable;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -78,7 +79,7 @@ public class HiveTableSource
                 SupportsPartitionPushDown,
                 SupportsProjectionPushDown,
                 SupportsLimitPushDown,
-                SupportsDynamicPartitionPruning {
+                SupportsDynamicFiltering {
 
     private static final String HIVE_TRANSFORMATION = "hive";
 
@@ -239,14 +240,20 @@ public class HiveTableSource
     }
 
     @Override
-    public void applyDynamicPartitionPruning(List<String> dynamicPartitionKeys) {
+    public List<String> applyDynamicFiltering(List<String> candidateFilterFields) {
         checkArgument(remainingPartitions == null);
         if (catalogTable.getPartitionKeys() != null
                 && catalogTable.getPartitionKeys().size() != 0) {
-            checkArgument(!dynamicPartitionKeys.isEmpty());
-            checkArgument(catalogTable.getPartitionKeys().containsAll(dynamicPartitionKeys));
-
-            this.dynamicPartitionKeys = dynamicPartitionKeys;
+            checkArgument(!candidateFilterFields.isEmpty());
+            List<String> acceptedPartitionFields = new ArrayList<>();
+            for (String field : candidateFilterFields) {
+                if (catalogTable.getPartitionKeys().contains(field)) {
+                    acceptedPartitionFields.add(field);
+                }
+            }
+            // only accept partition field to do dynamic partition pruning
+            this.dynamicPartitionKeys = acceptedPartitionFields;
+            return acceptedPartitionFields;
         } else {
             throw new UnsupportedOperationException(
                     "Should not apply dynamic partitions to a non-partitioned table.");

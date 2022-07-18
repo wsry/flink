@@ -19,13 +19,13 @@
 package org.apache.flink.connector.file.src.enumerate;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.table.connector.source.PartitionData;
+import org.apache.flink.table.connector.source.DynamicFilteringData;
 
 /** DynamicFileEnumerator. */
 @PublicEvolving
 public interface DynamicFileEnumerator extends FileEnumerator {
 
-    void setPartitionData(PartitionData partitionData);
+    void setDynamicFilteringData(DynamicFilteringData data);
 
     /** Provider for DynamicFileEnumerator. */
     @FunctionalInterface

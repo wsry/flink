@@ -23,22 +23,26 @@ import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.InputFormatSourceFunction;
+import org.apache.flink.streaming.api.transformations.MultipleInputTransformation;
 import org.apache.flink.streaming.api.transformations.SourceTransformation;
+import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.planner.delegation.PlannerBase;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNode;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeConfig;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeContext;
+import org.apache.flink.table.planner.plan.nodes.exec.InputProperty;
 import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecTableSourceScan;
 import org.apache.flink.table.planner.plan.nodes.exec.spec.DynamicTableSourceSpec;
 import org.apache.flink.table.planner.plan.nodes.exec.utils.ExecNodeUtil;
+import org.apache.flink.table.runtime.operators.dpp.DppFilterOperatorFactory;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.util.Preconditions;
 
-import javax.annotation.Nullable;
-
-import java.util.concurrent.CompletableFuture;
+import java.util.Collections;
+import java.util.UUID;
 
 /**
  * Batch {@link ExecNode} to read data from an external source defined by a bounded {@link
@@ -47,10 +51,23 @@ import java.util.concurrent.CompletableFuture;
 public class BatchExecTableSourceScan extends CommonExecTableSourceScan
         implements BatchExecNode<RowData> {
 
-    private final BatchExecDynamicPartitionCollector dppCollector;
+    public BatchExecTableSourceScan(
+            ReadableConfig tableConfig,
+            DynamicTableSourceSpec tableSourceSpec,
+            InputProperty inputProperty,
+            RowType outputType,
+            String description) {
+        super(
+                ExecNodeContext.newNodeId(),
+                ExecNodeContext.newContext(BatchExecTableSourceScan.class),
+                ExecNodeContext.newPersistedConfig(BatchExecTableSourceScan.class, tableConfig),
+                tableSourceSpec,
+                Collections.singletonList(inputProperty),
+                outputType,
+                description);
+    }
 
     public BatchExecTableSourceScan(
-            @Nullable BatchExecDynamicPartitionCollector dppCollector,
             ReadableConfig tableConfig,
             DynamicTableSourceSpec tableSourceSpec,
             RowType outputType,
@@ -60,9 +77,9 @@ public class BatchExecTableSourceScan extends CommonExecTableSourceScan
                 ExecNodeContext.newContext(BatchExecTableSourceScan.class),
                 ExecNodeContext.newPersistedConfig(BatchExecTableSourceScan.class, tableConfig),
                 tableSourceSpec,
+                Collections.emptyList(),
                 outputType,
                 description);
-        this.dppCollector = dppCollector;
     }
 
     @Override
@@ -74,16 +91,39 @@ public class BatchExecTableSourceScan extends CommonExecTableSourceScan
         // declare all legacy transformations as bounded to make the stream graph generator happy
         ExecNodeUtil.makeLegacySourceTransformationsBounded(transformation);
 
-        if (transformation instanceof SourceTransformation && dppCollector != null) {
-            // TODO hack solution now, will introduce a new FLIP to solve it
-            CompletableFuture<byte[]> sourceOperatorIdFuture =
-                    ((SourceTransformation<?, ?, ?>) transformation)
-                            .getSource()
-                            .getOperatorIdFuture();
-            dppCollector.setSourceOperatorIdFuture(sourceOperatorIdFuture);
+        if (getInputEdges().isEmpty()) {
+            return transformation;
+        }
+
+        // handle dynamic filtering
+        Preconditions.checkArgument(getInputEdges().size() == 1);
+        if (!(getInputEdges().get(0).getSource()
+                instanceof BatchExecDynamicFilteringDataCollector)) {
+            throw new TableException(
+                    "The source input must be BatchExecDynamicFilteringCollector now");
+        }
+        BatchExecDynamicFilteringDataCollector dppCollector =
+                (BatchExecDynamicFilteringDataCollector) getInputEdges().get(0).getSource();
+        if (transformation instanceof SourceTransformation) {
+            String dynamicFilteringDataListenerID = UUID.randomUUID().toString();
+            ((SourceTransformation<?, ?, ?>) transformation)
+                    .setCoordinatorListeningID(dynamicFilteringDataListenerID);
+            dppCollector.registerDynamicFilteringDataListenerID(
+                    String.valueOf(transformation.getId()));
+
             Transformation<Object> dppTransformation =
                     dppCollector.translateToPlanInternal(planner, config);
-            planner.addExtraTransformation(dppTransformation);
+
+            MultipleInputTransformation<RowData> multipleInputTransformation =
+                    new MultipleInputTransformation<>(
+                            "Placeholder-Filter",
+                            new DppFilterOperatorFactory(),
+                            transformation.getOutputType(),
+                            transformation.getParallelism());
+            multipleInputTransformation.addInput(dppTransformation);
+            multipleInputTransformation.addInput(transformation);
+
+            return multipleInputTransformation;
         }
         return transformation;
     }
