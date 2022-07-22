@@ -37,6 +37,8 @@ public class DynamicFilteringDataCollectorOperatorCoordinator
     private final CoordinatorStore coordinatorStore;
     private final List<String> dynamicFilteringDataListenerIDs;
 
+    private boolean hasReceivedFilteringData;
+
     public DynamicFilteringDataCollectorOperatorCoordinator(
             Context context, List<String> dynamicFilteringDataListenerIDs) {
         this.coordinatorStore = context.getCoordinatorStore();
@@ -50,15 +52,24 @@ public class DynamicFilteringDataCollectorOperatorCoordinator
     public void close() throws Exception {}
 
     @Override
-    public void handleEventFromOperator(int subtask, OperatorEvent event) throws Exception {
+    public void handleEventFromOperator(int subtask, int attemptNumber, OperatorEvent event)
+            throws Exception {
+        // Since there might be speculative execution, once the dynamic filter collectors operator
+        // has been executed for multiple attempts, we only keep the first notification.
+        if (hasReceivedFilteringData) {
+            return;
+        }
+
         for (String listenerID : dynamicFilteringDataListenerIDs) {
             // push event
             OperatorCoordinator listener = (OperatorCoordinator) coordinatorStore.get(listenerID);
             if (listener == null) {
                 throw new IllegalStateException("Dynamic filtering data listener missing");
             }
-            listener.handleEventFromOperator(0, event);
+            listener.handleEventFromOperator(0, attemptNumber, event);
         }
+
+        hasReceivedFilteringData = true;
     }
 
     @Override
@@ -68,19 +79,16 @@ public class DynamicFilteringDataCollectorOperatorCoordinator
     }
 
     @Override
-    public void subtaskFailed(int subtask, @Nullable Throwable reason) {
-        // subtask failed, the socket server does not exist anymore
-    }
-
-    @Override
     public void subtaskReset(int subtask, long checkpointId) {
         // nothing to do here, connections are re-created lazily
     }
 
     @Override
-    public void subtaskReady(int subtask, SubtaskGateway gateway) {
-        // nothing to do here, connections are re-created lazily
-    }
+    public void executionAttemptFailed(
+            int subtask, int attemptNumber, @Nullable Throwable reason) {}
+
+    @Override
+    public void executionAttemptReady(int subtask, int attemptNumber, SubtaskGateway gateway) {}
 
     @Override
     public void checkpointCoordinator(long checkpointId, CompletableFuture<byte[]> result)
