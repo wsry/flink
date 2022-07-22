@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.runtime.operators.dpp;
+package org.apache.flink.table.runtime.operators.dyamicfiltering;
 
 import org.apache.flink.streaming.api.operators.AbstractStreamOperatorV2;
 import org.apache.flink.streaming.api.operators.Input;
 import org.apache.flink.streaming.api.operators.MultipleInputStreamOperator;
+import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
@@ -31,20 +32,27 @@ import org.apache.flink.table.data.RowData;
 import java.util.Arrays;
 import java.util.List;
 
-/** This is the filter operator right. */
-public class DppFilterOperator extends AbstractStreamOperatorV2<RowData>
+/** This is the placeholder operator right. */
+public class DynamicFilteringPlaceholderOperator extends AbstractStreamOperatorV2<RowData>
         implements MultipleInputStreamOperator<RowData> {
 
-    public DppFilterOperator(StreamOperatorParameters<RowData> parameters, int numberOfInputs) {
-        super(parameters, numberOfInputs);
+    public DynamicFilteringPlaceholderOperator(StreamOperatorParameters<RowData> parameters) {
+        super(parameters, 2);
     }
 
     @Override
     public List<Input> getInputs() {
-        return Arrays.asList(new DppOperatorInput(), new FactInput());
+        return Arrays.asList(
+                new DynamicFilteringDataCollectorInput(), new FactTableSourceInput(output));
     }
 
-    public class FactInput implements Input<RowData> {
+    /** FactTableSourceInput. */
+    public static class FactTableSourceInput implements Input<RowData> {
+        private final Output<StreamRecord<RowData>> output;;
+
+        public FactTableSourceInput(Output<StreamRecord<RowData>> output) {
+            this.output = output;
+        }
 
         @Override
         public void processElement(StreamRecord<RowData> element) throws Exception {
@@ -67,12 +75,11 @@ public class DppFilterOperator extends AbstractStreamOperatorV2<RowData>
         }
 
         @Override
-        public void setKeyContextElement(StreamRecord<RowData> record) throws Exception {
-
-        }
+        public void setKeyContextElement(StreamRecord<RowData> record) throws Exception {}
     }
 
-    public class DppOperatorInput implements Input<Object> {
+    /** DynamicFilteringDataCollectorInput. */
+    public static class DynamicFilteringDataCollectorInput implements Input<Object> {
 
         @Override
         public void processElement(StreamRecord<Object> element) throws Exception {}

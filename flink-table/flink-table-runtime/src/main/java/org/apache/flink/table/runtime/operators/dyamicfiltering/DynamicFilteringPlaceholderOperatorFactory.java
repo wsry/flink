@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.runtime.operators.dpp;
+package org.apache.flink.table.runtime.operators.dyamicfiltering;
 
 import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
@@ -24,12 +24,13 @@ import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.table.data.RowData;
 
-public class DppFilterOperatorFactory extends AbstractStreamOperatorFactory<RowData> {
+public class DynamicFilteringPlaceholderOperatorFactory
+        extends AbstractStreamOperatorFactory<RowData> {
 
     @Override
     public <T extends StreamOperator<RowData>> T createStreamOperator(
             StreamOperatorParameters<RowData> parameters) {
-        return (T) new DppFilterOperator(parameters, 2);
+        return (T) new DynamicFilteringPlaceholderOperator(parameters);
     }
 
     @Override
@@ -39,6 +40,6 @@ public class DppFilterOperatorFactory extends AbstractStreamOperatorFactory<RowD
 
     @Override
     public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
-        return DppFilterOperator.class;
+        return DynamicFilteringPlaceholderOperator.class;
     }
 }

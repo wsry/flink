@@ -217,7 +217,9 @@ public class SourceCoordinator<SplitT extends SourceSplit, EnumChkT>
         // the other methods are invoked after the enumerator has started.
         runInEventLoop(() -> enumerator.start(), "starting the SplitEnumerator.");
 
-        coordinatorStore.putIfAbsent(coordinatorListeningID, this);
+        if (coordinatorListeningID != null) {
+            coordinatorStore.putIfAbsent(coordinatorListeningID, this);
+        }
     }
 
     @Override

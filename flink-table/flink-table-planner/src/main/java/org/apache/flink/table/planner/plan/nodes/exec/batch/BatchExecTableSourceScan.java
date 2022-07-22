@@ -36,7 +36,7 @@ import org.apache.flink.table.planner.plan.nodes.exec.InputProperty;
 import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecTableSourceScan;
 import org.apache.flink.table.planner.plan.nodes.exec.spec.DynamicTableSourceSpec;
 import org.apache.flink.table.planner.plan.nodes.exec.utils.ExecNodeUtil;
-import org.apache.flink.table.runtime.operators.dpp.DppFilterOperatorFactory;
+import org.apache.flink.table.runtime.operators.dyamicfiltering.DynamicFilteringPlaceholderOperatorFactory;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Preconditions;
@@ -102,25 +102,25 @@ public class BatchExecTableSourceScan extends CommonExecTableSourceScan
             throw new TableException(
                     "The source input must be BatchExecDynamicFilteringCollector now");
         }
-        BatchExecDynamicFilteringDataCollector dppCollector =
+        BatchExecDynamicFilteringDataCollector dynamicFilteringDataCollector =
                 (BatchExecDynamicFilteringDataCollector) getInputEdges().get(0).getSource();
         if (transformation instanceof SourceTransformation) {
             String dynamicFilteringDataListenerID = UUID.randomUUID().toString();
             ((SourceTransformation<?, ?, ?>) transformation)
                     .setCoordinatorListeningID(dynamicFilteringDataListenerID);
-            dppCollector.registerDynamicFilteringDataListenerID(
-                    String.valueOf(transformation.getId()));
+            dynamicFilteringDataCollector.registerDynamicFilteringDataListenerID(
+                    dynamicFilteringDataListenerID);
 
-            Transformation<Object> dppTransformation =
-                    dppCollector.translateToPlanInternal(planner, config);
+            Transformation<Object> dynamicFilteringTransform =
+                    dynamicFilteringDataCollector.translateToPlanInternal(planner, config);
 
             MultipleInputTransformation<RowData> multipleInputTransformation =
                     new MultipleInputTransformation<>(
                             "Placeholder-Filter",
-                            new DppFilterOperatorFactory(),
+                            new DynamicFilteringPlaceholderOperatorFactory(),
                             transformation.getOutputType(),
                             transformation.getParallelism());
-            multipleInputTransformation.addInput(dppTransformation);
+            multipleInputTransformation.addInput(dynamicFilteringTransform);
             multipleInputTransformation.addInput(transformation);
 
             return multipleInputTransformation;

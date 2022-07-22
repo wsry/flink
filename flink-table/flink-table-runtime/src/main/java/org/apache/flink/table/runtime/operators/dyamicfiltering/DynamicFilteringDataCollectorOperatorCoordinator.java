@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.table.runtime.operators.dpp;
+package org.apache.flink.table.runtime.operators.dyamicfiltering;
 
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;

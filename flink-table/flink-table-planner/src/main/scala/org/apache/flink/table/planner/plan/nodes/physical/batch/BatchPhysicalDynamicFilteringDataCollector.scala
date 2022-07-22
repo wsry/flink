@@ -51,7 +51,7 @@ class BatchPhysicalDynamicFilteringDataCollector(
     super
       .explainTerms(pw)
       .item(
-        "dynamicFilteringFieldIndices",
+        "fields",
         dynamicFilteringFieldIndices
           .map(i => getInput.getRowType.getFieldNames.get(i))
           .mkString(","))
