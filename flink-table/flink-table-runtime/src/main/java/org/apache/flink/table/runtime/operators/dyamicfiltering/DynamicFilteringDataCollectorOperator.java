@@ -107,7 +107,7 @@ public class DynamicFilteringDataCollectorOperator extends AbstractStreamOperato
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputViewStreamWrapper wrapper = new DataOutputViewStreamWrapper(baos);
-        serializer.serialize(value, wrapper);
+        serializer.serialize(rowData, wrapper);
         boolean duplicated = !buffer.add(baos.toByteArray());
         if (duplicated) {
             return;
@@ -122,6 +122,7 @@ public class DynamicFilteringDataCollectorOperator extends AbstractStreamOperato
         return threshold > 0 && currentSize > threshold;
     }
 
+    @Override
     public void finish() throws Exception {
         sendEvent();
     }

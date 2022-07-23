@@ -245,8 +245,4 @@ public abstract class ExecNodeBase<T> implements ExecNode<T> {
         }
         return detailName;
     }
-
-    public void resetTransformation() {
-        this.transformation = null;
-    }
 }
