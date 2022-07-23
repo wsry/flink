@@ -98,6 +98,8 @@ public class BatchExecDynamicFilteringDataCollector extends ExecNodeBase<Object>
     }
 
     public void registerDynamicFilteringDataListenerID(String id) {
-        this.dynamicFilteringDataListenerIDs.add(id);
+        if (!this.dynamicFilteringDataListenerIDs.contains(id)) {
+            this.dynamicFilteringDataListenerIDs.add(id);
+        }
     }
 }

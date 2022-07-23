@@ -25,7 +25,6 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.InputFormatSourceFunction;
 import org.apache.flink.streaming.api.transformations.MultipleInputTransformation;
 import org.apache.flink.streaming.api.transformations.SourceTransformation;
-import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.planner.delegation.PlannerBase;
@@ -39,7 +38,6 @@ import org.apache.flink.table.planner.plan.nodes.exec.utils.ExecNodeUtil;
 import org.apache.flink.table.runtime.operators.dyamicfiltering.DynamicFilteringPlaceholderOperatorFactory;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.util.Preconditions;
 
 import java.util.Collections;
 import java.util.UUID;
@@ -50,6 +48,12 @@ import java.util.UUID;
  */
 public class BatchExecTableSourceScan extends CommonExecTableSourceScan
         implements BatchExecNode<RowData> {
+
+    // Avoids creates different ids if translated multiple times
+    private final String dynamicFilteringDataListenerID = UUID.randomUUID().toString();
+
+    private BatchExecDynamicFilteringDataCollector cachedDynamicFilteringDataCollector;
+    private boolean needDynamicFilteringDependency;
 
     public BatchExecTableSourceScan(
             ReadableConfig tableConfig,
@@ -82,6 +86,23 @@ public class BatchExecTableSourceScan extends CommonExecTableSourceScan
                 description);
     }
 
+    public void setCachedDynamicFilteringDataCollector(
+            BatchExecDynamicFilteringDataCollector cachedDynamicFilteringDataCollector) {
+        this.cachedDynamicFilteringDataCollector = cachedDynamicFilteringDataCollector;
+    }
+
+    public BatchExecDynamicFilteringDataCollector getCachedDynamicFilteringDataCollector() {
+        return cachedDynamicFilteringDataCollector;
+    }
+
+    public boolean isNeedDynamicFilteringDependency() {
+        return needDynamicFilteringDependency;
+    }
+
+    public void setNeedDynamicFilteringDependency(boolean needDynamicFilteringDependency) {
+        this.needDynamicFilteringDependency = needDynamicFilteringDependency;
+    }
+
     @Override
     protected Transformation<RowData> translateToPlanInternal(
             PlannerBase planner, ExecNodeConfig config) {
@@ -91,29 +112,22 @@ public class BatchExecTableSourceScan extends CommonExecTableSourceScan
         // declare all legacy transformations as bounded to make the stream graph generator happy
         ExecNodeUtil.makeLegacySourceTransformationsBounded(transformation);
 
-        if (getInputEdges().isEmpty()) {
+        // case 1. no dpp applied
+        if (cachedDynamicFilteringDataCollector == null
+                || !(transformation instanceof SourceTransformation)) {
             return transformation;
         }
 
-        // handle dynamic filtering
-        Preconditions.checkArgument(getInputEdges().size() == 1);
-        if (!(getInputEdges().get(0).getSource()
-                instanceof BatchExecDynamicFilteringDataCollector)) {
-            throw new TableException(
-                    "The source input must be BatchExecDynamicFilteringCollector now");
-        }
-        BatchExecDynamicFilteringDataCollector dynamicFilteringDataCollector =
-                (BatchExecDynamicFilteringDataCollector) getInputEdges().get(0).getSource();
-        if (transformation instanceof SourceTransformation) {
-            String dynamicFilteringDataListenerID = UUID.randomUUID().toString();
-            ((SourceTransformation<?, ?, ?>) transformation)
-                    .setCoordinatorListeningID(dynamicFilteringDataListenerID);
-            dynamicFilteringDataCollector.registerDynamicFilteringDataListenerID(
-                    dynamicFilteringDataListenerID);
-
-            Transformation<Object> dynamicFilteringTransform =
-                    dynamicFilteringDataCollector.translateToPlanInternal(planner, config);
-
+        ((SourceTransformation<?, ?, ?>) transformation)
+                .setCoordinatorListeningID(dynamicFilteringDataListenerID);
+        cachedDynamicFilteringDataCollector.registerDynamicFilteringDataListenerID(
+                dynamicFilteringDataListenerID);
+        Transformation<Object> dynamicFilteringTransform =
+                cachedDynamicFilteringDataCollector.translateToPlanInternal(planner, config);
+        if (!needDynamicFilteringDependency) {
+            planner.addExtraTransformation(dynamicFilteringTransform);
+            return transformation;
+        } else {
             MultipleInputTransformation<RowData> multipleInputTransformation =
                     new MultipleInputTransformation<>(
                             "Placeholder-Filter",
@@ -125,7 +139,6 @@ public class BatchExecTableSourceScan extends CommonExecTableSourceScan
 
             return multipleInputTransformation;
         }
-        return transformation;
     }
 
     @Override

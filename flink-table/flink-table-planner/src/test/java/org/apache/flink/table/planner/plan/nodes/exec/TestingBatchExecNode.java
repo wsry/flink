@@ -91,6 +91,12 @@ public class TestingBatchExecNode implements BatchExecNode<RowData> {
     }
 
     @Override
+    public void setInputProperties(List<InputProperty> inputProperties) {
+        this.inputProperties.clear();
+        this.inputProperties.addAll(inputProperties);
+    }
+
+    @Override
     public void replaceInputEdge(int index, ExecEdge newInputEdge) {
         checkArgument(index >= 0 && index < inputEdges.size());
         inputEdges.set(index, newInputEdge);

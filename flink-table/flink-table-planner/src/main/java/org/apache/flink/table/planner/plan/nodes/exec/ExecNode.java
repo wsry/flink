@@ -102,6 +102,9 @@ public interface ExecNode<T> extends ExecNodeTranslator<T> {
     @JsonIgnore
     void setInputEdges(List<ExecEdge> inputEdges);
 
+    @JsonIgnore
+    void setInputProperties(List<InputProperty> inputProperties);
+
     /**
      * Replaces the <code>ordinalInParent</code><sup>th</sup> input edge.
      *

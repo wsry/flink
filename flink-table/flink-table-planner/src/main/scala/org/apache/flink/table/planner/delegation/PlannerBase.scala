@@ -103,6 +103,8 @@ abstract class PlannerBase(
   private var parser: Parser = _
   private var currentDialect: SqlDialect = getTableConfig.getSqlDialect
 
+  private[flink] val extraTransformations = new util.ArrayList[Transformation[_]]()
+
   @VisibleForTesting
   private[flink] val plannerContext: PlannerContext =
     new PlannerContext(
@@ -164,6 +166,10 @@ abstract class PlannerBase(
       currentDialect = getTableConfig.getSqlDialect
     }
     parser
+  }
+
+  def addExtraTransformation(transformation: Transformation[_]): Unit = {
+    extraTransformations.add(transformation)
   }
 
   override def translate(
@@ -454,6 +460,8 @@ abstract class PlannerBase(
     if (defaultParallelism > 0) {
       getExecEnv.getConfig.setParallelism(defaultParallelism)
     }
+
+    extraTransformations.clear()
   }
 
   protected def afterTranslation(): Unit = {

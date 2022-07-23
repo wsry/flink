@@ -29,6 +29,7 @@ import org.apache.flink.table.operations.{ModifyOperation, Operation}
 import org.apache.flink.table.planner.plan.`trait`.FlinkRelDistributionTraitDef
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNodeGraph
 import org.apache.flink.table.planner.plan.nodes.exec.batch.BatchExecNode
+import org.apache.flink.table.planner.plan.nodes.exec.processor._
 import org.apache.flink.table.planner.plan.nodes.exec.processor.{DeadlockBreakupProcessor, ExecNodeGraphProcessor, ForwardHashExchangeProcessor, MultipleInputNodeCreationProcessor}
 import org.apache.flink.table.planner.plan.nodes.exec.utils.ExecNodePlanDumper
 import org.apache.flink.table.planner.plan.optimize.{BatchCommonSubGraphBasedOptimizer, Optimizer}
@@ -70,6 +71,9 @@ class BatchPlanner(
 
   override protected def getExecNodeGraphProcessors: Seq[ExecNodeGraphProcessor] = {
     val processors = new util.ArrayList[ExecNodeGraphProcessor]()
+    if (getTableConfig.get(OptimizerConfigOptions.TABLE_OPTIMIZER_DYNAMIC_FILTERING_ENABLED)) {
+      processors.add(new ResetDppDependencyProcessor())
+    }
     // deadlock breakup
     processors.add(new DeadlockBreakupProcessor())
     // multiple input creation
@@ -77,6 +81,10 @@ class BatchPlanner(
       processors.add(new MultipleInputNodeCreationProcessor(false))
     }
     processors.add(new ForwardHashExchangeProcessor)
+    if (getTableConfig.get(OptimizerConfigOptions.TABLE_OPTIMIZER_DYNAMIC_FILTERING_ENABLED)) {
+      processors.add(new DppAddDependencyProcessor())
+    }
+
     processors
   }
 
@@ -92,7 +100,7 @@ class BatchPlanner(
             "This is a bug and should not happen. Please file an issue.")
     }
     afterTranslation()
-    transformations
+    planner.extraTransformations ++ transformations
   }
 
   override def explain(operations: util.List[Operation], extraDetails: ExplainDetail*): String = {

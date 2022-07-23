@@ -60,6 +60,7 @@ public class DynamicFilteringDataCollectorOperatorCoordinator
             return;
         }
 
+        System.out.println("dynamicFilteringDataListenerIDs: " + dynamicFilteringDataListenerIDs);
         for (String listenerID : dynamicFilteringDataListenerIDs) {
             // push event
             OperatorCoordinator listener = (OperatorCoordinator) coordinatorStore.get(listenerID);
