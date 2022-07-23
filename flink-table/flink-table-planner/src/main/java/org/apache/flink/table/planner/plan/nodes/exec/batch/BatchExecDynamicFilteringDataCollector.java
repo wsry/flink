@@ -54,7 +54,6 @@ public class BatchExecDynamicFilteringDataCollector extends ExecNodeBase<Object>
                     .defaultValue(MemorySize.parse("32 mb"));
 
     private final List<Integer> dynamicFilteringFieldIndices;
-    private final List<String> dynamicFilteringDataListenerIDs;
 
     public BatchExecDynamicFilteringDataCollector(
             List<Integer> dynamicFilteringFieldIndices,
@@ -71,7 +70,6 @@ public class BatchExecDynamicFilteringDataCollector extends ExecNodeBase<Object>
                 description);
         this.dynamicFilteringFieldIndices = dynamicFilteringFieldIndices;
         checkArgument(outputType.getFieldCount() == dynamicFilteringFieldIndices.size());
-        this.dynamicFilteringDataListenerIDs = new ArrayList<>();
     }
 
     @Override
@@ -83,7 +81,6 @@ public class BatchExecDynamicFilteringDataCollector extends ExecNodeBase<Object>
                 (Transformation<RowData>) inputEdge.translateToPlan(planner);
         StreamOperatorFactory<Object> factory =
                 new DynamicFilteringDataCollectorFactory(
-                        dynamicFilteringDataListenerIDs,
                         (RowType) getOutputType(),
                         dynamicFilteringFieldIndices,
                         config.get(TABLE_EXEC_DYNAMIC_FILTERING_THRESHOLD).getBytes());
@@ -95,11 +92,5 @@ public class BatchExecDynamicFilteringDataCollector extends ExecNodeBase<Object>
                 factory,
                 InternalTypeInfo.of(getOutputType()),
                 1); // parallelism should always be 1
-    }
-
-    public void registerDynamicFilteringDataListenerID(String id) {
-        if (!this.dynamicFilteringDataListenerIDs.contains(id)) {
-            this.dynamicFilteringDataListenerIDs.add(id);
-        }
     }
 }

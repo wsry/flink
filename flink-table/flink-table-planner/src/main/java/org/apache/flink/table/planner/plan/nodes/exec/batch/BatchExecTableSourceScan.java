@@ -24,6 +24,7 @@ import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.InputFormatSourceFunction;
 import org.apache.flink.streaming.api.transformations.MultipleInputTransformation;
+import org.apache.flink.streaming.api.transformations.OneInputTransformation;
 import org.apache.flink.streaming.api.transformations.SourceTransformation;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.data.RowData;
@@ -35,6 +36,7 @@ import org.apache.flink.table.planner.plan.nodes.exec.InputProperty;
 import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecTableSourceScan;
 import org.apache.flink.table.planner.plan.nodes.exec.spec.DynamicTableSourceSpec;
 import org.apache.flink.table.planner.plan.nodes.exec.utils.ExecNodeUtil;
+import org.apache.flink.table.runtime.operators.dyamicfiltering.DynamicFilteringDataCollectorFactory;
 import org.apache.flink.table.runtime.operators.dyamicfiltering.DynamicFilteringPlaceholderOperatorFactory;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
@@ -120,10 +122,15 @@ public class BatchExecTableSourceScan extends CommonExecTableSourceScan
 
         ((SourceTransformation<?, ?, ?>) transformation)
                 .setCoordinatorListeningID(dynamicFilteringDataListenerID);
-        cachedDynamicFilteringDataCollector.registerDynamicFilteringDataListenerID(
-                dynamicFilteringDataListenerID);
+
+        // Must use translateToPlan to avoid duplication dynamic filters.
         Transformation<Object> dynamicFilteringTransform =
-                cachedDynamicFilteringDataCollector.translateToPlanInternal(planner, config);
+                cachedDynamicFilteringDataCollector.translateToPlan(planner);
+        ((DynamicFilteringDataCollectorFactory)
+                        ((OneInputTransformation<?, ?>) dynamicFilteringTransform)
+                                .getOperatorFactory())
+                .registerDynamicFilteringDataListenerID(dynamicFilteringDataListenerID);
+
         if (!needDynamicFilteringDependency) {
             planner.addExtraTransformation(dynamicFilteringTransform);
             return transformation;

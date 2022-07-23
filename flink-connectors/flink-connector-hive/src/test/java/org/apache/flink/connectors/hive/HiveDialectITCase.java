@@ -597,12 +597,33 @@ public class HiveDialectITCase {
         tableEnv.getConfig().set(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 1);
         tableEnv.getConfig().set(HiveOptions.TABLE_EXEC_HIVE_INFER_SOURCE_PARALLELISM, false);
 
-        List<Row> results =
+        List<Row> results;
+        System.out.println(
+                tableEnv.explainSql(
+                        "(select a, b, c, p, x, y from fact, dim where x = p and z = 1 order by a) "
+                                + "union all "
+                                + "(select a, b, c, p, x, y from fact2, dim where x = p and z = 2 order by a)"));
+
+        results =
                 queryResult(
                         tableEnv.sqlQuery(
-                                "(select a, b, c, p, x, y from fact, dim where x = p and z = 1 order by a) " +
-                                    "union all " +
-                                    "(select a, b, c, p, x, y from fact2, dim where x = p and z = 2 order by a)"));
+                                "(select a, b, c, p, x, y from fact, dim where x = p and z = 1 order by a) "
+                                        + "union all "
+                                        + "(select a, b, c, p, x, y from fact2, dim where x = p and z = 2 order by a)"));
+        System.out.println(results);
+
+        System.out.println(
+                tableEnv.explainSql(
+                        "(select a, b, c, p, x, y from fact, dim where x = p and z = 1 order by a) "
+                                + "union all "
+                                + "(select a, b, c, p, x, y from fact2, dim where x = p and z = 1 order by a)"));
+
+        results =
+                queryResult(
+                        tableEnv.sqlQuery(
+                                "(select a, b, c, p, x, y from fact, dim where x = p and z = 1 order by a) "
+                                        + "union all "
+                                        + "(select a, b, c, p, x, y from fact2, dim where x = p and z = 1 order by a)"));
         System.out.println(results);
     }
 

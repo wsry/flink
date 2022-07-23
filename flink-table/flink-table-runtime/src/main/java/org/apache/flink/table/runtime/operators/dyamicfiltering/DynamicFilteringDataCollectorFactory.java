@@ -28,23 +28,22 @@ import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.table.types.logical.RowType;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /** DynamicFilteringDataCollectorFactory. */
 public class DynamicFilteringDataCollectorFactory extends AbstractStreamOperatorFactory<Object>
         implements CoordinatedOperatorFactory<Object> {
 
-    private final List<String> dynamicFilteringDataListenerIDs;
+    private final List<String> dynamicFilteringDataListenerIDs = new ArrayList<>();
     private final RowType dynamicFilteringFieldType;
     private final List<Integer> dynamicFilteringFieldIndices;
     private final long threshold;
 
     public DynamicFilteringDataCollectorFactory(
-            List<String> dynamicFilteringDataListenerIDs,
             RowType dynamicFilteringFieldType,
             List<Integer> dynamicFilteringFieldIndices,
             long threshold) {
-        this.dynamicFilteringDataListenerIDs = dynamicFilteringDataListenerIDs;
         this.dynamicFilteringFieldType = dynamicFilteringFieldType;
         this.dynamicFilteringFieldIndices = dynamicFilteringFieldIndices;
         this.threshold = threshold;
@@ -75,6 +74,12 @@ public class DynamicFilteringDataCollectorFactory extends AbstractStreamOperator
         final T castedOperator = (T) operator;
 
         return castedOperator;
+    }
+
+    public void registerDynamicFilteringDataListenerID(String id) {
+        if (!this.dynamicFilteringDataListenerIDs.contains(id)) {
+            this.dynamicFilteringDataListenerIDs.add(id);
+        }
     }
 
     @SuppressWarnings("rawtypes")
