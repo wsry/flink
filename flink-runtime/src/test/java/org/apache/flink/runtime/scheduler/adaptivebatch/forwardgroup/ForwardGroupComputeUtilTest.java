@@ -99,14 +99,14 @@ public class ForwardGroupComputeUtilTest extends TestLogger {
         v2.connectNewDataSetAsInput(
                 v1, DistributionPattern.ALL_TO_ALL, ResultPartitionType.BLOCKING);
         if (isForward1) {
-            v1.getProducedDataSets().get(0).getConsumer().setForward(true);
+            v1.getProducedDataSets().get(0).getConsumers().get(0).setForward(true);
         }
 
         v3.connectNewDataSetAsInput(
                 v2, DistributionPattern.POINTWISE, ResultPartitionType.BLOCKING);
 
         if (isForward2) {
-            v2.getProducedDataSets().get(0).getConsumer().setForward(true);
+            v2.getProducedDataSets().get(0).getConsumers().get(0).setForward(true);
         }
 
         Set<ForwardGroup> groups = computeForwardGroups(v1, v2, v3);
@@ -137,10 +137,10 @@ public class ForwardGroupComputeUtilTest extends TestLogger {
 
         v3.connectNewDataSetAsInput(
                 v1, DistributionPattern.ALL_TO_ALL, ResultPartitionType.BLOCKING);
-        v1.getProducedDataSets().get(0).getConsumer().setForward(true);
+        v1.getProducedDataSets().get(0).getConsumers().get(0).setForward(true);
         v3.connectNewDataSetAsInput(
                 v2, DistributionPattern.POINTWISE, ResultPartitionType.BLOCKING);
-        v2.getProducedDataSets().get(0).getConsumer().setForward(true);
+        v2.getProducedDataSets().get(0).getConsumers().get(0).setForward(true);
         v4.connectNewDataSetAsInput(
                 v3, DistributionPattern.ALL_TO_ALL, ResultPartitionType.BLOCKING);
 
@@ -176,8 +176,8 @@ public class ForwardGroupComputeUtilTest extends TestLogger {
                 v2, DistributionPattern.POINTWISE, ResultPartitionType.BLOCKING);
         v4.connectNewDataSetAsInput(
                 v2, DistributionPattern.POINTWISE, ResultPartitionType.BLOCKING);
-        v2.getProducedDataSets().get(0).getConsumer().setForward(true);
-        v2.getProducedDataSets().get(1).getConsumer().setForward(true);
+        v2.getProducedDataSets().get(0).getConsumers().get(0).setForward(true);
+        v2.getProducedDataSets().get(1).getConsumers().get(0).setForward(true);
 
         Set<ForwardGroup> groups = computeForwardGroups(v1, v2, v3, v4);
 

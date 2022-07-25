@@ -31,12 +31,19 @@ import org.apache.flink.runtime.testtasks.NoOpInvokable;
 import org.apache.flink.testutils.TestingUtils;
 import org.apache.flink.testutils.executor.TestExecutorResource;
 
+import org.assertj.core.api.Assertions;
 import org.junit.ClassRule;
 import org.junit.Test;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
 
+import static org.apache.flink.runtime.jobgraph.DistributionPattern.ALL_TO_ALL;
+import static org.apache.flink.runtime.jobgraph.DistributionPattern.POINTWISE;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link EdgeManager}. */
@@ -50,23 +57,7 @@ public class EdgeManagerTest {
     public void testGetConsumedPartitionGroup() throws Exception {
         JobVertex v1 = new JobVertex("source");
         JobVertex v2 = new JobVertex("sink");
-
-        v1.setParallelism(2);
-        v2.setParallelism(2);
-
-        v1.setInvokableClass(NoOpInvokable.class);
-        v2.setInvokableClass(NoOpInvokable.class);
-
-        v2.connectNewDataSetAsInput(
-                v1, DistributionPattern.ALL_TO_ALL, ResultPartitionType.BLOCKING);
-
-        JobGraph jobGraph = JobGraphTestUtils.batchJobGraph(v1, v2);
-        SchedulerBase scheduler =
-                SchedulerTestingUtils.createScheduler(
-                        jobGraph,
-                        ComponentMainThreadExecutorServiceAdapter.forMainThread(),
-                        EXECUTOR_RESOURCE.getExecutor());
-        ExecutionGraph eg = scheduler.getExecutionGraph();
+        ExecutionGraph eg = buildExecutionGraph(v1, v2, 2, 2, ALL_TO_ALL);
 
         ConsumedPartitionGroup groupRetrievedByDownstreamVertex =
                 Objects.requireNonNull(eg.getJobVertex(v2.getID()))
@@ -85,13 +76,72 @@ public class EdgeManagerTest {
         assertEquals(groupRetrievedByDownstreamVertex, groupRetrievedByIntermediateResultPartition);
 
         ConsumedPartitionGroup groupRetrievedByScheduledResultPartition =
-                scheduler
-                        .getExecutionGraph()
-                        .getSchedulingTopology()
+                eg.getSchedulingTopology()
                         .getResultPartition(consumedPartition.getPartitionId())
                         .getConsumedPartitionGroups()
                         .get(0);
 
         assertEquals(groupRetrievedByDownstreamVertex, groupRetrievedByScheduledResultPartition);
+    }
+
+    @Test
+    public void testCalculateNumberOfConsumers() throws Exception {
+        testCalculateNumberOfConsumers(5, 2, ALL_TO_ALL, new int[] {2, 2});
+        testCalculateNumberOfConsumers(5, 2, POINTWISE, new int[] {1, 1});
+        testCalculateNumberOfConsumers(2, 5, ALL_TO_ALL, new int[] {5, 5, 5, 5, 5});
+        testCalculateNumberOfConsumers(2, 5, POINTWISE, new int[] {3, 3, 3, 2, 2});
+        testCalculateNumberOfConsumers(5, 5, ALL_TO_ALL, new int[] {5, 5, 5, 5, 5});
+        testCalculateNumberOfConsumers(5, 5, POINTWISE, new int[] {1, 1, 1, 1, 1});
+    }
+
+    private void testCalculateNumberOfConsumers(
+            int producerParallelism,
+            int consumerParallelism,
+            DistributionPattern distributionPattern,
+            int[] expectedConsumers)
+            throws Exception {
+        JobVertex producer = new JobVertex("producer");
+        JobVertex consumer = new JobVertex("consumer");
+        ExecutionGraph eg =
+                buildExecutionGraph(
+                        producer,
+                        consumer,
+                        producerParallelism,
+                        consumerParallelism,
+                        distributionPattern);
+        List<ConsumedPartitionGroup> partitionGroups =
+                Arrays.stream(checkNotNull(eg.getJobVertex(consumer.getID())).getTaskVertices())
+                        .flatMap(ev -> ev.getAllConsumedPartitionGroups().stream())
+                        .collect(Collectors.toList());
+        int index = 0;
+        for (ConsumedPartitionGroup partitionGroup : partitionGroups) {
+            Assertions.assertThat(partitionGroup.getNumConsumers())
+                    .isEqualTo(expectedConsumers[index++]);
+        }
+    }
+
+    private DefaultExecutionGraph buildExecutionGraph(
+            JobVertex producer,
+            JobVertex consumer,
+            int producerParallelism,
+            int consumerParallelism,
+            DistributionPattern distributionPattern)
+            throws Exception {
+        producer.setParallelism(producerParallelism);
+        consumer.setParallelism(consumerParallelism);
+
+        producer.setInvokableClass(NoOpInvokable.class);
+        consumer.setInvokableClass(NoOpInvokable.class);
+
+        consumer.connectNewDataSetAsInput(
+                producer, distributionPattern, ResultPartitionType.BLOCKING);
+
+        JobGraph jobGraph = JobGraphTestUtils.batchJobGraph(producer, consumer);
+        SchedulerBase scheduler =
+                SchedulerTestingUtils.createScheduler(
+                        jobGraph,
+                        ComponentMainThreadExecutorServiceAdapter.forMainThread(),
+                        EXECUTOR_RESOURCE.getExecutor());
+        return (DefaultExecutionGraph) scheduler.getExecutionGraph();
     }
 }

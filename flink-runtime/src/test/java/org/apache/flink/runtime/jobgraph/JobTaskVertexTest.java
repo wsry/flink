@@ -29,11 +29,13 @@ import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
 import org.apache.flink.runtime.operators.util.TaskConfig;
 import org.apache.flink.util.InstantiationUtil;
 
+import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -43,6 +45,45 @@ import static org.junit.Assert.fail;
 
 @SuppressWarnings("serial")
 public class JobTaskVertexTest {
+
+    @Test
+    public void testMultipleConsumersVertices() {
+        JobVertex producer = new JobVertex("producer");
+        JobVertex consumer1 = new JobVertex("consumer1");
+        JobVertex consumer2 = new JobVertex("consumer2");
+
+        IntermediateDataSetID dataSetId = new IntermediateDataSetID();
+        consumer1.connectNewDataSetAsInput(
+                producer,
+                DistributionPattern.ALL_TO_ALL,
+                ResultPartitionType.BLOCKING,
+                dataSetId,
+                false);
+        consumer2.connectNewDataSetAsInput(
+                producer,
+                DistributionPattern.ALL_TO_ALL,
+                ResultPartitionType.BLOCKING,
+                dataSetId,
+                false);
+
+        JobVertex consumer3 = new JobVertex("consumer3");
+        consumer3.connectNewDataSetAsInput(
+                producer, DistributionPattern.ALL_TO_ALL, ResultPartitionType.BLOCKING);
+
+        Assertions.assertThat(producer.getProducedDataSets().size()).isEqualTo(2);
+
+        IntermediateDataSet dataSet = producer.getProducedDataSets().get(0);
+        Assertions.assertThat(dataSet.getId()).isEqualTo(dataSetId);
+
+        List<JobEdge> consumers1 = dataSet.getConsumers();
+        Assertions.assertThat(consumers1.size()).isEqualTo(2);
+        Assertions.assertThat(consumers1.get(0).getTarget().getID()).isEqualTo(consumer1.getID());
+        Assertions.assertThat(consumers1.get(1).getTarget().getID()).isEqualTo(consumer2.getID());
+
+        List<JobEdge> consumers2 = producer.getProducedDataSets().get(1).getConsumers();
+        Assertions.assertThat(consumers2.size()).isEqualTo(1);
+        Assertions.assertThat(consumers2.get(0).getTarget().getID()).isEqualTo(consumer3.getID());
+    }
 
     @Test
     public void testConnectDirectly() {
@@ -61,7 +102,7 @@ public class JobTaskVertexTest {
 
         assertEquals(target.getInputs().get(0).getSource(), source.getProducedDataSets().get(0));
 
-        assertEquals(target, source.getProducedDataSets().get(0).getConsumer().getTarget());
+        assertEquals(target, source.getProducedDataSets().get(0).getConsumers().get(0).getTarget());
     }
 
     @Test

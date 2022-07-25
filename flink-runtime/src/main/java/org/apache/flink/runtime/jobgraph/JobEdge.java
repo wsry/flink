@@ -55,7 +55,7 @@ public class JobEdge implements java.io.Serializable {
      */
     private String shipStrategyName;
 
-    private boolean isBroadcast;
+    private final boolean isBroadcast;
 
     private boolean isForward;
 
@@ -74,9 +74,13 @@ public class JobEdge implements java.io.Serializable {
      * @param source The data set that is at the source of this edge.
      * @param target The operation that is at the target of this edge.
      * @param distributionPattern The pattern that defines how the connection behaves in parallel.
+     * @param isBroadcast Whether the source broadcasts data to the target.
      */
     public JobEdge(
-            IntermediateDataSet source, JobVertex target, DistributionPattern distributionPattern) {
+            IntermediateDataSet source,
+            JobVertex target,
+            DistributionPattern distributionPattern,
+            boolean isBroadcast) {
         if (source == null || target == null || distributionPattern == null) {
             throw new NullPointerException();
         }
@@ -84,26 +88,7 @@ public class JobEdge implements java.io.Serializable {
         this.distributionPattern = distributionPattern;
         this.source = source;
         this.sourceId = source.getId();
-    }
-
-    /**
-     * Constructs a new job edge that refers to an intermediate result via the Id, rather than
-     * directly through the intermediate data set structure.
-     *
-     * @param sourceId The id of the data set that is at the source of this edge.
-     * @param target The operation that is at the target of this edge.
-     * @param distributionPattern The pattern that defines how the connection behaves in parallel.
-     */
-    public JobEdge(
-            IntermediateDataSetID sourceId,
-            JobVertex target,
-            DistributionPattern distributionPattern) {
-        if (sourceId == null || target == null || distributionPattern == null) {
-            throw new NullPointerException();
-        }
-        this.target = target;
-        this.distributionPattern = distributionPattern;
-        this.sourceId = sourceId;
+        this.isBroadcast = isBroadcast;
     }
 
     /**
@@ -171,11 +156,6 @@ public class JobEdge implements java.io.Serializable {
     /** Gets whether the edge is broadcast edge. */
     public boolean isBroadcast() {
         return isBroadcast;
-    }
-
-    /** Sets whether the edge is broadcast edge. */
-    public void setBroadcast(boolean broadcast) {
-        isBroadcast = broadcast;
     }
 
     /** Gets whether the edge is forward edge. */

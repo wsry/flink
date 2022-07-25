@@ -19,29 +19,19 @@
 package org.apache.flink.runtime.executiongraph;
 
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.runtime.JobException;
-import org.apache.flink.runtime.blob.BlobWriter;
 import org.apache.flink.runtime.blob.TestingBlobWriter;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutorServiceAdapter;
 import org.apache.flink.runtime.concurrent.ManuallyTriggeredScheduledExecutorService;
 import org.apache.flink.runtime.deployment.TaskDeploymentDescriptor.MaybeOffloaded;
 import org.apache.flink.runtime.execution.ExecutionState;
-import org.apache.flink.runtime.executiongraph.failover.flip1.TestRestartBackoffTimeStrategy;
+import org.apache.flink.runtime.io.network.partition.NoOpJobMasterPartitionTracker;
 import org.apache.flink.runtime.io.network.partition.PartitionNotFoundException;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
-import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
 import org.apache.flink.runtime.jobgraph.DistributionPattern;
-import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.runtime.jobgraph.JobGraphBuilder;
 import org.apache.flink.runtime.jobgraph.JobVertex;
-import org.apache.flink.runtime.jobgraph.JobVertexID;
-import org.apache.flink.runtime.jobmaster.LogicalSlot;
-import org.apache.flink.runtime.jobmaster.TestingLogicalSlotBuilder;
-import org.apache.flink.runtime.scheduler.DefaultScheduler;
-import org.apache.flink.runtime.scheduler.DefaultSchedulerBuilder;
+import org.apache.flink.runtime.scheduler.SchedulerBase;
 import org.apache.flink.runtime.shuffle.ShuffleDescriptor;
-import org.apache.flink.runtime.taskmanager.TaskExecutionState;
 import org.apache.flink.testutils.TestingUtils;
 import org.apache.flink.testutils.executor.TestExecutorResource;
 import org.apache.flink.util.TestLogger;
@@ -51,17 +41,17 @@ import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.flink.runtime.deployment.TaskDeploymentDescriptorFactoryTest.deserializeShuffleDescriptors;
+import static org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils.createSchedulerAndDeploy;
+import static org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils.transitionTaskToFinished;
+import static org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils.transitionTasksToFinished;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
@@ -121,8 +111,18 @@ public class RemoveCachedShuffleDescriptorTest extends TestLogger {
         final JobVertex v1 = ExecutionGraphTestUtils.createNoOpVertex("v1", PARALLELISM);
         final JobVertex v2 = ExecutionGraphTestUtils.createNoOpVertex("v2", PARALLELISM);
 
-        final DefaultScheduler scheduler =
-                createSchedulerAndDeploy(jobId, v1, v2, DistributionPattern.ALL_TO_ALL, blobWriter);
+        final SchedulerBase scheduler =
+                createSchedulerAndDeploy(
+                        false,
+                        jobId,
+                        v1,
+                        new JobVertex[] {v2},
+                        DistributionPattern.ALL_TO_ALL,
+                        blobWriter,
+                        mainThreadExecutor,
+                        ioExecutor,
+                        NoOpJobMasterPartitionTracker.INSTANCE,
+                        EXECUTOR_RESOURCE.getExecutor());
         final ExecutionGraph executionGraph = scheduler.getExecutionGraph();
 
         // ShuffleDescriptors should be cached during the deployment
@@ -166,8 +166,18 @@ public class RemoveCachedShuffleDescriptorTest extends TestLogger {
         final JobVertex v1 = ExecutionGraphTestUtils.createNoOpVertex("v1", PARALLELISM);
         final JobVertex v2 = ExecutionGraphTestUtils.createNoOpVertex("v2", PARALLELISM);
 
-        final DefaultScheduler scheduler =
-                createSchedulerAndDeploy(jobId, v1, v2, DistributionPattern.ALL_TO_ALL, blobWriter);
+        final SchedulerBase scheduler =
+                createSchedulerAndDeploy(
+                        false,
+                        jobId,
+                        v1,
+                        new JobVertex[] {v2},
+                        DistributionPattern.ALL_TO_ALL,
+                        blobWriter,
+                        mainThreadExecutor,
+                        ioExecutor,
+                        NoOpJobMasterPartitionTracker.INSTANCE,
+                        EXECUTOR_RESOURCE.getExecutor());
         final ExecutionGraph executionGraph = scheduler.getExecutionGraph();
 
         // ShuffleDescriptors should be cached during the deployment
@@ -208,8 +218,18 @@ public class RemoveCachedShuffleDescriptorTest extends TestLogger {
         final JobVertex v1 = ExecutionGraphTestUtils.createNoOpVertex("v1", PARALLELISM);
         final JobVertex v2 = ExecutionGraphTestUtils.createNoOpVertex("v2", PARALLELISM);
 
-        final DefaultScheduler scheduler =
-                createSchedulerAndDeploy(jobId, v1, v2, DistributionPattern.POINTWISE, blobWriter);
+        final SchedulerBase scheduler =
+                createSchedulerAndDeploy(
+                        false,
+                        jobId,
+                        v1,
+                        new JobVertex[] {v2},
+                        DistributionPattern.POINTWISE,
+                        blobWriter,
+                        mainThreadExecutor,
+                        ioExecutor,
+                        NoOpJobMasterPartitionTracker.INSTANCE,
+                        EXECUTOR_RESOURCE.getExecutor());
         final ExecutionGraph executionGraph = scheduler.getExecutionGraph();
 
         // ShuffleDescriptors should be cached during the deployment
@@ -265,8 +285,18 @@ public class RemoveCachedShuffleDescriptorTest extends TestLogger {
         final JobVertex v1 = ExecutionGraphTestUtils.createNoOpVertex("v1", PARALLELISM);
         final JobVertex v2 = ExecutionGraphTestUtils.createNoOpVertex("v2", PARALLELISM);
 
-        final DefaultScheduler scheduler =
-                createSchedulerAndDeploy(jobId, v1, v2, DistributionPattern.POINTWISE, blobWriter);
+        final SchedulerBase scheduler =
+                createSchedulerAndDeploy(
+                        false,
+                        jobId,
+                        v1,
+                        new JobVertex[] {v2},
+                        DistributionPattern.POINTWISE,
+                        blobWriter,
+                        mainThreadExecutor,
+                        ioExecutor,
+                        NoOpJobMasterPartitionTracker.INSTANCE,
+                        EXECUTOR_RESOURCE.getExecutor());
         final ExecutionGraph executionGraph = scheduler.getExecutionGraph();
 
         // ShuffleDescriptors should be cached during the deployment
@@ -294,42 +324,7 @@ public class RemoveCachedShuffleDescriptorTest extends TestLogger {
         assertEquals(expectedAfter, blobWriter.numberOfBlobs());
     }
 
-    private DefaultScheduler createSchedulerAndDeploy(
-            JobID jobId,
-            JobVertex v1,
-            JobVertex v2,
-            DistributionPattern distributionPattern,
-            BlobWriter blobWriter)
-            throws Exception {
-
-        v2.connectNewDataSetAsInput(v1, distributionPattern, ResultPartitionType.BLOCKING);
-
-        final List<JobVertex> ordered = new ArrayList<>(Arrays.asList(v1, v2));
-        final DefaultScheduler scheduler =
-                createScheduler(jobId, ordered, blobWriter, mainThreadExecutor, ioExecutor);
-        final ExecutionGraph executionGraph = scheduler.getExecutionGraph();
-        final TestingLogicalSlotBuilder slotBuilder = new TestingLogicalSlotBuilder();
-
-        CompletableFuture.runAsync(
-                        () -> {
-                            try {
-                                // Deploy upstream source vertices
-                                deployTasks(executionGraph, v1.getID(), slotBuilder);
-                                // Transition upstream vertices into FINISHED
-                                transitionTasksToFinished(executionGraph, v1.getID());
-                                // Deploy downstream sink vertices
-                                deployTasks(executionGraph, v2.getID(), slotBuilder);
-                            } catch (Exception e) {
-                                throw new RuntimeException("Exceptions shouldn't happen here.", e);
-                            }
-                        },
-                        mainThreadExecutor)
-                .join();
-
-        return scheduler;
-    }
-
-    private void triggerGlobalFailoverAndComplete(DefaultScheduler scheduler, JobVertex upstream)
+    private void triggerGlobalFailoverAndComplete(SchedulerBase scheduler, JobVertex upstream)
             throws TimeoutException {
 
         final Throwable t = new Exception();
@@ -379,66 +374,6 @@ public class RemoveCachedShuffleDescriptorTest extends TestLogger {
     }
 
     // ============== Utils ==============
-
-    private static DefaultScheduler createScheduler(
-            final JobID jobId,
-            final List<JobVertex> jobVertices,
-            final BlobWriter blobWriter,
-            final ComponentMainThreadExecutor mainThreadExecutor,
-            final ScheduledExecutorService ioExecutor)
-            throws Exception {
-        final JobGraph jobGraph =
-                JobGraphBuilder.newBatchJobGraphBuilder()
-                        .setJobId(jobId)
-                        .addJobVertices(jobVertices)
-                        .build();
-
-        return new DefaultSchedulerBuilder(
-                        jobGraph, mainThreadExecutor, EXECUTOR_RESOURCE.getExecutor())
-                .setRestartBackoffTimeStrategy(new TestRestartBackoffTimeStrategy(true, 0))
-                .setBlobWriter(blobWriter)
-                .setIoExecutor(ioExecutor)
-                .build();
-    }
-
-    private static void deployTasks(
-            ExecutionGraph executionGraph,
-            JobVertexID jobVertexID,
-            TestingLogicalSlotBuilder slotBuilder)
-            throws JobException, ExecutionException, InterruptedException {
-
-        for (ExecutionVertex vertex :
-                Objects.requireNonNull(executionGraph.getJobVertex(jobVertexID))
-                        .getTaskVertices()) {
-            LogicalSlot slot = slotBuilder.createTestingLogicalSlot();
-
-            Execution execution = vertex.getCurrentExecutionAttempt();
-            execution.registerProducedPartitions(slot.getTaskManagerLocation()).get();
-            execution.transitionState(ExecutionState.SCHEDULED);
-
-            vertex.tryAssignResource(slot);
-            vertex.deploy();
-        }
-    }
-
-    private static void transitionTasksToFinished(
-            ExecutionGraph executionGraph, JobVertexID jobVertexID) {
-
-        for (ExecutionVertex vertex :
-                Objects.requireNonNull(executionGraph.getJobVertex(jobVertexID))
-                        .getTaskVertices()) {
-            transitionTaskToFinished(executionGraph, vertex);
-        }
-    }
-
-    private static void transitionTaskToFinished(
-            ExecutionGraph executionGraph, ExecutionVertex executionVertex) {
-        executionGraph.updateState(
-                new TaskExecutionStateTransition(
-                        new TaskExecutionState(
-                                executionVertex.getCurrentExecutionAttempt().getAttemptId(),
-                                ExecutionState.FINISHED)));
-    }
 
     private static MaybeOffloaded<ShuffleDescriptor[]> getConsumedCachedShuffleDescriptor(
             ExecutionGraph executionGraph, JobVertex vertex) {

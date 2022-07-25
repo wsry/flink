@@ -1058,15 +1058,20 @@ public class StreamingJobGraphGenerator {
         if (partitioner.isPointwise()) {
             jobEdge =
                     downStreamVertex.connectNewDataSetAsInput(
-                            headVertex, DistributionPattern.POINTWISE, resultPartitionType);
+                            headVertex,
+                            DistributionPattern.POINTWISE,
+                            resultPartitionType,
+                            partitioner.isBroadcast());
         } else {
             jobEdge =
                     downStreamVertex.connectNewDataSetAsInput(
-                            headVertex, DistributionPattern.ALL_TO_ALL, resultPartitionType);
+                            headVertex,
+                            DistributionPattern.ALL_TO_ALL,
+                            resultPartitionType,
+                            partitioner.isBroadcast());
         }
         // set strategy name so that web interface can show it.
         jobEdge.setShipStrategyName(partitioner.toString());
-        jobEdge.setBroadcast(partitioner.isBroadcast());
         jobEdge.setForward(partitioner instanceof ForwardPartitioner);
         jobEdge.setDownstreamSubtaskStateMapper(partitioner.getDownstreamSubtaskStateMapper());
         jobEdge.setUpstreamSubtaskStateMapper(partitioner.getUpstreamSubtaskStateMapper());
