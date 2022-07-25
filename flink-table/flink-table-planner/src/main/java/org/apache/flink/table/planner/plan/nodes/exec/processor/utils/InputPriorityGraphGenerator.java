@@ -24,6 +24,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNode;
 import org.apache.flink.table.planner.plan.nodes.exec.InputProperty;
 import org.apache.flink.table.planner.plan.nodes.exec.batch.BatchExecNode;
+import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecTableSourceScan;
 import org.apache.flink.table.planner.plan.nodes.exec.visitor.AbstractExecNodeExactlyOnceVisitor;
 import org.apache.flink.util.Preconditions;
 
@@ -125,7 +126,8 @@ public abstract class InputPriorityGraphGenerator {
                 new AbstractExecNodeExactlyOnceVisitor() {
                     @Override
                     protected void visitNode(ExecNode<?> node) {
-                        if (!boundaries.contains(node)) {
+                        if (!boundaries.contains(node)
+                                && !(node instanceof CommonExecTableSourceScan)) {
                             visitInputs(node);
                         }
                         updateTopologyGraph(node);

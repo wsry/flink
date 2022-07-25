@@ -71,9 +71,6 @@ class BatchPlanner(
 
   override protected def getExecNodeGraphProcessors: Seq[ExecNodeGraphProcessor] = {
     val processors = new util.ArrayList[ExecNodeGraphProcessor]()
-    if (getTableConfig.get(OptimizerConfigOptions.TABLE_OPTIMIZER_DYNAMIC_FILTERING_ENABLED)) {
-      processors.add(new ResetDppDependencyProcessor())
-    }
     // deadlock breakup
     processors.add(new DeadlockBreakupProcessor())
     // multiple input creation
@@ -82,7 +79,7 @@ class BatchPlanner(
     }
     processors.add(new ForwardHashExchangeProcessor)
     if (getTableConfig.get(OptimizerConfigOptions.TABLE_OPTIMIZER_DYNAMIC_FILTERING_ENABLED)) {
-      processors.add(new DppAddDependencyProcessor())
+      processors.add(new DynamicFilteringDependencyProcessor())
     }
 
     processors

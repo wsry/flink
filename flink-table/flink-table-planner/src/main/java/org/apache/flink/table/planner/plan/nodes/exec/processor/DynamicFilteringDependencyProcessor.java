@@ -34,7 +34,7 @@ import java.util.Map;
  * This processors future check each dpp source to see if it is chained with an multiple input. If
  * so, we'll set the dependency
  */
-public class DppAddDependencyProcessor implements ExecNodeGraphProcessor {
+public class DynamicFilteringDependencyProcessor implements ExecNodeGraphProcessor {
 
     @Override
     public ExecNodeGraph process(ExecNodeGraph execGraph, ProcessorContext context) {
@@ -51,9 +51,7 @@ public class DppAddDependencyProcessor implements ExecNodeGraphProcessor {
                                             // The character of the dpp scan is that it has an
                                             // input.
                                             if (input instanceof BatchExecTableSourceScan
-                                                    && ((BatchExecTableSourceScan) input)
-                                                                    .getCachedDynamicFilteringDataCollector()
-                                                            != null) {
+                                                    && input.getInputEdges().size() > 0) {
                                                 factScanDescendants
                                                         .computeIfAbsent(
                                                                 input, ignored -> new ArrayList<>())

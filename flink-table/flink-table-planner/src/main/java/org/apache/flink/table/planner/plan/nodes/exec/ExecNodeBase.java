@@ -53,7 +53,7 @@ public abstract class ExecNodeBase<T> implements ExecNode<T> {
 
     private final LogicalType outputType;
 
-    private List<InputProperty> inputProperties;
+    private final List<InputProperty> inputProperties;
 
     private List<ExecEdge> inputEdges;
 
@@ -132,11 +132,6 @@ public abstract class ExecNodeBase<T> implements ExecNode<T> {
     public void setInputEdges(List<ExecEdge> inputEdges) {
         checkNotNull(inputEdges, "inputEdges should not be null.");
         this.inputEdges = new ArrayList<>(inputEdges);
-    }
-
-    @Override
-    public void setInputProperties(List<InputProperty> inputProperties) {
-        this.inputProperties = new ArrayList<>(inputProperties);
     }
 
     @Override
