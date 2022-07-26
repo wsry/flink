@@ -22,6 +22,7 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.api.connector.source.SupportsHandleExecutionAttemptSourceEvent;
 import org.apache.flink.connector.file.src.FileSource;
 import org.apache.flink.connector.file.src.FileSourceSplit;
 import org.apache.flink.connector.file.src.PendingSplitsCheckpoint;
@@ -60,7 +61,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 @Internal
 public class DynamicFileSplitEnumerator<SplitT extends FileSourceSplit>
-        implements SplitEnumerator<SplitT, PendingSplitsCheckpoint<SplitT>> {
+        implements SplitEnumerator<SplitT, PendingSplitsCheckpoint<SplitT>>,
+                SupportsHandleExecutionAttemptSourceEvent {
 
     private static final Logger LOG = LoggerFactory.getLogger(DynamicFileSplitEnumerator.class);
 
@@ -184,5 +186,15 @@ public class DynamicFileSplitEnumerator<SplitT extends FileSourceSplit>
             }
         }
         return PendingSplitsCheckpoint.fromCollectionSnapshot(fileSplits);
+    }
+
+    @Override
+    public void handleSourceEvent(int subtaskId, int attemptNumber, SourceEvent sourceEvent) {
+        if (sourceEvent instanceof DynamicFilteringEvent) {
+            LOG.info("Received DynamicFilteringEvent: {}", subtaskId);
+            createSplitAssigner(((DynamicFilteringEvent) sourceEvent).getData());
+        } else {
+            LOG.error("Received unrecognized event: {}", sourceEvent);
+        }
     }
 }
