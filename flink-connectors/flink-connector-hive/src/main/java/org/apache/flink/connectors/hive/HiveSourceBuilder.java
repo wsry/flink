@@ -79,7 +79,7 @@ public class HiveSourceBuilder {
     private static final Duration DEFAULT_SCAN_MONITOR_INTERVAL = Duration.ofMinutes(1L);
 
     private final JobConf jobConf;
-    private final int threadNum;
+    private final ReadableConfig flinkConf;
     private final boolean fallbackMappedReader;
 
     private final ObjectPath tablePath;
@@ -113,8 +113,7 @@ public class HiveSourceBuilder {
             @Nonnull String tableName,
             @Nonnull Map<String, String> tableOptions) {
         this.jobConf = jobConf;
-        this.threadNum =
-                flinkConf.get(HiveOptions.TABLE_EXEC_HIVE_LOAD_PARTITION_SPLITS_THREAD_NUM);
+        this.flinkConf = flinkConf;
         this.fallbackMappedReader = flinkConf.get(TABLE_EXEC_HIVE_FALLBACK_MAPRED_READER);
         this.tablePath = new ObjectPath(dbName, tableName);
         this.hiveVersion = hiveVersion == null ? HiveShimLoader.getHiveVersion() : hiveVersion;
@@ -152,8 +151,7 @@ public class HiveSourceBuilder {
             @Nullable String hiveVersion,
             @Nonnull CatalogTable catalogTable) {
         this.jobConf = jobConf;
-        this.threadNum =
-                flinkConf.get(HiveOptions.TABLE_EXEC_HIVE_LOAD_PARTITION_SPLITS_THREAD_NUM);
+        this.flinkConf = flinkConf;
         this.fallbackMappedReader = flinkConf.get(TABLE_EXEC_HIVE_FALLBACK_MAPRED_READER);
         this.tablePath = tablePath;
         this.hiveVersion = hiveVersion == null ? HiveShimLoader.getHiveVersion() : hiveVersion;
@@ -241,7 +239,6 @@ public class HiveSourceBuilder {
                 splitAssigner,
                 bulkFormat,
                 continuousSourceSettings,
-                threadNum,
                 jobConf,
                 tablePath,
                 partitionKeys,

@@ -51,7 +51,6 @@ public class HiveSourceDynamicFileEnumerator implements DynamicFileEnumerator {
     // For non-partition hive table, partitions only contains one partition which partitionValues is
     // empty.
     private final List<HiveTablePartition> allPartitions;
-    private final int threadNum;
     private final JobConf jobConf;
     private transient List<HiveTablePartition> finalPartitions;
 
@@ -59,12 +58,10 @@ public class HiveSourceDynamicFileEnumerator implements DynamicFileEnumerator {
             String table,
             List<String> dynamicPartitionKeys,
             List<HiveTablePartition> allPartitions,
-            int threadNum,
             JobConf jobConf) {
         this.table = table;
         this.dynamicPartitionKeys = dynamicPartitionKeys;
         this.allPartitions = allPartitions;
-        this.threadNum = threadNum;
         this.jobConf = jobConf;
     }
 
@@ -120,8 +117,7 @@ public class HiveSourceDynamicFileEnumerator implements DynamicFileEnumerator {
     @Override
     public Collection<FileSourceSplit> enumerateSplits(Path[] paths, int minDesiredSplits)
             throws IOException {
-        return new ArrayList<>(
-                createInputSplits(minDesiredSplits, finalPartitions, threadNum, jobConf));
+        return new ArrayList<>(createInputSplits(minDesiredSplits, finalPartitions, jobConf));
     }
 
     /** A factory to create {@link HiveSourceDynamicFileEnumerator}. */
@@ -132,26 +128,23 @@ public class HiveSourceDynamicFileEnumerator implements DynamicFileEnumerator {
         private final String table;
         private final List<String> dynamicPartitionKeys;
         private final List<HiveTablePartition> partitions;
-        private final int threadNum;
         private final JobConfWrapper jobConfWrapper;
 
         public Provider(
                 String table,
                 List<String> dynamicPartitionKeys,
                 List<HiveTablePartition> partitions,
-                int threadNum,
                 JobConfWrapper jobConfWrapper) {
             this.table = table;
             this.dynamicPartitionKeys = dynamicPartitionKeys;
             this.partitions = partitions;
-            this.threadNum = threadNum;
             this.jobConfWrapper = jobConfWrapper;
         }
 
         @Override
         public DynamicFileEnumerator create() {
             return new HiveSourceDynamicFileEnumerator(
-                    table, dynamicPartitionKeys, partitions, threadNum, jobConfWrapper.conf());
+                    table, dynamicPartitionKeys, partitions, jobConfWrapper.conf());
         }
     }
 }

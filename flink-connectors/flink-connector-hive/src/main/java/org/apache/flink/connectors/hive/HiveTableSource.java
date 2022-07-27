@@ -34,6 +34,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.api.config.ExecutionConfigOptions;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.hive.client.HiveShim;
@@ -132,6 +133,18 @@ public class HiveTableSource
     @VisibleForTesting
     protected DataStream<RowData> getDataStream(
             ProviderContext providerContext, StreamExecutionEnvironment execEnv) {
+
+        jobConf.set(
+                ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM.key(),
+                flinkConf
+                        .get(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM)
+                        .toString());
+        jobConf.set(
+                HiveOptions.TABLE_EXEC_HIVE_LOAD_PARTITION_SPLITS_THREAD_NUM.key(),
+                flinkConf
+                        .get(HiveOptions.TABLE_EXEC_HIVE_LOAD_PARTITION_SPLITS_THREAD_NUM)
+                        .toString());
+
         HiveSourceBuilder sourceBuilder =
                 new HiveSourceBuilder(jobConf, flinkConf, tablePath, hiveVersion, catalogTable)
                         .setProjectedFields(projectedFields)
@@ -151,8 +164,6 @@ public class HiveTableSource
                             catalogTable.getPartitionKeys(),
                             remainingPartitions);
 
-            int threadNum =
-                    flinkConf.get(HiveOptions.TABLE_EXEC_HIVE_LOAD_PARTITION_SPLITS_THREAD_NUM);
             int parallelism =
                     new HiveParallelismInference(tablePath, flinkConf)
                             .infer(
@@ -161,10 +172,7 @@ public class HiveTableSource
                                                     hivePartitionsToRead, jobConf),
                                     () ->
                                             HiveSourceFileEnumerator.createInputSplits(
-                                                            0,
-                                                            hivePartitionsToRead,
-                                                            threadNum,
-                                                            jobConf)
+                                                            0, hivePartitionsToRead, jobConf)
                                                     .size())
                             .limit(limit);
             return toDataStreamSource(
