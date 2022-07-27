@@ -89,10 +89,6 @@ public class BatchExecTableSourceScan extends CommonExecTableSourceScan
                 description);
     }
 
-    public boolean isNeedDynamicFilteringDependency() {
-        return needDynamicFilteringDependency;
-    }
-
     public void setNeedDynamicFilteringDependency(boolean needDynamicFilteringDependency) {
         this.needDynamicFilteringDependency = needDynamicFilteringDependency;
     }

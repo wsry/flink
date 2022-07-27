@@ -62,6 +62,7 @@ public class HiveSourceDynamicFileEnumerator implements DynamicFileEnumerator {
         this.table = table;
         this.dynamicPartitionKeys = dynamicPartitionKeys;
         this.allPartitions = allPartitions;
+        this.finalPartitions = allPartitions;
         this.jobConf = jobConf;
     }
 
