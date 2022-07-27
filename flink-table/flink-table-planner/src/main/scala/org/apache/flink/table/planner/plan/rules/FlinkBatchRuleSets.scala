@@ -18,7 +18,7 @@
 package org.apache.flink.table.planner.plan.rules
 
 import org.apache.flink.table.planner.plan.nodes.logical._
-import org.apache.flink.table.planner.plan.rules.logical.{RemoveUnreachableCoalesceArgumentsRule, _}
+import org.apache.flink.table.planner.plan.rules.logical._
 import org.apache.flink.table.planner.plan.rules.physical.FlinkExpandConversionRule
 import org.apache.flink.table.planner.plan.rules.physical.batch._
 
@@ -438,6 +438,10 @@ object FlinkBatchRuleSets {
     DynamicFilteringRule1.FACT_IN_RIGHT,
     DynamicFilteringRule2.FACT_IN_LEFT,
     DynamicFilteringRule3.FACT_IN_RIGHT,
-    DynamicFilteringRule4.FACT_IN_LEFT
+    DynamicFilteringRule4.FACT_IN_LEFT,
+    DynamicFilteringRule5.FACT_IN_RIGHT,
+    DynamicFilteringRule6.FACT_IN_LEFT,
+    DynamicFilteringRule7.FACT_IN_RIGHT,
+    DynamicFilteringRule8.FACT_IN_LEFT
   )
 }

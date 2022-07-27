@@ -241,7 +241,6 @@ public class HiveTableSource
 
     @Override
     public List<String> applyDynamicFiltering(List<String> candidateFilterFields) {
-        checkArgument(remainingPartitions == null);
         if (catalogTable.getPartitionKeys() != null
                 && catalogTable.getPartitionKeys().size() != 0) {
             checkArgument(!candidateFilterFields.isEmpty());
