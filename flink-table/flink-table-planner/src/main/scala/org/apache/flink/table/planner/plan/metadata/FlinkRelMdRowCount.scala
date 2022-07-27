@@ -23,6 +23,7 @@ import org.apache.flink.configuration.ConfigOptions.key
 import org.apache.flink.table.planner.plan.logical.{LogicalWindow, SlidingGroupWindow, TumblingGroupWindow}
 import org.apache.flink.table.planner.plan.nodes.calcite.{Expand, Rank, WindowAggregate}
 import org.apache.flink.table.planner.plan.nodes.physical.batch._
+import org.apache.flink.table.planner.plan.rules.physical.batch.DynamicFilteringRule
 import org.apache.flink.table.planner.plan.stats.ValueInterval
 import org.apache.flink.table.planner.plan.utils.{FlinkRelMdUtil, SortUtil}
 import org.apache.flink.table.planner.plan.utils.AggregateUtil.{hasTimeIntervalType, toLong}
@@ -335,10 +336,18 @@ class FlinkRelMdRowCount private extends MetadataHandler[BuiltInMetadata.RowCoun
       fmq.getSelectivity(joinWithOnlyEquiPred, nonEquiPred)
     }
 
+    val dynamicFilteringFactor = if (DynamicFilteringRule.supportDynamicFilter(join)) {
+      val tableConfig = unwrapTableConfig(join)
+      val dou = tableConfig.get(FlinkRelMdRowCount.TABLE_OPTIMIZER_DYNAMIC_FILTERING_FACTOR)
+      dou.doubleValue()
+    } else {
+      1
+    }
+
     if (leftNdv != null && rightNdv != null) {
       // selectivity of equi part is 1 / Max(leftNdv, rightNdv)
       val selectivityOfEquiPred = Math.min(1d, 1d / Math.max(leftNdv, rightNdv))
-      return leftRowCount * rightRowCount * selectivityOfEquiPred * selectivityOfNonEquiPred
+      return leftRowCount * rightRowCount * selectivityOfEquiPred * selectivityOfNonEquiPred * dynamicFilteringFactor
     }
 
     val leftKeysAreUnique = fmq.areColumnsUnique(leftChild, leftKeySet)
@@ -458,5 +467,11 @@ object FlinkRelMdRowCount {
       .defaultValue(JLong.valueOf(1000000L))
       .withDescription("Sets estimated number of records that one local-agg processes. " +
         "Optimizer will infer whether to use local/global aggregate according to it.")
+
+  val TABLE_OPTIMIZER_DYNAMIC_FILTERING_FACTOR: ConfigOption[JDouble] =
+    key("table.optimizer.dynamic-filtering-factor")
+      .doubleType()
+      .defaultValue(JDouble.valueOf(0.0000001))
+      .withDescription("dynamic-filtering-factor")
 
 }
