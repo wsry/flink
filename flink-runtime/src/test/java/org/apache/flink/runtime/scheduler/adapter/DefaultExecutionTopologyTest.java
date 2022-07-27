@@ -37,16 +37,17 @@ import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
 import org.apache.flink.runtime.scheduler.strategy.ResultPartitionState;
 import org.apache.flink.runtime.scheduler.strategy.SchedulingPipelinedRegion;
 import org.apache.flink.testutils.TestingUtils;
-import org.apache.flink.testutils.executor.TestExecutorResource;
+import org.apache.flink.testutils.executor.TestExecutorExtension;
 import org.apache.flink.util.IterableUtils;
 import org.apache.flink.util.TestLogger;
 
 import org.apache.flink.shaded.guava30.com.google.common.collect.Iterables;
 import org.apache.flink.shaded.guava30.com.google.common.collect.Sets;
 
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -57,31 +58,24 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 
-import static junit.framework.TestCase.assertSame;
-import static junit.framework.TestCase.assertTrue;
 import static org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils.createExecutionGraph;
 import static org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils.createNoOpVertex;
 import static org.apache.flink.runtime.io.network.partition.ResultPartitionType.BLOCKING;
 import static org.apache.flink.runtime.io.network.partition.ResultPartitionType.PIPELINED;
 import static org.apache.flink.runtime.jobgraph.DistributionPattern.ALL_TO_ALL;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.fail;
 
 /** Unit tests for {@link DefaultExecutionTopology}. */
 public class DefaultExecutionTopologyTest extends TestLogger {
-    @ClassRule
-    public static final TestExecutorResource<ScheduledExecutorService> EXECUTOR_RESOURCE =
-            TestingUtils.defaultExecutorResource();
+    @RegisterExtension
+    static final TestExecutorExtension<ScheduledExecutorService> EXECUTOR_RESOURCE =
+            TestingUtils.defaultExecutorExtension();
 
     private DefaultExecutionGraph executionGraph;
 
     private DefaultExecutionTopology adapter;
 
-    @Before
-    public void setUp() throws Exception {
+    @BeforeEach
+    void setUp() throws Exception {
         JobVertex[] jobVertices = new JobVertex[2];
         int parallelism = 3;
         jobVertices[0] = createNoOpVertex(parallelism);
@@ -92,13 +86,13 @@ public class DefaultExecutionTopologyTest extends TestLogger {
     }
 
     @Test
-    public void testConstructor() {
+    void testConstructor() {
         // implicitly tests order constraint of getVertices()
         assertGraphEquals(executionGraph, adapter);
     }
 
     @Test
-    public void testGetResultPartition() {
+    void testGetResultPartition() {
         for (ExecutionVertex vertex : executionGraph.getAllExecutionVertices()) {
             for (Map.Entry<IntermediateResultPartitionID, IntermediateResultPartition> entry :
                     vertex.getProducedPartitions().entrySet()) {
@@ -112,7 +106,7 @@ public class DefaultExecutionTopologyTest extends TestLogger {
     }
 
     @Test
-    public void testResultPartitionStateSupplier() {
+    void testResultPartitionStateSupplier() {
         final IntermediateResultPartition intermediateResultPartition =
                 IterableUtils.toStream(executionGraph.getAllExecutionVertices())
                         .flatMap(v -> v.getProducedPartitions().values().stream())
@@ -122,41 +116,37 @@ public class DefaultExecutionTopologyTest extends TestLogger {
         final DefaultResultPartition schedulingResultPartition =
                 adapter.getResultPartition(intermediateResultPartition.getPartitionId());
 
-        assertEquals(ResultPartitionState.CREATED, schedulingResultPartition.getState());
+        Assertions.assertThat(schedulingResultPartition.getState())
+                .isEqualTo(ResultPartitionState.CREATED);
 
         intermediateResultPartition.markDataProduced();
-        assertEquals(ResultPartitionState.CONSUMABLE, schedulingResultPartition.getState());
+        Assertions.assertThat(schedulingResultPartition.getState())
+                .isEqualTo(ResultPartitionState.CONSUMABLE);
     }
 
     @Test
-    public void testGetVertexOrThrow() {
-        try {
-            adapter.getVertex(new ExecutionVertexID(new JobVertexID(), 0));
-            fail("get not exist vertex");
-        } catch (IllegalArgumentException exception) {
-            // expected
-        }
+    void testGetVertexOrThrow() {
+        Assertions.assertThatThrownBy(
+                        () -> adapter.getVertex(new ExecutionVertexID(new JobVertexID(), 0)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    public void testResultPartitionOrThrow() {
-        try {
-            adapter.getResultPartition(new IntermediateResultPartitionID());
-            fail("get not exist result partition");
-        } catch (IllegalArgumentException exception) {
-            // expected
-        }
+    void testResultPartitionOrThrow() {
+        Assertions.assertThatThrownBy(
+                        () -> adapter.getResultPartition(new IntermediateResultPartitionID()))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    public void testGetAllPipelinedRegions() {
+    void testGetAllPipelinedRegions() {
         final Iterable<DefaultSchedulingPipelinedRegion> allPipelinedRegions =
                 adapter.getAllPipelinedRegions();
-        assertEquals(1, Iterables.size(allPipelinedRegions));
+        Assertions.assertThat(Iterables.size(allPipelinedRegions)).isEqualTo(1);
     }
 
     @Test
-    public void testGetPipelinedRegionOfVertex() {
+    void testGetPipelinedRegionOfVertex() {
         for (DefaultExecutionVertex vertex : adapter.getVertices()) {
             final DefaultSchedulingPipelinedRegion pipelinedRegion =
                     adapter.getPipelinedRegionOfVertex(vertex.getId());
@@ -164,8 +154,8 @@ public class DefaultExecutionTopologyTest extends TestLogger {
         }
     }
 
-    @Test(expected = IllegalStateException.class)
-    public void testErrorIfCoLocatedTasksAreNotInSameRegion() throws Exception {
+    @Test
+    void testErrorIfCoLocatedTasksAreNotInSameRegion() throws Exception {
         int parallelism = 3;
         final JobVertex v1 = createNoOpVertex(parallelism);
         final JobVertex v2 = createNoOpVertex(parallelism);
@@ -175,13 +165,13 @@ public class DefaultExecutionTopologyTest extends TestLogger {
         v2.setSlotSharingGroup(slotSharingGroup);
         v1.setStrictlyCoLocatedWith(v2);
 
-        final DefaultExecutionGraph executionGraph =
-                createExecutionGraph(EXECUTOR_RESOURCE.getExecutor(), v1, v2);
-        DefaultExecutionTopology.fromExecutionGraph(executionGraph);
+        Assertions.assertThatThrownBy(
+                        () -> createExecutionGraph(EXECUTOR_RESOURCE.getExecutor(), v1, v2))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    public void testUpdateTopology() throws Exception {
+    void testUpdateTopology() throws Exception {
         final JobVertex[] jobVertices = createJobVertices(BLOCKING);
         executionGraph = createDynamicGraph(jobVertices);
         adapter = DefaultExecutionTopology.fromExecutionGraph(executionGraph);
@@ -191,18 +181,17 @@ public class DefaultExecutionTopologyTest extends TestLogger {
 
         executionGraph.initializeJobVertex(ejv1, 0L);
         adapter.notifyExecutionGraphUpdated(executionGraph, Collections.singletonList(ejv1));
-        assertThat(IterableUtils.toStream(adapter.getVertices()).count(), is(3L));
+        Assertions.assertThat(IterableUtils.toStream(adapter.getVertices()).count()).isEqualTo(3L);
 
         executionGraph.initializeJobVertex(ejv2, 0L);
         adapter.notifyExecutionGraphUpdated(executionGraph, Collections.singletonList(ejv2));
-        assertThat(IterableUtils.toStream(adapter.getVertices()).count(), is(6L));
+        Assertions.assertThat(IterableUtils.toStream(adapter.getVertices()).count()).isEqualTo(6L);
 
         assertGraphEquals(executionGraph, adapter);
     }
 
-    @Test(expected = IllegalStateException.class)
-    public void testErrorIfUpdateTopologyWithNewVertexPipelinedConnectedToOldOnes()
-            throws Exception {
+    @Test
+    void testErrorIfUpdateTopologyWithNewVertexPipelinedConnectedToOldOnes() throws Exception {
         final JobVertex[] jobVertices = createJobVertices(PIPELINED);
         executionGraph = createDynamicGraph(jobVertices);
         adapter = DefaultExecutionTopology.fromExecutionGraph(executionGraph);
@@ -214,11 +203,15 @@ public class DefaultExecutionTopologyTest extends TestLogger {
         adapter.notifyExecutionGraphUpdated(executionGraph, Collections.singletonList(ejv1));
 
         executionGraph.initializeJobVertex(ejv2, 0L);
-        adapter.notifyExecutionGraphUpdated(executionGraph, Collections.singletonList(ejv2));
+        Assertions.assertThatThrownBy(
+                        () ->
+                                adapter.notifyExecutionGraphUpdated(
+                                        executionGraph, Collections.singletonList(ejv2)))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    public void testExistingRegionsAreNotAffectedDuringTopologyUpdate() throws Exception {
+    void testExistingRegionsAreNotAffectedDuringTopologyUpdate() throws Exception {
         final JobVertex[] jobVertices = createJobVertices(BLOCKING);
         executionGraph = createDynamicGraph(jobVertices);
         adapter = DefaultExecutionTopology.fromExecutionGraph(executionGraph);
@@ -236,7 +229,7 @@ public class DefaultExecutionTopologyTest extends TestLogger {
         SchedulingPipelinedRegion regionNew =
                 adapter.getPipelinedRegionOfVertex(new ExecutionVertexID(ejv1.getJobVertexId(), 0));
 
-        assertSame(regionOld, regionNew);
+        Assertions.assertThat(regionNew).isSameAs(regionOld);
     }
 
     private JobVertex[] createJobVertices(ResultPartitionType resultPartitionType) {
@@ -259,7 +252,7 @@ public class DefaultExecutionTopologyTest extends TestLogger {
             final DefaultSchedulingPipelinedRegion pipelinedRegionOfVertex) {
         final Set<DefaultExecutionVertex> allVertices =
                 Sets.newHashSet(pipelinedRegionOfVertex.getVertices());
-        assertEquals(Sets.newHashSet(adapter.getVertices()), allVertices);
+        Assertions.assertThat(allVertices).isEqualTo(Sets.newHashSet(adapter.getVertices()));
     }
 
     private static void assertGraphEquals(
@@ -273,7 +266,7 @@ public class DefaultExecutionTopologyTest extends TestLogger {
             ExecutionVertex originalVertex = originalVertices.next();
             DefaultExecutionVertex adaptedVertex = adaptedVertices.next();
 
-            assertEquals(originalVertex.getID(), adaptedVertex.getId());
+            Assertions.assertThat(adaptedVertex.getId()).isEqualTo(originalVertex.getID());
 
             List<IntermediateResultPartition> originalConsumedPartitions = new ArrayList<>();
             for (ConsumedPartitionGroup consumedPartitionGroup :
@@ -299,17 +292,15 @@ public class DefaultExecutionTopologyTest extends TestLogger {
             assertPartitionsEquals(originalProducedPartitions, adaptedProducedPartitions);
         }
 
-        assertFalse(
-                "Number of adapted vertices exceeds number of original vertices.",
-                adaptedVertices.hasNext());
+        Assertions.assertThat(adaptedVertices.hasNext()).isFalse();
     }
 
     private static void assertPartitionsEquals(
             Iterable<IntermediateResultPartition> originalResultPartitions,
             Iterable<DefaultResultPartition> adaptedResultPartitions) {
 
-        assertEquals(
-                Iterables.size(originalResultPartitions), Iterables.size(adaptedResultPartitions));
+        Assertions.assertThat(Iterables.size(adaptedResultPartitions))
+                .isEqualTo(Iterables.size(originalResultPartitions));
 
         for (IntermediateResultPartition originalPartition : originalResultPartitions) {
             DefaultResultPartition adaptedPartition =
@@ -335,17 +326,20 @@ public class DefaultExecutionTopologyTest extends TestLogger {
                 }
             }
             List<ConsumerVertexGroup> adaptedConsumers = adaptedPartition.getConsumerVertexGroups();
-            assertFalse(adaptedConsumers.isEmpty());
+            Assertions.assertThat(adaptedConsumers.isEmpty()).isFalse();
             for (ExecutionVertexID originalId : originalConsumerIds) {
                 // it is sufficient to verify that some vertex exists with the correct ID here,
                 // since deep equality is verified later in the main loop
                 // this DOES rely on an implicit assumption that the vertices objects returned by
                 // the topology are
                 // identical to those stored in the partition
-                assertTrue(
-                        adaptedConsumers.stream()
-                                .flatMap(IterableUtils::toStream)
-                                .anyMatch(adaptedConsumer -> adaptedConsumer.equals(originalId)));
+                Assertions.assertThat(
+                                adaptedConsumers.stream()
+                                        .flatMap(IterableUtils::toStream)
+                                        .anyMatch(
+                                                adaptedConsumer ->
+                                                        adaptedConsumer.equals(originalId)))
+                        .isTrue();
             }
         }
     }
@@ -354,11 +348,13 @@ public class DefaultExecutionTopologyTest extends TestLogger {
             IntermediateResultPartition originalPartition,
             DefaultResultPartition adaptedPartition) {
 
-        assertEquals(originalPartition.getPartitionId(), adaptedPartition.getId());
-        assertEquals(
-                originalPartition.getIntermediateResult().getId(), adaptedPartition.getResultId());
-        assertEquals(originalPartition.getResultType(), adaptedPartition.getResultType());
-        assertEquals(
-                originalPartition.getProducer().getID(), adaptedPartition.getProducer().getId());
+        Assertions.assertThat(adaptedPartition.getId())
+                .isEqualTo(originalPartition.getPartitionId());
+        Assertions.assertThat(adaptedPartition.getResultId())
+                .isEqualTo(originalPartition.getIntermediateResult().getId());
+        Assertions.assertThat(adaptedPartition.getResultType())
+                .isEqualTo(originalPartition.getResultType());
+        Assertions.assertThat(adaptedPartition.getProducer().getId())
+                .isEqualTo(originalPartition.getProducer().getID());
     }
 }

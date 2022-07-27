@@ -26,8 +26,9 @@ import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
 import org.apache.flink.runtime.scheduler.strategy.ResultPartitionState;
 import org.apache.flink.util.TestLogger;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,11 +38,6 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 import static org.apache.flink.runtime.io.network.partition.ResultPartitionType.BLOCKING;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.contains;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 /** Unit tests for {@link DefaultResultPartition}. */
 public class DefaultResultPartitionTest extends TestLogger {
@@ -58,8 +54,8 @@ public class DefaultResultPartitionTest extends TestLogger {
     private final Map<IntermediateResultPartitionID, List<ConsumerVertexGroup>>
             consumerVertexGroups = new HashMap<>();
 
-    @Before
-    public void setUp() {
+    @BeforeEach
+    void setUp() {
         resultPartition =
                 new DefaultResultPartition(
                         resultPartitionId,
@@ -75,25 +71,26 @@ public class DefaultResultPartitionTest extends TestLogger {
     }
 
     @Test
-    public void testGetPartitionState() {
+    void testGetPartitionState() {
         for (ResultPartitionState state : ResultPartitionState.values()) {
             resultPartitionState.setResultPartitionState(state);
-            assertEquals(state, resultPartition.getState());
+            Assertions.assertThat(resultPartition.getState()).isEqualTo(state);
         }
     }
 
     @Test
-    public void testGetConsumerVertexGroup() {
+    void testGetConsumerVertexGroup() {
 
-        assertTrue(resultPartition.getConsumerVertexGroups().isEmpty());
+        Assertions.assertThat(resultPartition.getConsumerVertexGroups().isEmpty()).isTrue();
 
         // test update consumers
         ExecutionVertexID executionVertexId = new ExecutionVertexID(new JobVertexID(), 0);
         consumerVertexGroups.put(
                 resultPartition.getId(),
                 Collections.singletonList(ConsumerVertexGroup.fromSingleVertex(executionVertexId)));
-        assertFalse(resultPartition.getConsumerVertexGroups().isEmpty());
-        assertThat(resultPartition.getConsumerVertexGroups().get(0), contains(executionVertexId));
+        Assertions.assertThat(resultPartition.getConsumerVertexGroups().isEmpty()).isFalse();
+        Assertions.assertThat(resultPartition.getConsumerVertexGroups().get(0))
+                .contains(executionVertexId);
     }
 
     /** A test {@link ResultPartitionState} supplier. */

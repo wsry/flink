@@ -29,11 +29,12 @@ import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.scheduler.adaptivebatch.AdaptiveBatchScheduler;
 import org.apache.flink.runtime.testtasks.NoOpInvokable;
 import org.apache.flink.testutils.TestingUtils;
-import org.apache.flink.testutils.executor.TestExecutorResource;
+import org.apache.flink.testutils.executor.TestExecutorExtension;
 import org.apache.flink.util.TestLogger;
 
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -41,14 +42,11 @@ import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertEquals;
-
 /** Unit tests for {@link ForwardGroupComputeUtil}. */
 public class ForwardGroupComputeUtilTest extends TestLogger {
-    @ClassRule
-    public static final TestExecutorResource<ScheduledExecutorService> EXECUTOR_RESOURCE =
-            TestingUtils.defaultExecutorResource();
+    @RegisterExtension
+    static final TestExecutorExtension<ScheduledExecutorService> EXECUTOR_RESOURCE =
+            TestingUtils.defaultExecutorExtension();
 
     /**
      * Tests that the computation of the job graph with isolated vertices works correctly.
@@ -90,7 +88,7 @@ public class ForwardGroupComputeUtilTest extends TestLogger {
     }
 
     private void testThreeVerticesConnectSequentially(
-            boolean isForward1, boolean isForward2, int numOfGroups, int... groupSizes)
+            boolean isForward1, boolean isForward2, int numOfGroups, Integer... groupSizes)
             throws Exception {
         JobVertex v1 = new JobVertex("v1");
         JobVertex v2 = new JobVertex("v2");
@@ -193,10 +191,11 @@ public class ForwardGroupComputeUtilTest extends TestLogger {
                         .values());
     }
 
-    private static void checkGroupSize(Set<ForwardGroup> groups, int numOfGroups, int... sizes) {
-        assertEquals(numOfGroups, groups.size());
-        containsInAnyOrder(
-                groups.stream().map(ForwardGroup::size).collect(Collectors.toList()), sizes);
+    private static void checkGroupSize(
+            Set<ForwardGroup> groups, int numOfGroups, Integer... sizes) {
+        Assertions.assertThat(groups.size()).isEqualTo(numOfGroups);
+        Assertions.assertThat(groups.stream().map(ForwardGroup::size).collect(Collectors.toList()))
+                .contains(sizes);
     }
 
     private static DefaultExecutionGraph createDynamicGraph(JobVertex... vertices)
