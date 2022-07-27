@@ -19,11 +19,14 @@
 package org.apache.flink.connector.jdbc.catalog;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.connector.jdbc.dialect.JdbcDialectTypeMapper;
 import org.apache.flink.connector.jdbc.dialect.psql.PostgresTypeMapper;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotExistException;
+import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
+import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.util.Preconditions;
 
@@ -36,6 +39,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -144,6 +148,12 @@ public class PostgresCatalog extends AbstractJdbcCatalog {
     protected DataType fromJDBCType(ObjectPath tablePath, ResultSetMetaData metadata, int colIndex)
             throws SQLException {
         return dialectTypeMapper.mapping(tablePath, metadata, colIndex);
+    }
+
+    @Override
+    public Tuple2<CatalogTableStatistics, CatalogColumnStatistics> getPartitionTableStats(
+            ObjectPath tablePath, List<Map<String, String>> remainingPartitions) throws Exception {
+        return null;
     }
 
     @Override

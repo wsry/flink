@@ -144,6 +144,15 @@ public class OptimizerConfigOptions {
                                     + "into a multiple input operator to reduce shuffling and improve performance. Default value is true.");
 
     @Documentation.TableOption(execMode = Documentation.ExecMode.BATCH_STREAMING)
+    public static final ConfigOption<Boolean> TABLE_OPTIMIZER_PUSH_PARTITION_USE_REMAINING_STATS =
+            key("table.optimizer.push-partition-use-remaining-stats")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "When it is true, the optimizer will use remaining partition statistics;"
+                                    + " while it is false, the optimizer will use all partition statistics");
+
+    @Documentation.TableOption(execMode = Documentation.ExecMode.BATCH_STREAMING)
     public static final ConfigOption<Boolean> TABLE_OPTIMIZER_DYNAMIC_FILTERING_ENABLED =
             key("table.optimizer.dynamic-filtering.enabled")
                     .booleanType()

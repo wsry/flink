@@ -26,12 +26,16 @@ import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.catalog.exceptions.PartitionNotExistException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.exceptions.TableNotPartitionedException;
+import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
+import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.abilities.SupportsPartitionPushDown;
 import org.apache.flink.table.expressions.Expression;
 import org.apache.flink.table.expressions.ResolvedExpression;
+import org.apache.flink.table.plan.stats.TableStats;
 import org.apache.flink.table.planner.calcite.FlinkContext;
 import org.apache.flink.table.planner.calcite.FlinkTypeFactory;
 import org.apache.flink.table.planner.plan.abilities.source.PartitionPushDownSpec;
@@ -42,6 +46,7 @@ import org.apache.flink.table.planner.plan.utils.FlinkRelOptUtil;
 import org.apache.flink.table.planner.plan.utils.PartitionPruner;
 import org.apache.flink.table.planner.plan.utils.RexNodeExtractor;
 import org.apache.flink.table.planner.plan.utils.RexNodeToExpressionConverter;
+import org.apache.flink.table.planner.utils.CatalogTableStatisticsConverter;
 import org.apache.flink.table.planner.utils.ShortcutUtils;
 import org.apache.flink.table.planner.utils.TableConfigUtils;
 import org.apache.flink.table.types.logical.LogicalType;
@@ -57,6 +62,8 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.tools.RelBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -77,6 +84,10 @@ import scala.collection.Seq;
  * LogicalTableScan}.
  */
 public class PushPartitionIntoTableSourceScanRule extends RelOptRule {
+
+    private static final Logger LOG =
+            LoggerFactory.getLogger(PushPartitionIntoTableSourceScanRule.class);
+
     public static final PushPartitionIntoTableSourceScanRule INSTANCE =
             new PushPartitionIntoTableSourceScanRule();
 
@@ -185,7 +196,7 @@ public class PushPartitionIntoTableSourceScanRule extends RelOptRule {
         TableSourceTable newTableSourceTable =
                 tableSourceTable.copy(
                         dynamicTableSource,
-                        // the statistics will be updated in FlinkCollectStatisticsProgram
+                        // the statistics will be updated in FlinkRecomputeStatisticsProgram
                         tableSourceTable.getStatistic(),
                         new SourceAbilitySpec[] {partitionPushDownSpec});
         LogicalTableScan newScan =
@@ -344,5 +355,21 @@ public class PushPartitionIntoTableSourceScanRule extends RelOptRule {
                         .collect(Collectors.toList());
         // prune partitions
         return pruner.apply(allPartitions);
+    }
+
+    private Optional<TableStats> getPartitionStats(
+            Catalog catalog, ObjectPath tablePath, Map<String, String> partition) {
+        try {
+            CatalogPartitionSpec spec = new CatalogPartitionSpec(partition);
+            CatalogTableStatistics partitionStat = catalog.getPartitionStatistics(tablePath, spec);
+            CatalogColumnStatistics partitionColStat =
+                    catalog.getPartitionColumnStatistics(tablePath, spec);
+            TableStats stats =
+                    CatalogTableStatisticsConverter.convertToTableStats(
+                            partitionStat, partitionColStat);
+            return Optional.of(stats);
+        } catch (PartitionNotExistException e) {
+            return Optional.empty();
+        }
     }
 }
