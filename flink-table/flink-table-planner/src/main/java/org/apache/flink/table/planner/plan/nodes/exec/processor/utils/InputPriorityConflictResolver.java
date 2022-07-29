@@ -25,11 +25,14 @@ import org.apache.flink.table.planner.plan.nodes.exec.ExecEdge;
 import org.apache.flink.table.planner.plan.nodes.exec.ExecNode;
 import org.apache.flink.table.planner.plan.nodes.exec.InputProperty;
 import org.apache.flink.table.planner.plan.nodes.exec.batch.BatchExecExchange;
+import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecTableSourceScan;
 import org.apache.flink.table.planner.plan.nodes.exec.visitor.AbstractExecNodeExactlyOnceVisitor;
 import org.apache.flink.table.types.logical.RowType;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.apache.flink.table.planner.utils.StreamExchangeModeUtils.getBatchStreamExchangeMode;
 
@@ -59,9 +62,27 @@ public class InputPriorityConflictResolver extends InputPriorityGraphGenerator {
             InputProperty.DamBehavior safeDamBehavior,
             StreamExchangeMode exchangeMode,
             ReadableConfig tableConfig) {
-        super(roots, Collections.emptySet(), safeDamBehavior);
+        super(roots, getDynamicFilteringSourceNodes(roots), safeDamBehavior);
         this.exchangeMode = exchangeMode;
         this.tableConfig = tableConfig;
+    }
+
+    private static Set<ExecNode<?>> getDynamicFilteringSourceNodes(List<ExecNode<?>> roots) {
+        Set<ExecNode<?>> sourceNodes = new HashSet<>();
+        AbstractExecNodeExactlyOnceVisitor visitor =
+                new AbstractExecNodeExactlyOnceVisitor() {
+                    @Override
+                    protected void visitNode(ExecNode<?> node) {
+                        if (node instanceof CommonExecTableSourceScan
+                                && node.getInputEdges().size() > 0) {
+                            sourceNodes.add(node);
+                        } else {
+                            visitInputs(node);
+                        }
+                    }
+                };
+        roots.forEach(n -> n.accept(visitor));
+        return sourceNodes;
     }
 
     public void detectAndResolve() {

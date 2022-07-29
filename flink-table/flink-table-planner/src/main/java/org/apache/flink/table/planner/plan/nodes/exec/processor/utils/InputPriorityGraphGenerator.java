@@ -126,6 +126,9 @@ public abstract class InputPriorityGraphGenerator {
                 new AbstractExecNodeExactlyOnceVisitor() {
                     @Override
                     protected void visitNode(ExecNode<?> node) {
+                        if (node instanceof CommonExecTableSourceScan) {
+                            return;
+                        }
                         if (!boundaries.contains(node)
                                 && !(node instanceof CommonExecTableSourceScan)) {
                             visitInputs(node);
