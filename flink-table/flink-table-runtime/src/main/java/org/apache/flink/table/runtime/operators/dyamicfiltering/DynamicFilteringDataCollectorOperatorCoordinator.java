@@ -25,6 +25,8 @@ import org.apache.flink.runtime.operators.coordination.CoordinatorStore;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 
 import java.util.List;
@@ -60,7 +62,8 @@ public class DynamicFilteringDataCollectorOperatorCoordinator
             return;
         }
 
-        System.out.println("dynamicFilteringDataListenerIDs: " + dynamicFilteringDataListenerIDs);
+        LoggerFactory.getLogger(DynamicFilteringDataCollectorOperatorCoordinator.class)
+                .warn("dynamicFilteringDataListenerIDs: " + dynamicFilteringDataListenerIDs);
         for (String listenerID : dynamicFilteringDataListenerIDs) {
             // push event
             OperatorCoordinator listener = (OperatorCoordinator) coordinatorStore.get(listenerID);

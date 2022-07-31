@@ -169,7 +169,9 @@ abstract class PlannerBase(
   }
 
   def addExtraTransformation(transformation: Transformation[_]): Unit = {
-    extraTransformations.add(transformation)
+    if (!extraTransformations.contains(transformation)) {
+      extraTransformations.add(transformation)
+    }
   }
 
   override def translate(
@@ -460,8 +462,6 @@ abstract class PlannerBase(
     if (defaultParallelism > 0) {
       getExecEnv.getConfig.setParallelism(defaultParallelism)
     }
-
-    extraTransformations.clear()
   }
 
   protected def afterTranslation(): Unit = {

@@ -111,10 +111,10 @@ public class DynamicFileSplitEnumerator<SplitT extends FileSourceSplit>
             createSplitAssigner(null);
         }
 
-        if (LOG.isInfoEnabled()) {
+        if (LOG.isDebugEnabled()) {
             final String hostInfo =
                     hostname == null ? "(no host locality info)" : "(on host '" + hostname + "')";
-            LOG.info("Subtask {} {} is requesting a file source split", subtask, hostInfo);
+            LOG.debug("Subtask {} {} is requesting a file source split", subtask, hostInfo);
         }
 
         final Optional<FileSourceSplit> nextSplit = getNextSplit(hostname);
@@ -122,7 +122,7 @@ public class DynamicFileSplitEnumerator<SplitT extends FileSourceSplit>
             final FileSourceSplit split = nextSplit.get();
             context.assignSplit((SplitT) split, subtask);
             assignedSplits.add((SplitT) split);
-            LOG.info("Assigned split to subtask {} : {}", subtask, split);
+            LOG.debug("Assigned split to subtask {} : {}", subtask, split);
         } else {
             context.signalNoMoreSplits(subtask);
             LOG.info("No more splits available for subtask {}", subtask);
@@ -146,7 +146,7 @@ public class DynamicFileSplitEnumerator<SplitT extends FileSourceSplit>
     @Override
     public void handleSourceEvent(int subtaskId, SourceEvent sourceEvent) {
         if (sourceEvent instanceof DynamicFilteringEvent) {
-            LOG.info("Received DynamicFilteringEvent: {}", subtaskId);
+            LOG.warn("Received DynamicFilteringEvent: {}", subtaskId);
             createSplitAssigner(((DynamicFilteringEvent) sourceEvent).getData());
         } else {
             LOG.error("Received unrecognized event: {}", sourceEvent);
