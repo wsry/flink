@@ -103,6 +103,6 @@ public class PlannerTest {
         //            System.out.println("JobVertex" + ":" + vertex);
         //        }
         //
-        //        tEnv.executeSql(queryString);
+        tEnv.executeSql(queryString);
     }
 }

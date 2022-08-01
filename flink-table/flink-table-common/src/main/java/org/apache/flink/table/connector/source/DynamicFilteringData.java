@@ -26,6 +26,8 @@ import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
 
+import org.slf4j.LoggerFactory;
+
 import java.io.ByteArrayInputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -33,6 +35,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.IntStream;
+
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** DynamicFilteringData. */
 public class DynamicFilteringData implements Serializable {
@@ -69,9 +73,9 @@ public class DynamicFilteringData implements Serializable {
 
     public boolean contains(RowData row) {
         Optional<List<RowData>> dataOpt = getData();
-        if (!dataOpt.isPresent()) {
-            return true;
-        } else if (row.getArity() != rowType.getFieldCount()) {
+        checkState(dataOpt.isPresent(), "The data should be exists");
+
+        if (row.getArity() != rowType.getFieldCount()) {
             throw new TableException("The arity of RowData is different");
         } else {
             List<RowData> data = dataOpt.get();
@@ -82,11 +86,16 @@ public class DynamicFilteringData implements Serializable {
             for (RowData rd : data) {
                 boolean equals = true;
                 for (int i = 0; i < rowType.getFieldCount(); ++i) {
-                    if (!Objects.equals(
-                            fieldGetters[i].getFieldOrNull(row),
-                            fieldGetters[i].getFieldOrNull(rd))) {
-                        equals = false;
-                        break;
+                    try {
+                        if (!Objects.equals(
+                                fieldGetters[i].getFieldOrNull(row),
+                                fieldGetters[i].getFieldOrNull(rd))) {
+                            equals = false;
+                            break;
+                        }
+                    } catch (ClassCastException e) {
+                        LoggerFactory.getLogger(DynamicFilteringData.class)
+                                .warn("indicating the type is not equal", e);
                     }
                 }
                 if (equals) {
