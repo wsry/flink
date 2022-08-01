@@ -40,6 +40,7 @@ public class DynamicFilteringData implements Serializable {
     private final RowType rowType;
     private final List<byte[]> serializedData;
     private final boolean exceedThreshold;
+    private transient volatile boolean prepared = false;
     private transient List<RowData> data;
 
     public DynamicFilteringData(
@@ -62,19 +63,7 @@ public class DynamicFilteringData implements Serializable {
             return Optional.empty();
         }
 
-        if (data == null) {
-            data = new ArrayList<>();
-            TypeSerializer<RowData> serializer = typeInfo.createSerializer(new ExecutionConfig());
-            for (byte[] bytes : serializedData) {
-                try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-                        DataInputViewStreamWrapper inView = new DataInputViewStreamWrapper(bais)) {
-                    RowData partition = serializer.deserialize(inView);
-                    data.add(partition);
-                } catch (Exception e) {
-                    throw new TableException("Unable to deserialize the value.", e);
-                }
-            }
-        }
+        prepare();
         return Optional.of(data);
     }
 
@@ -108,10 +97,37 @@ public class DynamicFilteringData implements Serializable {
         }
     }
 
+    private void prepare() {
+        if (!prepared) {
+            synchronized (this) {
+                if (!prepared) {
+                    doPrepare();
+                    prepared = true;
+                }
+            }
+        }
+    }
+
+    private void doPrepare() {
+        data = new ArrayList<>();
+        TypeSerializer<RowData> serializer = typeInfo.createSerializer(new ExecutionConfig());
+        for (byte[] bytes : serializedData) {
+            try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+                    DataInputViewStreamWrapper inView = new DataInputViewStreamWrapper(bais)) {
+                RowData partition = serializer.deserialize(inView);
+                data.add(partition);
+            } catch (Exception e) {
+                throw new TableException("Unable to deserialize the value.", e);
+            }
+        }
+    }
+
     @Override
     public String toString() {
-        Optional<List<RowData>> data = getData();
-        return data.map(p -> "DynamicFilteringData{data=" + p + '}')
-                .orElse("DynamicFilteringData{exceedThreshold=true}");
+        return "DynamicFilteringData{exceedThreshold="
+                + exceedThreshold
+                + ", data size="
+                + serializedData.size()
+                + "}";
     }
 }
