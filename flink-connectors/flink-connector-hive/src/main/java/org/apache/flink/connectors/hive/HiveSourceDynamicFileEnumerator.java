@@ -91,6 +91,7 @@ public class HiveSourceDynamicFileEnumerator implements DynamicFileEnumerator {
         } catch (Exception e) {
             LOG.error("Failed to set partition data, will use all partitions", e);
             finalPartitions = allPartitions;
+            throw new RuntimeException("Failed to apply dynamic filtering", e);
         }
     }
 
