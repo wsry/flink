@@ -78,7 +78,7 @@ class BatchPlanner(
     if (getTableConfig.get(OptimizerConfigOptions.TABLE_OPTIMIZER_DYNAMIC_FILTERING_ENABLED)) {
       processors.add(new DynamicFilteringDependencyProcessor())
     }
-
+    processors.add(new ResetTransformationProcessor)
     processors
   }
 
@@ -95,11 +95,7 @@ class BatchPlanner(
     }
     afterTranslation()
 
-    print("extra:" + extraTransformations + ", " + planner.extraTransformations)
-    val result = extraTransformations ++ planner.extraTransformations ++ transformations
-    // now we have to clean it...
-    extraTransformations.clear()
-    result
+    planner.extraTransformations ++ transformations
   }
 
   override def explain(operations: util.List[Operation], extraDetails: ExplainDetail*): String = {

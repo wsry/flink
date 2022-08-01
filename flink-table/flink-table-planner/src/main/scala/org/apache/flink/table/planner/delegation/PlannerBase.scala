@@ -462,6 +462,7 @@ abstract class PlannerBase(
     if (defaultParallelism > 0) {
       getExecEnv.getConfig.setParallelism(defaultParallelism)
     }
+    extraTransformations.clear()
   }
 
   protected def afterTranslation(): Unit = {
