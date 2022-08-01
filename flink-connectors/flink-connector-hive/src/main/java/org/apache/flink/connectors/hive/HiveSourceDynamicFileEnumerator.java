@@ -20,6 +20,7 @@ package org.apache.flink.connectors.hive;
 
 import org.apache.flink.connector.file.src.FileSourceSplit;
 import org.apache.flink.connector.file.src.enumerate.DynamicFileEnumerator;
+import org.apache.flink.connectors.hive.util.JobConfUtils;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.table.connector.source.DynamicFilteringData;
 import org.apache.flink.table.data.GenericRowData;
@@ -98,9 +99,8 @@ public class HiveSourceDynamicFileEnumerator implements DynamicFileEnumerator {
         GenericRowData rowData = new GenericRowData(rowType.getFieldCount());
         for (int i = 0; i < rowType.getFieldCount(); ++i) {
             String value = partition.getPartitionSpec().get(dynamicPartitionKeys.get(i));
-            // For partition table, hive will add a default partition named
-            // "__HIVE_DEFAULT_PARTITION__"
-            if (value.equals("__HIVE_DEFAULT_PARTITION__")) {
+            // For partition table, hive will add a default partition.
+            if (value.equals(JobConfUtils.getDefaultPartitionName(jobConf))) {
                 rowData.setField(i, value);
                 continue;
             }

@@ -36,6 +36,7 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.util.Preconditions;
 
 import org.apache.hadoop.hive.common.type.HiveDecimal;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
@@ -253,7 +254,9 @@ public class HiveStatsUtil {
                                 .getPartitionStatistics(
                                         objectPath,
                                         HiveCatalog.createPartitionSpec(
-                                                partition, "__HIVE_DEFAULT_PARTITION__"))
+                                                partition,
+                                                hiveCatalog.getHiveConf().getVar(
+                                                        HiveConf.ConfVars.DEFAULTPARTITIONNAME)))
                                 .getRowCount();
             } catch (Exception e) {
                 LOG.info(
@@ -496,8 +499,8 @@ public class HiveStatsUtil {
     }
 
     private static CatalogColumnStatisticsDataBase createTableColumnStatsFromPartitionedName(
-            String partitionName) {
-        if (partitionName.equals("__HIVE_DEFAULT_PARTITION__")) {
+            String partitionName, HiveConf hiveConf) {
+        if (partitionName.equals(hiveConf.getVar(HiveConf.ConfVars.DEFAULTPARTITIONNAME))) {
             // when it's default partition, the ndv should be 1 and null count should be 1
             return new CatalogColumnStatisticsDataLong(null, null, 1L, 1L);
         } else {

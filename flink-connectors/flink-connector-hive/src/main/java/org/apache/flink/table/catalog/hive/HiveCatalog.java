@@ -24,6 +24,7 @@ import org.apache.flink.api.java.hadoop.mapred.utils.HadoopUtils;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.connectors.hive.HiveDynamicTableFactory;
 import org.apache.flink.connectors.hive.HiveTableFactory;
+import org.apache.flink.connectors.hive.util.JobConfUtils;
 import org.apache.flink.sql.parser.hive.ddl.HiveDDLUtils;
 import org.apache.flink.sql.parser.hive.ddl.SqlAlterHiveDatabase;
 import org.apache.flink.sql.parser.hive.ddl.SqlAlterHiveDatabaseOwner;
@@ -104,6 +105,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
+import org.apache.hadoop.mapred.jobcontrol.Job;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1674,10 +1676,11 @@ public class HiveCatalog extends AbstractCatalog {
                 Long ndv = null;
                 Long nullCount = null;
                 String partitionCol = hiveTable.getPartitionKeys().get(0).getName();
+                String defaultPartitionName = getHiveConf().getVar(HiveConf.ConfVars.DEFAULTPARTITIONNAME);
                 for (String partition : partNames) {
                     String[] partVal = partition.split("=");
                     String value = partVal[1];
-                    if (value.equals("__HIVE_DEFAULT_PARTITION__")) {
+                    if (value.equals(defaultPartitionName)) {
                         ndv = HiveStatsUtil.add(ndv, 1L);
                         try {
                             nullCount =
@@ -1686,13 +1689,12 @@ public class HiveCatalog extends AbstractCatalog {
                                                     new CatalogPartitionSpec(
                                                             Collections.singletonMap(
                                                                     partitionCol,
-                                                                    "__HIVE_DEFAULT_PARTITION__")))
+                                                                    defaultPartitionName)))
                                             .getRowCount();
                         } catch (Exception e) {
                             LOGGER.info(
                                     "Fail to get getPartitionColumnStatistics for partition {}={}",
-                                    partitionCol,
-                                    "__HIVE_DEFAULT_PARTITION__");
+                                    partitionCol, defaultPartitionName);
                         }
                     } else {
                         Long pv = Long.valueOf(value);
@@ -1844,10 +1846,11 @@ public class HiveCatalog extends AbstractCatalog {
         Long ndv = null;
         Long nullCount = null;
         String partitionCol = hiveTable.getPartitionKeys().get(0).getName();
+        String defaultPartitionName = getHiveConf().getVar(HiveConf.ConfVars.DEFAULTPARTITIONNAME);
         for (String partition : partitionNames) {
             String[] partVal = partition.split("=");
             String value = partVal[1];
-            if (value.equals("__HIVE_DEFAULT_PARTITION__")) {
+            if (value.equals(defaultPartitionName)) {
                 ndv = HiveStatsUtil.add(ndv, 1L);
                 try {
                     nullCount =
@@ -1855,14 +1858,12 @@ public class HiveCatalog extends AbstractCatalog {
                                             tablePath,
                                             new CatalogPartitionSpec(
                                                     Collections.singletonMap(
-                                                            partitionCol,
-                                                            "__HIVE_DEFAULT_PARTITION__")))
+                                                            partitionCol, defaultPartitionName)))
                                     .getRowCount();
                 } catch (Exception e) {
                     LOGGER.info(
                             "Fail to get getPartitionColumnStatistics for partition {}={}",
-                            partitionCol,
-                            "__HIVE_DEFAULT_PARTITION__");
+                            partitionCol, defaultPartitionName);
                 }
             } else {
                 Long pv = Long.valueOf(value);
