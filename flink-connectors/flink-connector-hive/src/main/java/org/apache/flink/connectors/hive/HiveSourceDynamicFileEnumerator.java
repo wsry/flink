@@ -98,6 +98,12 @@ public class HiveSourceDynamicFileEnumerator implements DynamicFileEnumerator {
         GenericRowData rowData = new GenericRowData(rowType.getFieldCount());
         for (int i = 0; i < rowType.getFieldCount(); ++i) {
             String value = partition.getPartitionSpec().get(dynamicPartitionKeys.get(i));
+            // For partition table, hive will add a default partition named
+            // "__HIVE_DEFAULT_PARTITION__"
+            if (value.equals("__HIVE_DEFAULT_PARTITION__")) {
+                rowData.setField(i, value);
+                continue;
+            }
             switch (rowType.getTypeAt(i).getTypeRoot()) {
                 case INTEGER:
                     rowData.setField(i, Integer.valueOf(value));
