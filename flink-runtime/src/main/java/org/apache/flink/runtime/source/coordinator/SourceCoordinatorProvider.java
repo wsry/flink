@@ -83,12 +83,13 @@ public class SourceCoordinatorProvider<SplitT extends SourceSplit>
                         context,
                         splitSerializer,
                         context.isConcurrentExecutionAttemptsSupported());
-        SourceCoordinator<SplitT, ?> coordinator = new SourceCoordinator<>(
-                operatorName,
-                source,
-                sourceCoordinatorContext,
-                context.getCoordinatorStore(),
-                alignmentParams);
+        SourceCoordinator<SplitT, ?> coordinator =
+                new SourceCoordinator<>(
+                        operatorName,
+                        source,
+                        sourceCoordinatorContext,
+                        context.getCoordinatorStore(),
+                        alignmentParams);
         coordinator.setCoordinatorListeningID(coordinatorListeningID);
         return coordinator;
     }

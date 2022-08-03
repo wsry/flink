@@ -22,7 +22,6 @@ import org.apache.flink.annotation.Public;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 
 import java.io.Serializable;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * The interface for Source. It acts like a factory class that helps construct the {@link

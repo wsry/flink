@@ -36,7 +36,6 @@ import org.apache.flink.table.runtime.operators.dyamicfiltering.DynamicFiltering
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 

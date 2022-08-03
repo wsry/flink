@@ -255,8 +255,11 @@ public class HiveStatsUtil {
                                         objectPath,
                                         HiveCatalog.createPartitionSpec(
                                                 partition,
-                                                hiveCatalog.getHiveConf().getVar(
-                                                        HiveConf.ConfVars.DEFAULTPARTITIONNAME)))
+                                                hiveCatalog
+                                                        .getHiveConf()
+                                                        .getVar(
+                                                                HiveConf.ConfVars
+                                                                        .DEFAULTPARTITIONNAME)))
                                 .getRowCount();
             } catch (Exception e) {
                 LOG.info(

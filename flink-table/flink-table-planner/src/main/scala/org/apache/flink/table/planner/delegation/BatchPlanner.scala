@@ -17,14 +17,11 @@
  */
 package org.apache.flink.table.planner.delegation
 
-import org.apache.calcite.plan.{ConventionTraitDef, RelTrait, RelTraitDef}
-import org.apache.calcite.rel.RelCollationTraitDef
-import org.apache.calcite.sql.SqlExplainLevel
 import org.apache.flink.api.common.RuntimeExecutionMode
 import org.apache.flink.api.dag.Transformation
 import org.apache.flink.configuration.ExecutionOptions
-import org.apache.flink.table.api.config.OptimizerConfigOptions
 import org.apache.flink.table.api.{ExplainDetail, PlanReference, TableConfig, TableException}
+import org.apache.flink.table.api.config.OptimizerConfigOptions
 import org.apache.flink.table.catalog.{CatalogManager, FunctionCatalog}
 import org.apache.flink.table.delegation.{Executor, InternalPlan}
 import org.apache.flink.table.module.ModuleManager
@@ -38,7 +35,12 @@ import org.apache.flink.table.planner.plan.optimize.{BatchCommonSubGraphBasedOpt
 import org.apache.flink.table.planner.plan.utils.FlinkRelOptUtil
 import org.apache.flink.table.planner.utils.DummyStreamExecutionEnvironment
 
+import org.apache.calcite.plan.{ConventionTraitDef, RelTrait, RelTraitDef}
+import org.apache.calcite.rel.RelCollationTraitDef
+import org.apache.calcite.sql.SqlExplainLevel
+
 import java.util
+
 import scala.collection.JavaConversions._
 
 class BatchPlanner(

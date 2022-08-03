@@ -26,18 +26,18 @@ import org.apache.flink.table.planner.plan.nodes.exec.visitor.AbstractExecNodeEx
 /** ResetTransformationProcessor. */
 public class ResetTransformationProcessor implements ExecNodeGraphProcessor {
 
-	@Override
-	public ExecNodeGraph process(ExecNodeGraph execGraph, ProcessorContext context) {
-		AbstractExecNodeExactlyOnceVisitor visitor =
-				new AbstractExecNodeExactlyOnceVisitor() {
+    @Override
+    public ExecNodeGraph process(ExecNodeGraph execGraph, ProcessorContext context) {
+        AbstractExecNodeExactlyOnceVisitor visitor =
+                new AbstractExecNodeExactlyOnceVisitor() {
 
-					@Override
-					protected void visitNode(ExecNode<?> node) {
-						((ExecNodeBase<?>) node).resetTransformation();
-						visitInputs(node);
-					}
-				};
-		execGraph.getRootNodes().forEach(r -> r.accept(visitor));
-		return execGraph;
-	}
+                    @Override
+                    protected void visitNode(ExecNode<?> node) {
+                        ((ExecNodeBase<?>) node).resetTransformation();
+                        visitInputs(node);
+                    }
+                };
+        execGraph.getRootNodes().forEach(r -> r.accept(visitor));
+        return execGraph;
+    }
 }
