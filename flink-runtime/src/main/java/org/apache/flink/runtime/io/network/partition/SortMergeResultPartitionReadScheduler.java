@@ -85,8 +85,8 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
     /** Executor to run the shuffle data reading task. */
     private final Executor ioExecutor;
 
-    /** Number of subpartitions in the target result partition. */
-    private final int numSubpartitions;
+    /** Maximum number of buffers can be allocated by this partition reader. */
+    private final int maxRequestedBuffers;
 
     /**
      * Maximum time to wait when requesting read buffers from the buffer pool before throwing an
@@ -150,11 +150,15 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
         this.lock = checkNotNull(lock);
         this.bufferPool = checkNotNull(bufferPool);
         this.ioExecutor = checkNotNull(ioExecutor);
-        this.numSubpartitions = numSubpartitions;
-
+        // one partition reader can consume at most Math.max(16M, numSubpartitions) (the expected
+        // buffers per request is 4M) buffers for data read, which means larger parallelism, more
+        // buffers. Currently, it is only an empirical strategy which can not be configured.
+        this.maxRequestedBuffers =
+                Math.max(4 * bufferPool.getNumBuffersPerRequest(), numSubpartitions);
         this.bufferRequestTimeout = checkNotNull(bufferRequestTimeout);
     }
 
+    @Override
     public synchronized void run() {
         Set<SortMergeSubpartitionReader> finishedReaders = new HashSet<>();
         Queue<MemorySegment> buffers;
@@ -388,12 +392,6 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
 
     private void mayTriggerReading() {
         assert Thread.holdsLock(lock);
-
-        // one partition reader can consume at most Math.max(16M, numReaders) (the expected
-        // buffers per request is 4M) buffers for data read, which means larger parallelism, more
-        // buffers. Currently, it is only an empirical strategy which can not be configured.
-        int maxRequestedBuffers =
-                Math.max(4 * bufferPool.getNumBuffersPerRequest(), allReaders.size());
 
         if (!isRunning
                 && !allReaders.isEmpty()
