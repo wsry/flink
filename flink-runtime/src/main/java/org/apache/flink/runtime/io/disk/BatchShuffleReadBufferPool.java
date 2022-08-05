@@ -135,7 +135,7 @@ public class BatchShuffleReadBufferPool {
     }
 
     public int getMaxConcurrentRequests() {
-        return numBuffersPerRequest > 0 ? numTotalBuffers / numBuffersPerRequest : 0;
+        return Math.min(8, numBuffersPerRequest > 0 ? numTotalBuffers / numBuffersPerRequest : 0);
     }
 
     public int getBufferSize() {
