@@ -59,6 +59,7 @@ SCHEDULER="${1:-Default}"
 set_config_key "jobmanager.scheduler" "${SCHEDULER}"
 set_config_key "taskmanager.memory.process.size" "4096m"
 set_config_key "taskmanager.memory.network.fraction" "0.2"
+set_config_key "task.cancellation.timeout" "40960000"
 
 if [ "${SCHEDULER}" == "Default" ]; then
     set_config_key "taskmanager.numberOfTaskSlots" "4"
