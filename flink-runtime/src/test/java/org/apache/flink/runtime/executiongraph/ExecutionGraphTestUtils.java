@@ -35,7 +35,6 @@ import org.apache.flink.runtime.scheduler.DefaultSchedulerBuilder;
 import org.apache.flink.runtime.scheduler.SchedulerBase;
 import org.apache.flink.runtime.scheduler.strategy.ConsumedPartitionGroup;
 import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
-import org.apache.flink.runtime.taskmanager.TaskExecutionState;
 import org.apache.flink.runtime.testtasks.NoOpInvokable;
 import org.apache.flink.runtime.testutils.DirectScheduledExecutorService;
 
@@ -44,7 +43,6 @@ import javax.annotation.Nullable;
 import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.List;
-import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
@@ -249,23 +247,6 @@ public class ExecutionGraphTestUtils {
         for (ExecutionVertex vertex : eg.getAllExecutionVertices()) {
             vertex.getCurrentExecutionAttempt().completeCancelling();
         }
-    }
-
-    public static void finishJobVertex(ExecutionGraph executionGraph, JobVertexID jobVertexId) {
-        for (ExecutionVertex vertex :
-                Objects.requireNonNull(executionGraph.getJobVertex(jobVertexId))
-                        .getTaskVertices()) {
-            finishExecutionVertex(executionGraph, vertex);
-        }
-    }
-
-    public static void finishExecutionVertex(
-            ExecutionGraph executionGraph, ExecutionVertex executionVertex) {
-        executionGraph.updateState(
-                new TaskExecutionStateTransition(
-                        new TaskExecutionState(
-                                executionVertex.getCurrentExecutionAttempt().getAttemptId(),
-                                ExecutionState.FINISHED)));
     }
 
     /**

@@ -206,8 +206,7 @@ public class JobIntermediateDatasetReuseTest {
                 sender,
                 DistributionPattern.POINTWISE,
                 ResultPartitionType.BLOCKING_PERSISTENT,
-                intermediateDataSetID,
-                false);
+                intermediateDataSetID);
 
         return new JobGraph(null, "First Job", sender, receiver);
     }

@@ -170,7 +170,7 @@ class ExecutionJobVertexTest {
             int parallelism, int maxParallelism, int defaultMaxParallelism) throws Exception {
         JobVertex jobVertex = new JobVertex("testVertex");
         jobVertex.setInvokableClass(AbstractInvokable.class);
-        jobVertex.getOrCreateResultDataSet(
+        jobVertex.createAndAddResultDataSet(
                 new IntermediateDataSetID(), ResultPartitionType.BLOCKING);
 
         if (maxParallelism > 0) {

@@ -1246,7 +1246,7 @@ public class JobGraphGenerator implements Visitor<PlanNode> {
                 predecessorVertex != null,
                 "Bug: Chained task has not been assigned its containing vertex when connecting.");
 
-        predecessorVertex.getOrCreateResultDataSet(
+        predecessorVertex.createAndAddResultDataSet(
                 // use specified intermediateDataSetID
                 new IntermediateDataSetID(
                         ((BlockingShuffleOutputFormat) userCodeObject).getIntermediateDataSetId()),
@@ -1326,7 +1326,7 @@ public class JobGraphGenerator implements Visitor<PlanNode> {
 
         JobEdge edge =
                 targetVertex.connectNewDataSetAsInput(
-                        sourceVertex, distributionPattern, resultType, isBroadcast);
+                        sourceVertex, distributionPattern, resultType);
 
         // -------------- configure the source task's ship strategy strategies in task config
         // --------------
@@ -1403,6 +1403,7 @@ public class JobGraphGenerator implements Visitor<PlanNode> {
                 channel.getTempMode() == TempMode.NONE ? null : channel.getTempMode().toString();
 
         edge.setShipStrategyName(shipStrategy);
+        edge.setBroadcast(isBroadcast);
         edge.setForward(channel.getShipStrategy() == ShipStrategyType.FORWARD);
         edge.setPreProcessingOperationName(localStrategy);
         edge.setOperatorLevelCachingDescription(caching);

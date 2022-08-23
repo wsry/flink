@@ -27,6 +27,7 @@ import org.apache.flink.runtime.scheduler.strategy.ResultPartitionState;
 import org.apache.flink.runtime.scheduler.strategy.SchedulingResultPartition;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -44,7 +45,7 @@ class DefaultResultPartition implements SchedulingResultPartition {
 
     private DefaultExecutionVertex producer;
 
-    private final Supplier<List<ConsumerVertexGroup>> consumerVertexGroupsSupplier;
+    private final Supplier<ConsumerVertexGroup> consumerVertexGroupSupplier;
 
     private final Supplier<List<ConsumedPartitionGroup>> consumerPartitionGroupSupplier;
 
@@ -53,13 +54,13 @@ class DefaultResultPartition implements SchedulingResultPartition {
             IntermediateDataSetID intermediateDataSetId,
             ResultPartitionType partitionType,
             Supplier<ResultPartitionState> resultPartitionStateSupplier,
-            Supplier<List<ConsumerVertexGroup>> consumerVertexGroupsSupplier,
+            Supplier<ConsumerVertexGroup> consumerVertexGroupSupplier,
             Supplier<List<ConsumedPartitionGroup>> consumerPartitionGroupSupplier) {
         this.resultPartitionId = checkNotNull(partitionId);
         this.intermediateDataSetId = checkNotNull(intermediateDataSetId);
         this.partitionType = checkNotNull(partitionType);
         this.resultPartitionStateSupplier = checkNotNull(resultPartitionStateSupplier);
-        this.consumerVertexGroupsSupplier = checkNotNull(consumerVertexGroupsSupplier);
+        this.consumerVertexGroupSupplier = checkNotNull(consumerVertexGroupSupplier);
         this.consumerPartitionGroupSupplier = checkNotNull(consumerPartitionGroupSupplier);
     }
 
@@ -89,8 +90,8 @@ class DefaultResultPartition implements SchedulingResultPartition {
     }
 
     @Override
-    public List<ConsumerVertexGroup> getConsumerVertexGroups() {
-        return checkNotNull(consumerVertexGroupsSupplier.get());
+    public Optional<ConsumerVertexGroup> getConsumerVertexGroup() {
+        return Optional.ofNullable(consumerVertexGroupSupplier.get());
     }
 
     @Override

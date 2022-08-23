@@ -81,7 +81,6 @@ class DefaultExecutionVertexTest {
         List<ConsumedPartitionGroup> consumedPartitionGroups =
                 Collections.singletonList(
                         ConsumedPartitionGroup.fromSinglePartition(
-                                1,
                                 intermediateResultPartitionId,
                                 schedulingResultPartition.getResultType()));
         Map<IntermediateResultPartitionID, DefaultResultPartition> resultPartitionById =

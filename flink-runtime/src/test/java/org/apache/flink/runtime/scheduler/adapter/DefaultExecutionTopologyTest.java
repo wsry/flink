@@ -52,6 +52,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -313,23 +314,17 @@ class DefaultExecutionTopologyTest {
 
             assertPartitionEquals(originalPartition, adaptedPartition);
 
-            List<ExecutionVertexID> originalConsumerIds = new ArrayList<>();
-            for (ConsumerVertexGroup consumerVertexGroup :
-                    originalPartition.getConsumerVertexGroups()) {
-                for (ExecutionVertexID executionVertexId : consumerVertexGroup) {
-                    originalConsumerIds.add(executionVertexId);
-                }
-            }
-            List<ConsumerVertexGroup> adaptedConsumers = adaptedPartition.getConsumerVertexGroups();
-            assertThat(adaptedConsumers).isNotEmpty();
-            for (ExecutionVertexID originalId : originalConsumerIds) {
+            ConsumerVertexGroup consumerVertexGroup = originalPartition.getConsumerVertexGroup();
+            Optional<ConsumerVertexGroup> adaptedConsumers =
+                    adaptedPartition.getConsumerVertexGroup();
+            assertThat(adaptedConsumers).isPresent();
+            for (ExecutionVertexID originalId : consumerVertexGroup) {
                 // it is sufficient to verify that some vertex exists with the correct ID here,
                 // since deep equality is verified later in the main loop
                 // this DOES rely on an implicit assumption that the vertices objects returned by
                 // the topology are
                 // identical to those stored in the partition
-                assertThat(adaptedConsumers.stream().flatMap(IterableUtils::toStream))
-                        .contains(originalId);
+                assertThat(adaptedConsumers.get()).contains(originalId);
             }
         }
     }

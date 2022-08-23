@@ -262,7 +262,7 @@ public class DefaultExecutionTopology implements SchedulingTopology {
             List<DefaultResultPartition> producedPartitions =
                     generateProducedSchedulingResultPartition(
                             vertex.getProducedPartitions(),
-                            edgeManager::getConsumerVertexGroupsForPartition);
+                            edgeManager::getConsumerVertexGroupForPartition);
 
             producedPartitions.forEach(
                     partition -> resultPartitionsById.put(partition.getId(), partition));
@@ -285,8 +285,8 @@ public class DefaultExecutionTopology implements SchedulingTopology {
     private static List<DefaultResultPartition> generateProducedSchedulingResultPartition(
             Map<IntermediateResultPartitionID, IntermediateResultPartition>
                     producedIntermediatePartitions,
-            Function<IntermediateResultPartitionID, List<ConsumerVertexGroup>>
-                    partitionConsumerVertexGroupsRetriever) {
+            Function<IntermediateResultPartitionID, ConsumerVertexGroup>
+                    partitionConsumerVertexGroupRetriever) {
 
         List<DefaultResultPartition> producedSchedulingPartitions =
                 new ArrayList<>(producedIntermediatePartitions.size());
@@ -305,8 +305,8 @@ public class DefaultExecutionTopology implements SchedulingTopology {
                                                                 ? ResultPartitionState.CONSUMABLE
                                                                 : ResultPartitionState.CREATED,
                                                 () ->
-                                                        partitionConsumerVertexGroupsRetriever
-                                                                .apply(irp.getPartitionId()),
+                                                        partitionConsumerVertexGroupRetriever.apply(
+                                                                irp.getPartitionId()),
                                                 irp::getConsumedPartitionGroups)));
 
         return producedSchedulingPartitions;

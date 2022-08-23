@@ -30,11 +30,12 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** Class that manages all the connections between tasks. */
 public class EdgeManager {
 
-    private final Map<IntermediateResultPartitionID, List<ConsumerVertexGroup>> partitionConsumers =
+    private final Map<IntermediateResultPartitionID, ConsumerVertexGroup> partitionConsumers =
             new HashMap<>();
 
     private final Map<ExecutionVertexID, List<ConsumedPartitionGroup>> vertexConsumedPartitions =
@@ -49,9 +50,9 @@ public class EdgeManager {
 
         checkNotNull(consumerVertexGroup);
 
-        List<ConsumerVertexGroup> groups =
-                getConsumerVertexGroupsForPartitionInternal(resultPartitionId);
-        groups.add(consumerVertexGroup);
+        checkState(
+                partitionConsumers.putIfAbsent(resultPartitionId, consumerVertexGroup) == null,
+                "Currently one partition can have at most one consumer group");
     }
 
     public void connectVertexWithConsumedPartitionGroup(
@@ -65,20 +66,14 @@ public class EdgeManager {
         consumedPartitions.add(consumedPartitionGroup);
     }
 
-    private List<ConsumerVertexGroup> getConsumerVertexGroupsForPartitionInternal(
-            IntermediateResultPartitionID resultPartitionId) {
-        return partitionConsumers.computeIfAbsent(resultPartitionId, id -> new ArrayList<>());
-    }
-
     private List<ConsumedPartitionGroup> getConsumedPartitionGroupsForVertexInternal(
             ExecutionVertexID executionVertexId) {
         return vertexConsumedPartitions.computeIfAbsent(executionVertexId, id -> new ArrayList<>());
     }
 
-    public List<ConsumerVertexGroup> getConsumerVertexGroupsForPartition(
+    public ConsumerVertexGroup getConsumerVertexGroupForPartition(
             IntermediateResultPartitionID resultPartitionId) {
-        return Collections.unmodifiableList(
-                getConsumerVertexGroupsForPartitionInternal(resultPartitionId));
+        return partitionConsumers.get(resultPartitionId);
     }
 
     public List<ConsumedPartitionGroup> getConsumedPartitionGroupsForVertex(
@@ -104,10 +99,5 @@ public class EdgeManager {
             IntermediateResultPartitionID resultPartitionId) {
         return Collections.unmodifiableList(
                 getConsumedPartitionGroupsByIdInternal(resultPartitionId));
-    }
-
-    public int getNumberOfConsumedPartitionGroupsById(
-            IntermediateResultPartitionID resultPartitionId) {
-        return getConsumedPartitionGroupsByIdInternal(resultPartitionId).size();
     }
 }

@@ -133,9 +133,7 @@ public class TaskDeploymentDescriptorFactory {
             IntermediateResult consumedIntermediateResult = resultPartition.getIntermediateResult();
             SubpartitionIndexRange consumedSubpartitionRange =
                     computeConsumedSubpartitionRange(
-                            consumedPartitionGroup.getNumConsumers(),
-                            resultPartition,
-                            executionId.getSubtaskIndex());
+                            resultPartition, executionId.getSubtaskIndex());
 
             IntermediateDataSetID resultId = consumedIntermediateResult.getId();
             ResultPartitionType partitionType = consumedIntermediateResult.getResultType();
@@ -166,9 +164,8 @@ public class TaskDeploymentDescriptorFactory {
     }
 
     public static SubpartitionIndexRange computeConsumedSubpartitionRange(
-            int numConsumers,
-            IntermediateResultPartition resultPartition,
-            int consumerSubtaskIndex) {
+            IntermediateResultPartition resultPartition, int consumerSubtaskIndex) {
+        int numConsumers = resultPartition.getConsumerVertexGroup().size();
         int consumerIndex = consumerSubtaskIndex % numConsumers;
         IntermediateResult consumedIntermediateResult = resultPartition.getIntermediateResult();
         int numSubpartitions = resultPartition.getNumberOfSubpartitions();
