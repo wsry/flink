@@ -99,8 +99,6 @@ public final class SharedPoolNettyShuffleServiceFactory
                 resultPartitionManager,
                 connectionManager,
                 shuffleEnvironmentContext.getParentMetricGroup(),
-                shuffleEnvironmentContext.getIoExecutor(),
-                shuffleEnvironmentContext.getNumberOfSlots(),
-                shuffleEnvironmentContext.getTmpDirPaths());
+                shuffleEnvironmentContext.getIoExecutor());
     }
 }
