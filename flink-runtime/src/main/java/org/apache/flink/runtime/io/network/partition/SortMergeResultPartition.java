@@ -188,7 +188,6 @@ public class SortMergeResultPartition extends ResultPartition {
 
         // initialize the buffer pool eagerly to avoid reporting errors such as OOM too late
         readBufferPool.initialize();
-        super.setup();
 
         int numRequiredBuffer = bufferPool.getNumberOfRequiredMemorySegments();
         if (numRequiredBuffer < 2) {
