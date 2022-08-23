@@ -33,7 +33,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -70,17 +69,6 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
      * throwing an exception.
      */
     private static final Duration DEFAULT_BUFFER_REQUEST_TIMEOUT = Duration.ofMinutes(5);
-
-    /** Used to read buffer headers from file channel. */
-    private final ByteBuffer headerBuf = BufferReaderWriterUtil.allocatedHeaderBuffer();
-
-    /** Used to read index entry for file reader initializing. */
-    private final ByteBuffer indexEntryBufferInit =
-            ByteBuffer.allocateDirect(PartitionedFile.INDEX_ENTRY_SIZE);
-
-    /** Used to read index entry for file reader reading data. */
-    private final ByteBuffer indexEntryBufferRead =
-            ByteBuffer.allocateDirect(PartitionedFile.INDEX_ENTRY_SIZE);
 
     /** Lock used to synchronize multi-thread access to thread-unsafe fields. */
     private final Object lock;
@@ -156,8 +144,6 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
         this.bufferPool = checkNotNull(bufferPool);
         this.ioExecutor = checkNotNull(ioExecutor);
         this.bufferRequestTimeout = checkNotNull(bufferRequestTimeout);
-        BufferReaderWriterUtil.configureByteBuffer(indexEntryBufferInit);
-        BufferReaderWriterUtil.configureByteBuffer(indexEntryBufferRead);
     }
 
     @Override
@@ -369,16 +355,8 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
             if (allReaders.isEmpty()) {
                 openFileChannels(resultFile);
             }
-            PartitionedFileReader partitionedFileReader =
-                    new PartitionedFileReader(
-                            resultFile,
-                            targetSubpartition,
-                            dataFileChannel,
-                            indexFileChannel,
-                            headerBuf,
-                            indexEntryBufferRead);
-            partitionedFileReader.initRegionIndex(indexEntryBufferInit);
-            return partitionedFileReader;
+            return new PartitionedFileReader(
+                    resultFile, targetSubpartition, dataFileChannel, indexFileChannel);
         } catch (Throwable throwable) {
             if (allReaders.isEmpty()) {
                 closeFileChannels();

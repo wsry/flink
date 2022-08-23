@@ -38,8 +38,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /** Reader which can read all data of the target subpartition from a {@link PartitionedFile}. */
 class PartitionedFileReader {
 
-    /** Used to read buffer headers from file channel. */
-    private final ByteBuffer headerBuf;
+    /** Used to read buffers from file channel. */
+    private final ByteBuffer headerBuf = BufferReaderWriterUtil.allocatedHeaderBuffer();
 
     /** Used to read index entry from index file. */
     private final ByteBuffer indexEntryBuf;
@@ -69,9 +69,8 @@ class PartitionedFileReader {
             PartitionedFile partitionedFile,
             int targetSubpartition,
             FileChannel dataFileChannel,
-            FileChannel indexFileChannel,
-            ByteBuffer headerBuffer,
-            ByteBuffer indexEntryBuffer) {
+            FileChannel indexFileChannel)
+            throws IOException {
         checkArgument(checkNotNull(dataFileChannel).isOpen(), "Data file channel must be opened.");
         checkArgument(
                 checkNotNull(indexFileChannel).isOpen(), "Index file channel must be opened.");
@@ -80,11 +79,13 @@ class PartitionedFileReader {
         this.targetSubpartition = targetSubpartition;
         this.dataFileChannel = dataFileChannel;
         this.indexFileChannel = indexFileChannel;
-        this.headerBuf = headerBuffer;
-        this.indexEntryBuf = indexEntryBuffer;
+
+        this.indexEntryBuf = ByteBuffer.allocateDirect(PartitionedFile.INDEX_ENTRY_SIZE);
+        BufferReaderWriterUtil.configureByteBuffer(indexEntryBuf);
+        moveToNextReadableRegion();
     }
 
-    private void moveToNextReadableRegion(ByteBuffer indexEntryBuf) throws IOException {
+    private void moveToNextReadableRegion() throws IOException {
         while (currentRegionRemainingBytes <= 0
                 && nextRegionToRead < partitionedFile.getNumRegions()) {
             partitionedFile.getIndexEntry(
@@ -164,12 +165,8 @@ class PartitionedFileReader {
     }
 
     boolean hasRemaining() throws IOException {
-        moveToNextReadableRegion(indexEntryBuf);
+        moveToNextReadableRegion();
         return currentRegionRemainingBytes > 0;
-    }
-
-    void initRegionIndex(ByteBuffer initIndexEntryBuffer) throws IOException {
-        moveToNextReadableRegion(initIndexEntryBuffer);
     }
 
     /** Gets read priority of this file reader. Smaller value indicates higher priority. */

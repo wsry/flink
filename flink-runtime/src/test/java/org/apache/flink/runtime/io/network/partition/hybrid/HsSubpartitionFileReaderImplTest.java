@@ -501,8 +501,7 @@ class HsSubpartitionFileReaderImplTest {
                 operations,
                 diskIndex,
                 MAX_BUFFERS_READ_AHEAD,
-                (ignore) -> {},
-                BufferReaderWriterUtil.allocatedHeaderBuffer());
+                (ignore) -> {});
     }
 
     private static FileChannel openFileChannel(Path path) throws IOException {

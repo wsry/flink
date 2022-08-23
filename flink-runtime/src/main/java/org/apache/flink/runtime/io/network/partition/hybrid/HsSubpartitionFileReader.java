@@ -22,7 +22,6 @@ import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.runtime.io.network.buffer.BufferRecycler;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Queue;
 import java.util.function.Consumer;
@@ -61,7 +60,6 @@ public interface HsSubpartitionFileReader extends Comparable<HsSubpartitionFileR
                 HsSubpartitionViewInternalOperations operation,
                 HsFileDataIndex dataIndex,
                 int maxBuffersReadAhead,
-                Consumer<HsSubpartitionFileReader> fileReaderReleaser,
-                ByteBuffer headerBuffer);
+                Consumer<HsSubpartitionFileReader> fileReaderReleaser);
     }
 }

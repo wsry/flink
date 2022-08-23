@@ -51,7 +51,7 @@ import static org.apache.flink.util.Preconditions.checkState;
  */
 public class HsSubpartitionFileReaderImpl implements HsSubpartitionFileReader {
 
-    private final ByteBuffer headerBuf;
+    private final ByteBuffer headerBuf = BufferReaderWriterUtil.allocatedHeaderBuffer();
 
     private final int subpartitionId;
 
@@ -75,12 +75,10 @@ public class HsSubpartitionFileReaderImpl implements HsSubpartitionFileReader {
             HsSubpartitionViewInternalOperations operations,
             HsFileDataIndex dataIndex,
             int maxBufferReadAhead,
-            Consumer<HsSubpartitionFileReader> fileReaderReleaser,
-            ByteBuffer headerBuf) {
+            Consumer<HsSubpartitionFileReader> fileReaderReleaser) {
         this.subpartitionId = subpartitionId;
         this.dataFileChannel = dataFileChannel;
         this.operations = operations;
-        this.headerBuf = headerBuf;
         this.bufferIndexManager = new BufferIndexManager(maxBufferReadAhead);
         this.cachedRegionManager = new CachedRegionManager(subpartitionId, dataIndex);
         this.fileReaderReleaser = fileReaderReleaser;
@@ -482,16 +480,14 @@ public class HsSubpartitionFileReaderImpl implements HsSubpartitionFileReader {
                 HsSubpartitionViewInternalOperations operation,
                 HsFileDataIndex dataIndex,
                 int maxBuffersReadAhead,
-                Consumer<HsSubpartitionFileReader> fileReaderReleaser,
-                ByteBuffer headerBuffer) {
+                Consumer<HsSubpartitionFileReader> fileReaderReleaser) {
             return new HsSubpartitionFileReaderImpl(
                     subpartitionId,
                     dataFileChannel,
                     operation,
                     dataIndex,
                     maxBuffersReadAhead,
-                    fileReaderReleaser,
-                    headerBuffer);
+                    fileReaderReleaser);
         }
     }
 }

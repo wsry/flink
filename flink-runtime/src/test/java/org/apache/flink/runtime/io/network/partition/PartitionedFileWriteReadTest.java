@@ -30,7 +30,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -110,12 +109,7 @@ class PartitionedFileWriteReadTest {
         for (int subpartition = 0; subpartition < numSubpartitions; ++subpartition) {
             PartitionedFileReader fileReader =
                     new PartitionedFileReader(
-                            partitionedFile,
-                            subpartition,
-                            dataFileChannel,
-                            indexFileChannel,
-                            BufferReaderWriterUtil.allocatedHeaderBuffer(),
-                            createAndConfigIndexEntryBuffer());
+                            partitionedFile, subpartition, dataFileChannel, indexFileChannel);
             while (fileReader.hasRemaining()) {
                 final int subIndex = subpartition;
                 fileReader.readCurrentRegion(
@@ -193,12 +187,7 @@ class PartitionedFileWriteReadTest {
         for (int subpartition = 0; subpartition < numSubpartitions; ++subpartition) {
             PartitionedFileReader fileReader =
                     new PartitionedFileReader(
-                            partitionedFile,
-                            subpartition,
-                            dataFileChannel,
-                            indexFileChannel,
-                            BufferReaderWriterUtil.allocatedHeaderBuffer(),
-                            createAndConfigIndexEntryBuffer());
+                            partitionedFile, subpartition, dataFileChannel, indexFileChannel);
             int bufferIndex = 0;
             while (fileReader.hasRemaining()) {
                 final int subIndex = subpartition;
@@ -291,12 +280,7 @@ class PartitionedFileWriteReadTest {
         FileChannel indexFileChannel = openFileChannel(partitionedFile.getIndexFilePath());
         PartitionedFileReader partitionedFileReader =
                 new PartitionedFileReader(
-                        partitionedFile,
-                        1,
-                        dataFileChannel,
-                        indexFileChannel,
-                        BufferReaderWriterUtil.allocatedHeaderBuffer(),
-                        createAndConfigIndexEntryBuffer());
+                        partitionedFile, targetSubpartition, dataFileChannel, indexFileChannel);
 
         partitionedFileReader.readCurrentRegion(
                 allocateBuffers(bufferSize),
@@ -328,11 +312,5 @@ class PartitionedFileWriteReadTest {
         PartitionedFileWriter partitionedFileWriter = createPartitionedFileWriter(1);
         partitionedFileWriter.finish();
         return partitionedFileWriter;
-    }
-
-    public static ByteBuffer createAndConfigIndexEntryBuffer() {
-        ByteBuffer indexEntryBuffer = ByteBuffer.allocateDirect(PartitionedFile.INDEX_ENTRY_SIZE);
-        BufferReaderWriterUtil.configureByteBuffer(indexEntryBuffer);
-        return indexEntryBuffer;
     }
 }

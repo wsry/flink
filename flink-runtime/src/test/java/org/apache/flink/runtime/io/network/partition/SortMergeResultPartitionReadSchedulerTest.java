@@ -45,7 +45,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 
-import static org.apache.flink.runtime.io.network.partition.PartitionedFileWriteReadTest.createAndConfigIndexEntryBuffer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -92,13 +91,7 @@ class SortMergeResultPartitionReadSchedulerTest {
         dataFileChannel = openFileChannel(partitionedFile.getDataFilePath());
         indexFileChannel = openFileChannel(partitionedFile.getIndexFilePath());
         fileReader =
-                new PartitionedFileReader(
-                        partitionedFile,
-                        0,
-                        dataFileChannel,
-                        indexFileChannel,
-                        BufferReaderWriterUtil.allocatedHeaderBuffer(),
-                        createAndConfigIndexEntryBuffer());
+                new PartitionedFileReader(partitionedFile, 0, dataFileChannel, indexFileChannel);
         bufferPool = new BatchShuffleReadBufferPool(totalBytes, bufferSize);
         executor = Executors.newFixedThreadPool(numThreads);
         readScheduler =

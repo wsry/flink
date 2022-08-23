@@ -36,7 +36,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -432,8 +431,7 @@ class HsFileDataManagerTest {
                     HsSubpartitionViewInternalOperations operation,
                     HsFileDataIndex dataIndex,
                     int maxBuffersReadAhead,
-                    Consumer<HsSubpartitionFileReader> fileReaderReleaser,
-                    ByteBuffer headerBuffer) {
+                    Consumer<HsSubpartitionFileReader> fileReaderReleaser) {
                 return checkNotNull(allReaders.poll());
             }
         }
