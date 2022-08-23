@@ -34,9 +34,7 @@ import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.io.network.api.EndOfData;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.api.StopMode;
-import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
 import org.apache.flink.runtime.io.network.partition.consumer.StreamTestSingleInputGate;
-import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.memory.MemoryManager;
@@ -52,8 +50,8 @@ import org.apache.flink.runtime.state.TestTaskStateManager;
 import org.apache.flink.runtime.taskmanager.TaskManagerRuntimeInfo;
 import org.apache.flink.runtime.util.TestingTaskManagerRuntimeInfo;
 import org.apache.flink.streaming.api.TimeCharacteristic;
-import org.apache.flink.streaming.api.graph.NonChainedOutput;
 import org.apache.flink.streaming.api.graph.StreamConfig;
+import org.apache.flink.streaming.api.graph.StreamEdge;
 import org.apache.flink.streaming.api.graph.StreamNode;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
@@ -239,26 +237,24 @@ public class StreamTaskTestHarness<OUT> {
                     private static final long serialVersionUID = 1L;
                 };
 
-        List<NonChainedOutput> streamOutputs = new LinkedList<>();
+        List<StreamEdge> outEdgesInOrder = new LinkedList<>();
         StreamNode sourceVertexDummy =
                 new StreamNode(
                         0, "group", null, dummyOperator, "source dummy", SourceStreamTask.class);
+        StreamNode targetVertexDummy =
+                new StreamNode(
+                        1, "group", null, dummyOperator, "target dummy", SourceStreamTask.class);
 
-        streamOutputs.add(
-                new NonChainedOutput(
-                        true,
-                        sourceVertexDummy.getId(),
-                        1,
-                        1,
-                        100,
-                        false,
-                        new IntermediateDataSetID(),
-                        null,
+        outEdgesInOrder.add(
+                new StreamEdge(
+                        sourceVertexDummy,
+                        targetVertexDummy,
+                        0,
                         new BroadcastPartitioner<>(),
-                        ResultPartitionType.PIPELINED_BOUNDED));
+                        null /* output tag */));
 
-        streamConfig.setVertexNonChainedOutputs(streamOutputs);
-        streamConfig.setOperatorNonChainedOutputs(streamOutputs);
+        streamConfig.setOutEdgesInOrder(outEdgesInOrder);
+        streamConfig.setNonChainedOutputs(outEdgesInOrder);
         streamConfig.serializeAllConfigs();
     }
 

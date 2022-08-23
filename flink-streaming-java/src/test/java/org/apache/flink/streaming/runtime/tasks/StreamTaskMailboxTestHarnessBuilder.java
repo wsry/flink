@@ -27,10 +27,8 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.io.network.api.writer.ResultPartitionWriter;
-import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
 import org.apache.flink.runtime.io.network.partition.consumer.SingleInputGateBuilder;
 import org.apache.flink.runtime.io.network.partition.consumer.StreamTestSingleInputGate;
-import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.metrics.groups.TaskMetricGroup;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
@@ -45,7 +43,6 @@ import org.apache.flink.runtime.taskmanager.TestCheckpointResponder;
 import org.apache.flink.runtime.throughput.BufferDebloatConfiguration;
 import org.apache.flink.runtime.util.TestingTaskManagerRuntimeInfo;
 import org.apache.flink.streaming.api.TimeCharacteristic;
-import org.apache.flink.streaming.api.graph.NonChainedOutput;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamConfig.InputConfig;
 import org.apache.flink.streaming.api.graph.StreamConfig.NetworkInputConfig;
@@ -343,7 +340,7 @@ public class StreamTaskMailboxTestHarnessBuilder<OUT> {
                         ? StreamConfigChainer.MAIN_NODE_ID
                         : Collections.max(transitiveChainedTaskConfigs.keySet());
 
-        List<StreamEdge> chainedOutputs = new LinkedList<>();
+        List<StreamEdge> outEdgesInOrder = new LinkedList<>();
 
         StreamEdge sourceToMainEdge =
                 new StreamEdge(
@@ -358,26 +355,12 @@ public class StreamTaskMailboxTestHarnessBuilder<OUT> {
                         0,
                         new ForwardPartitioner<>(),
                         null);
-        chainedOutputs.add(sourceToMainEdge);
-
-        List<NonChainedOutput> streamOutputsInOrder = new LinkedList<>();
-        streamOutputsInOrder.add(
-                new NonChainedOutput(
-                        true,
-                        sourceToMainEdge.getSourceId(),
-                        1,
-                        1,
-                        100,
-                        false,
-                        new IntermediateDataSetID(),
-                        null,
-                        new ForwardPartitioner<>(),
-                        ResultPartitionType.PIPELINED_BOUNDED));
+        outEdgesInOrder.add(sourceToMainEdge);
 
         StreamConfig sourceConfig = new StreamConfig(new Configuration());
         sourceConfig.setTimeCharacteristic(streamConfig.getTimeCharacteristic());
-        sourceConfig.setVertexNonChainedOutputs(streamOutputsInOrder);
-        sourceConfig.setChainedOutputs(chainedOutputs);
+        sourceConfig.setOutEdgesInOrder(outEdgesInOrder);
+        sourceConfig.setChainedOutputs(outEdgesInOrder);
         sourceConfig.setTypeSerializerOut(sourceInput.getSourceSerializer());
         sourceConfig.setOperatorID(sourceInput.getOperatorId());
         sourceConfig.setStreamOperatorFactory(sourceInput.getSourceOperatorFactory());

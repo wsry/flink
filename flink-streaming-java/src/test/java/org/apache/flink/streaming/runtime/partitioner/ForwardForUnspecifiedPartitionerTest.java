@@ -19,45 +19,46 @@ package org.apache.flink.streaming.runtime.partitioner;
 
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobVertex;
-import org.apache.flink.streaming.api.graph.NonChainedOutput;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamEdge;
 import org.apache.flink.util.TestLogger;
 
-import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.util.List;
 
+import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+
 /** Test for {@link ForwardForUnspecifiedPartitioner}. */
-class ForwardForUnspecifiedPartitionerTest extends TestLogger {
+public class ForwardForUnspecifiedPartitionerTest extends TestLogger {
 
     @Test
-    void testConvertToForwardPartitioner() {
+    public void testConvertToForwardPartitioner() {
         JobGraph jobGraph =
                 StreamPartitionerTestUtils.createJobGraph(
                         "group1", "group1", new ForwardForUnspecifiedPartitioner<>());
         List<JobVertex> jobVertices = jobGraph.getVerticesSortedTopologicallyFromSources();
-        Assertions.assertThat(jobVertices.size()).isEqualTo(1);
+        assertThat(jobVertices.size(), is(1));
         JobVertex vertex = jobGraph.getVerticesSortedTopologicallyFromSources().get(0);
 
         StreamConfig sourceConfig = new StreamConfig(vertex.getConfiguration());
         StreamEdge edge = sourceConfig.getChainedOutputs(getClass().getClassLoader()).get(0);
-        Assertions.assertThat(edge.getPartitioner()).isInstanceOf(ForwardPartitioner.class);
+        assertThat(edge.getPartitioner(), instanceOf(ForwardPartitioner.class));
     }
 
     @Test
-    void testConvertToRescalePartitioner() {
+    public void testConvertToRescalePartitioner() {
         JobGraph jobGraph =
                 StreamPartitionerTestUtils.createJobGraph(
                         "group1", "group2", new ForwardForUnspecifiedPartitioner<>());
         List<JobVertex> jobVertices = jobGraph.getVerticesSortedTopologicallyFromSources();
-        Assertions.assertThat(jobVertices.size()).isEqualTo(2);
+        assertThat(jobVertices.size(), is(2));
         JobVertex sourceVertex = jobGraph.getVerticesSortedTopologicallyFromSources().get(0);
 
         StreamConfig sourceConfig = new StreamConfig(sourceVertex.getConfiguration());
-        NonChainedOutput output =
-                sourceConfig.getOperatorNonChainedOutputs(getClass().getClassLoader()).get(0);
-        Assertions.assertThat(output.getPartitioner()).isInstanceOf(RescalePartitioner.class);
+        StreamEdge edge = sourceConfig.getNonChainedOutputs(getClass().getClassLoader()).get(0);
+        assertThat(edge.getPartitioner(), instanceOf(RescalePartitioner.class));
     }
 }
