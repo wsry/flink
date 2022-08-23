@@ -34,7 +34,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
@@ -82,10 +81,12 @@ public class DataBufferTest {
 
         // fill the sort buffer with randomly generated data
         int totalBytesWritten = 0;
-        int[] subpartitionReadOrder = getRandomSubpartitionOrder(numSubpartitions);
         DataBuffer dataBuffer =
                 createDataBuffer(
-                        bufferPoolSize, bufferSize, numSubpartitions, subpartitionReadOrder);
+                        bufferPoolSize,
+                        bufferSize,
+                        numSubpartitions,
+                        getRandomSubpartitionOrder(numSubpartitions));
         int numDataBuffers = 5;
         while (numDataBuffers > 0) {
             // record size may be larger than buffer size so a record may span multiple segments
@@ -111,34 +112,31 @@ public class DataBufferTest {
                 totalBytesWritten += record.remaining();
             }
 
-            if (!isFull) {
-                continue;
-            }
-            dataBuffer.finish();
-            --numDataBuffers;
-
-            while (dataBuffer.hasRemaining()) {
+            while (isFull && dataBuffer.hasRemaining()) {
                 BufferWithChannel buffer = copyIntoSegment(bufferSize, dataBuffer);
                 if (buffer == null) {
                     break;
                 }
                 addBufferRead(buffer, buffersRead, numBytesRead);
             }
-            dataBuffer =
-                    createDataBuffer(
-                            bufferPoolSize, bufferSize, numSubpartitions, subpartitionReadOrder);
+
+            if (isFull) {
+                --numDataBuffers;
+                dataBuffer.reset();
+            }
         }
 
         // read all data from the sort buffer
         if (dataBuffer.hasRemaining()) {
             assertTrue(dataBuffer instanceof HashBasedDataBuffer);
+            dataBuffer.reset();
             dataBuffer.finish();
             while (dataBuffer.hasRemaining()) {
                 addBufferRead(copyIntoSegment(bufferSize, dataBuffer), buffersRead, numBytesRead);
             }
         }
 
-        assertEquals(0, dataBuffer.numTotalBytes());
+        assertEquals(totalBytesWritten, dataBuffer.numTotalBytes());
         checkWriteReadResult(
                 numSubpartitions, numBytesWritten, numBytesRead, dataWritten, buffersRead);
     }
@@ -302,7 +300,7 @@ public class DataBufferTest {
 
         // append should fail for insufficient capacity
         int numRecords = bufferPoolSize - 1;
-        long numBytes = bufferSize * numRecords;
+        long numBytes = useHashBuffer ? bufferSize * bufferPoolSize : bufferSize * numRecords;
         appendAndCheckResult(dataBuffer, bufferSize + 1, true, numBytes, numRecords, true);
     }
 
@@ -312,7 +310,9 @@ public class DataBufferTest {
         int bufferSize = 1024;
 
         DataBuffer dataBuffer = createDataBuffer(bufferPoolSize, bufferSize, 1);
-        appendAndCheckResult(dataBuffer, bufferPoolSize * bufferSize + 1, true, 0, 0, false);
+        long numBytes = useHashBuffer ? bufferPoolSize * bufferSize : 0;
+        appendAndCheckResult(
+                dataBuffer, bufferPoolSize * bufferSize + 1, true, numBytes, 0, useHashBuffer);
     }
 
     private void appendAndCheckResult(
@@ -378,12 +378,8 @@ public class DataBufferTest {
         NetworkBufferPool globalPool = new NetworkBufferPool(bufferPoolSize, bufferSize);
         BufferPool bufferPool = globalPool.createBufferPool(bufferPoolSize, bufferPoolSize);
 
-        LinkedList<MemorySegment> segments = new LinkedList<>();
-        for (int i = 0; i < bufferPoolSize; ++i) {
-            segments.add(bufferPool.requestMemorySegmentBlocking());
-        }
         DataBuffer dataBuffer =
-                new SortBasedDataBuffer(segments, bufferPool, 1, bufferSize, bufferPoolSize, null);
+                new SortBasedDataBuffer(bufferPool, 1, bufferSize, bufferPoolSize, null);
         dataBuffer.append(ByteBuffer.allocate(recordSize), 0, Buffer.DataType.DATA_BUFFER);
 
         assertEquals(bufferPoolSize, bufferPool.bestEffortGetNumOfUsedBuffers());
@@ -400,36 +396,22 @@ public class DataBufferTest {
     }
 
     private DataBuffer createDataBuffer(int bufferPoolSize, int bufferSize, int numSubpartitions)
-            throws Exception {
+            throws IOException {
         return createDataBuffer(bufferPoolSize, bufferSize, numSubpartitions, null);
     }
 
     private DataBuffer createDataBuffer(
             int bufferPoolSize, int bufferSize, int numSubpartitions, int[] customReadOrder)
-            throws Exception {
+            throws IOException {
         NetworkBufferPool globalPool = new NetworkBufferPool(bufferPoolSize, bufferSize);
         BufferPool bufferPool = globalPool.createBufferPool(bufferPoolSize, bufferPoolSize);
 
-        LinkedList<MemorySegment> segments = new LinkedList<>();
-        for (int i = 0; i < bufferPoolSize; ++i) {
-            segments.add(bufferPool.requestMemorySegmentBlocking());
-        }
         if (useHashBuffer) {
             return new HashBasedDataBuffer(
-                    segments,
-                    bufferPool,
-                    numSubpartitions,
-                    bufferSize,
-                    bufferPoolSize,
-                    customReadOrder);
+                    bufferPool, numSubpartitions, bufferPoolSize, customReadOrder);
         } else {
             return new SortBasedDataBuffer(
-                    segments,
-                    bufferPool,
-                    numSubpartitions,
-                    bufferSize,
-                    bufferPoolSize,
-                    customReadOrder);
+                    bufferPool, numSubpartitions, bufferSize, bufferPoolSize, customReadOrder);
         }
     }
 
