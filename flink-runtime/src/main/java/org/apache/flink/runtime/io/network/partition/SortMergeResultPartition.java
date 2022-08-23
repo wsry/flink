@@ -520,10 +520,24 @@ public class SortMergeResultPartition extends ResultPartition {
     }
 
     @Override
-    public void flushAll() {}
+    public void flushAll() {
+        try {
+            flushUnicastDataBuffer();
+            flushBroadcastDataBuffer();
+        } catch (IOException e) {
+            LOG.error("Failed to flush the current sort buffer.", e);
+        }
+    }
 
     @Override
-    public void flush(int subpartitionIndex) {}
+    public void flush(int subpartitionIndex) {
+        try {
+            flushUnicastDataBuffer();
+            flushBroadcastDataBuffer();
+        } catch (IOException e) {
+            LOG.error("Failed to flush the current sort buffer.", e);
+        }
+    }
 
     @Override
     public CompletableFuture<?> getAvailableFuture() {
