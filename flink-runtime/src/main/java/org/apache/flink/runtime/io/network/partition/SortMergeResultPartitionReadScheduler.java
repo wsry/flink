@@ -171,39 +171,28 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
             removeFinishedAndFailedReaders(0, finishedReaders);
             return;
         }
-        checkState(!buffers.isEmpty(), "No buffer available.");
         int numBuffersAllocated = buffers.size();
 
-        ArrayList<SortMergeSubpartitionReader> unfinishedReaders = new ArrayList<>();
-        SortMergeSubpartitionReader subpartitionReader = getNextReader();
-        while (subpartitionReader != null) {
+        SortMergeSubpartitionReader subpartitionReader = addPreviousAndGetNextReader(null, true);
+        while (subpartitionReader != null && !buffers.isEmpty()) {
             try {
                 if (!subpartitionReader.readBuffers(buffers, this)) {
                     // there is no resource to release for finished readers currently
                     finishedReaders.add(subpartitionReader);
-                } else {
-                    unfinishedReaders.add(subpartitionReader);
+                    subpartitionReader = null;
                 }
             } catch (Throwable throwable) {
                 failSubpartitionReaders(Collections.singletonList(subpartitionReader), throwable);
+                subpartitionReader = null;
                 LOG.debug("Failed to read shuffle data.", throwable);
             }
-
-            if (buffers.isEmpty()) {
-                break;
-            }
-
-            subpartitionReader = getNextReader();
-            if (subpartitionReader == null && !unfinishedReaders.isEmpty()) {
-                returnUnfinishedReaders(unfinishedReaders);
-                subpartitionReader = getNextReader();
-            }
+            subpartitionReader =
+                    addPreviousAndGetNextReader(subpartitionReader, !buffers.isEmpty());
         }
 
         int numBuffersRead = numBuffersAllocated - buffers.size();
         releaseBuffers(buffers);
 
-        returnUnfinishedReaders(unfinishedReaders);
         removeFinishedAndFailedReaders(numBuffersRead, finishedReaders);
     }
 
@@ -307,22 +296,20 @@ class SortMergeResultPartitionReadScheduler implements Runnable, BufferRecycler 
     }
 
     @Nullable
-    private SortMergeSubpartitionReader getNextReader() {
+    private SortMergeSubpartitionReader addPreviousAndGetNextReader(
+            SortMergeSubpartitionReader previousReader, boolean pollNext) {
         synchronized (lock) {
+            if (previousReader != null) {
+                sortedReaders.add(previousReader);
+            }
+            if (!pollNext) {
+                return null;
+            }
             SortMergeSubpartitionReader subpartitionReader = sortedReaders.poll();
             while (subpartitionReader != null && failedReaders.contains(subpartitionReader)) {
                 subpartitionReader = sortedReaders.poll();
             }
             return subpartitionReader;
-        }
-    }
-
-    private void returnUnfinishedReaders(ArrayList<SortMergeSubpartitionReader> readers) {
-        if (readers != null && !readers.isEmpty()) {
-            synchronized (lock) {
-                sortedReaders.addAll(readers);
-                readers.clear();
-            }
         }
     }
 
