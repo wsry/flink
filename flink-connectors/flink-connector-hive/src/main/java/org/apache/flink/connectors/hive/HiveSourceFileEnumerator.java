@@ -106,8 +106,12 @@ public class HiveSourceFileEnumerator implements FileEnumerator {
         // works for orc format
         for (HiveTablePartition partition : partitions) {
             String serializationLib =
-                    partition.getStorageDescriptor().getSerdeInfo().getSerializationLib();
-            if (!"orc".equalsIgnoreCase(serializationLib)) {
+                    partition
+                            .getStorageDescriptor()
+                            .getSerdeInfo()
+                            .getSerializationLib()
+                            .toLowerCase();
+            if (!serializationLib.contains("orc")) {
                 return false;
             }
         }
