@@ -57,8 +57,6 @@ public class PipelinedRegionSchedulingStrategy implements SchedulingStrategy {
     private final Set<ConsumedPartitionGroup> crossRegionConsumedPartitionGroups =
             Collections.newSetFromMap(new IdentityHashMap<>());
 
-    private final Set<SchedulingPipelinedRegion> scheduledRegions = new HashSet<>();
-
     public PipelinedRegionSchedulingStrategy(
             final SchedulerOperations schedulerOperations,
             final SchedulingTopology schedulingTopology) {
@@ -165,7 +163,6 @@ public class PipelinedRegionSchedulingStrategy implements SchedulingStrategy {
                 verticesToRestart.stream()
                         .map(schedulingTopology::getPipelinedRegionOfVertex)
                         .collect(Collectors.toSet());
-        scheduledRegions.removeAll(regionsToRestart);
         maybeScheduleRegions(regionsToRestart);
     }
 
@@ -219,8 +216,7 @@ public class PipelinedRegionSchedulingStrategy implements SchedulingStrategy {
     private void maybeScheduleRegion(
             final SchedulingPipelinedRegion region,
             final Map<ConsumedPartitionGroup, Boolean> consumableStatusCache) {
-        if (scheduledRegions.contains(region)
-                || !areRegionInputsAllConsumable(region, consumableStatusCache)) {
+        if (!areRegionInputsAllConsumable(region, consumableStatusCache)) {
             return;
         }
 
@@ -229,7 +225,6 @@ public class PipelinedRegionSchedulingStrategy implements SchedulingStrategy {
                 "BUG: trying to schedule a region which is not in CREATED state");
 
         schedulerOperations.allocateSlotsAndDeploy(regionVerticesSorted.get(region));
-        scheduledRegions.add(region);
     }
 
     private boolean areRegionInputsAllConsumable(
