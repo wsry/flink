@@ -82,7 +82,7 @@ public class TestingSchedulingPipelinedRegion implements SchedulingPipelinedRegi
     }
 
     @Override
-    public Iterable<ConsumedPartitionGroup> getAllNonPipelinedConsumedPartitionGroups() {
+    public Iterable<ConsumedPartitionGroup> getAllBlockingConsumedPartitionGroups() {
         return Collections.unmodifiableSet(blockingConsumedPartitionGroups);
     }
 
