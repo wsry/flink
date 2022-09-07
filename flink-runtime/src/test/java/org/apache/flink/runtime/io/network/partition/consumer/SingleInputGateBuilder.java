@@ -112,7 +112,14 @@ public class SingleInputGateBuilder {
         NettyShuffleEnvironmentConfiguration config = environment.getConfiguration();
         this.bufferPoolFactory =
                 SingleInputGateFactory.createBufferPoolFactory(
-                        environment.getNetworkBufferPool(), config.floatingNetworkBuffersPerGate());
+                        environment.getNetworkBufferPool(),
+                        config.floatingNetworkBuffersPerGate(),
+                        partitionType,
+                        numberOfChannels
+                                * (1
+                                        + subpartitionIndexRange.getEndIndex()
+                                        - subpartitionIndexRange.getStartIndex()),
+                        config.networkBuffersPerChannel());
         this.segmentProvider = environment.getNetworkBufferPool();
         return this;
     }

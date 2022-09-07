@@ -227,4 +227,8 @@ public enum ResultPartitionType {
     public boolean isReconsumable() {
         return isReconsumable;
     }
+
+    public boolean isBlocking() {
+        return this == BLOCKING || this == BLOCKING_PERSISTENT;
+    }
 }
