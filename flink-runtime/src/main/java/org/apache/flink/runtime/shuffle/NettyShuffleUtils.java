@@ -53,6 +53,19 @@ public class NettyShuffleUtils {
         return Pair.of(1, numFloatingBuffersPerGate);
     }
 
+    public static Pair<Integer, Integer> getMinMaxFloatingBuffersPerInputGate(
+            final int numFloatingBuffersPerGate,
+            ResultPartitionType partitionType,
+            int numInputChannels,
+            int configuredBuffersPerChannel) {
+        // We should guarantee at-least one floating buffer for local channel state recovery.
+        return Pair.of(
+                1,
+                partitionType.isBlocking()
+                        ? numInputChannels * configuredBuffersPerChannel + numFloatingBuffersPerGate
+                        : numFloatingBuffersPerGate);
+    }
+
     /**
      * Calculates and returns local network buffer pool size used by the result partition. The
      * left/right value of the returned pair represent the min/max buffers require by the pool.

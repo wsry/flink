@@ -166,6 +166,8 @@ public class SsgNetworkMemoryCalculationUtils {
 
     private static Map<IntermediateDataSetID, ResultPartitionType> getPartitionTypes(JobVertex jv) {
         Map<IntermediateDataSetID, ResultPartitionType> ret = new HashMap<>();
+        //        jv.getInputs().forEach(jobEdge -> ret.put(jobEdge.getSourceId(),
+        // jobEdge.getSource().getResultType()));
         jv.getProducedDataSets().forEach(ds -> ret.putIfAbsent(ds.getId(), ds.getResultType()));
         return ret;
     }
