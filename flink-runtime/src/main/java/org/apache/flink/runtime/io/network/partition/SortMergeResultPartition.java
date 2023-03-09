@@ -186,6 +186,18 @@ public class SortMergeResultPartition extends ResultPartition {
             }
         }
 
+        // reserve the "guaranteed" buffers for this buffer pool to avoid the case that those
+        // buffers are taken by other result partitions and can not be released, which may cause
+        // deadlock
+        try {
+            for (int i = 0; i < bufferPool.getNumberOfRequiredMemorySegments(); ++i) {
+                freeSegments.add(checkNotNull(bufferPool.requestMemorySegmentBlocking()));
+            }
+        } catch (Throwable throwable) {
+            freeSegments.forEach(bufferPool::recycle);
+            throw new IOException("Failed to reserve required buffers.", throwable);
+        }
+
         // initialize the buffer pool eagerly to avoid reporting errors such as OOM too late
         readBufferPool.initialize();
         LOG.info("Sort-merge partition {} initialized.", getPartitionId());
